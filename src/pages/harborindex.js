@@ -12,7 +12,7 @@ import fastifyWebsocket from '@fastify/websocket';
 dotenv.config();
 
 // Retrieve the OpenAI API key from environment variables.
-const OPENAI_API_KEY  = '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';
+const OPENAI_API_KEY  = '';
 
 if (!OPENAI_API_KEY) {
     console.error('Missing OpenAI API key. Please set it in the .env file.');
