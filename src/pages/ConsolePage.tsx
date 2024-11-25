@@ -34,14 +34,7 @@ interface Coordinates {
   lat: number;
   lng: number;
   location?: string;
-  temperature?: {
-    value: number;
-    units: string;
-  };
-  wind_speed?: {
-    value: number;
-    units: string;
-  };
+  allows_children?: string;
 }
 
 /**
@@ -184,7 +177,8 @@ export function ConsolePage() {
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Hello!`,
+        text: `Hello! I am an AI assistant trained to help you and your information is protected.How can I help you?`,
+        //text: `Hello!`,
         // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
       },
     ]);
@@ -375,6 +369,14 @@ export function ConsolePage() {
     // Get refs
     const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
+    const shelters = [
+      { id: 1, name: 'La Casa de las Madres',lat: 37.7610277, lng: -122.4690144, location: 'San Francisco', allows_children: true },
+      { id: 2, name: 'Asian Womens Shelter', lat: 37.7614492, lng: -122.4227025, location: 'San Francisco',  allows_children: false },
+      { id: 3, name: 'Riley Center, St Vincent de Paul', lat: 37.7766628, lng: -122.4107561, location: 'San Francisco', allows_children: true },
+      { id: 4, name: 'A Womans Place', lat: 37.7785507, lng: -123.4629249, location: 'San Francisco', allows_children: false },
+  
+    ];
+    const urls=['https://www.thehotline.org/','https://www.womensv.org/'];
 
     // Set instructions
     client.updateSession({ instructions: instructions });
@@ -413,48 +415,79 @@ export function ConsolePage() {
     );
     client.addTool(
       {
-        name: 'get_weather',
+        name: 'get_list_of_shelters',
         description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
+          'Retrieves the list of shelters by location for the user.',
         parameters: {
           type: 'object',
           properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
             location: {
               type: 'string',
               description: 'Name of the location',
             },
+            allows_children: {
+              type: 'string',
+              description: 'Does the location allow children?',
+            },
           },
-          required: ['lat', 'lng', 'location'],
+          required: ['location', 'allows_children'],
         },
       },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
+      async ({location, allows_children }: { [key: string]: any }) => {
+        // Use shelters variable initialized outside of this code
+        const filteredShelters = Object.entries(shelters).filter(([
+        , { location: location, allows_children: shelterAllowsChildren }
+        ]) => {
+        return allows_children == null || shelterAllowsChildren === allows_children;
+        });
+    
+        if (filteredShelters.length > 0) {
+          const [, { lat: shelterLat, lng: shelterLng }] = filteredShelters[0];
+          setMarker({ lat: shelterLat, lng: shelterLng, location });
+          setCoords({ lat: shelterLat, lng: shelterLng, location });
+        }
+    
+        return filteredShelters;
       }
     );
-
+    client.addTool(
+      {
+        name: 'fetch_resources_from_urls',
+        description:
+          'Fetches resources from multiple URLs and returns their content.',
+        parameters: {
+          type: 'object',
+          properties: {
+            urls: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'List of URLs to fetch resources from',
+            },
+          },
+          required: ['urls'],
+        },
+      },
+      async ({ urls }: { [key: string]: any }) => {
+        const fetchPromises = urls.map(async (url: string) => {
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+            }
+            const data = await response.text();
+            return { url, data };
+          } catch (error) {
+            return { url, error: error instanceof Error ? error.message : 'Unknown error' };
+          }
+        });
+    
+        const results = await Promise.all(fetchPromises);
+        return results;
+      }
+    );
+    
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
       setRealtimeEvents((realtimeEvents) => {
@@ -508,7 +541,7 @@ export function ConsolePage() {
       <div className="content-top">
         <div className="content-title">
           <img src="/openai-logomark.svg" />
-          <span>realtime console</span>
+          <span>Harbor - Realtime Domestic Violence Support Agent</span>
         </div>
         <div className="content-api-key">
           {!LOCAL_RELAY_SERVER_URL && (
@@ -693,21 +726,9 @@ export function ConsolePage() {
         </div>
         <div className="content-right">
           <div className="content-block map">
-            <div className="content-block-title">get_weather()</div>
+            <div className="content-block-title">get_list_of_shelters()</div>
             <div className="content-block-title bottom">
               {marker?.location || 'not yet retrieved'}
-              {!!marker?.temperature && (
-                <>
-                  <br />
-                  🌡️ {marker.temperature.value} {marker.temperature.units}
-                </>
-              )}
-              {!!marker?.wind_speed && (
-                <>
-                  {' '}
-                  🍃 {marker.wind_speed.value} {marker.wind_speed.units}
-                </>
-              )}
             </div>
             <div className="content-block-body full">
               {coords && (
@@ -716,12 +737,6 @@ export function ConsolePage() {
                   location={coords.location}
                 />
               )}
-            </div>
-          </div>
-          <div className="content-block kv">
-            <div className="content-block-title">set_memory()</div>
-            <div className="content-block-body content-kv">
-              {JSON.stringify(memoryKv, null, 2)}
             </div>
           </div>
         </div>
