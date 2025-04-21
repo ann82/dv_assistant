@@ -21,7 +21,6 @@ import { WavRenderer } from '../utils/wav_renderer';
 
 import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
 import { Button } from '../components/button/Button';
-import { Toggle } from '../components/toggle/Toggle';
 import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
@@ -109,8 +108,9 @@ export function ConsolePage() {
     [key: string]: boolean;
   }>({});
   const [isConnected, setIsConnected] = useState(false);
-  const [canPushToTalk, setCanPushToTalk] = useState(true);
+  const [canPushToTalk, setCanPushToTalk] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [vadState, setVadState] = useState<'listening' | 'processing' | 'error' | null>(null);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
   const [coords, setCoords] = useState<Coordinates | null>({
     lat: 37.775593,
@@ -160,31 +160,42 @@ export function ConsolePage() {
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
 
-    // Set state variables
-    startTimeRef.current = new Date().toISOString();
-    setIsConnected(true);
-    setRealtimeEvents([]);
-    setItems(client.conversation.getItems());
+    try {
+      // Set state variables
+      startTimeRef.current = new Date().toISOString();
+      setIsConnected(true);
+      setRealtimeEvents([]);
+      setItems(client.conversation.getItems());
+      setVadState('listening'); // Set initial VAD state
 
-    // Connect to microphone
-    await wavRecorder.begin();
+      // Connect to microphone
+      await wavRecorder.begin();
 
-    // Connect to audio output
-    await wavStreamPlayer.connect();
+      // Connect to audio output
+      await wavStreamPlayer.connect();
 
-    // Connect to realtime API
-    await client.connect();
-    client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: `Hello! I am an AI assistant trained to help you and your information is protected.How can I help you?`,
-        //text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-      },
-    ]);
+      // Connect to realtime API
+      await client.connect();
+      
+      // Set VAD mode explicitly
+      client.updateSession({ turn_detection: { type: 'server_vad' } });
+      
+      // Start VAD recording immediately
+      await wavRecorder.record((data) => {
+        client.appendInputAudio(data.mono);
+        setVadState('processing'); // Update state when processing audio
+      });
 
-    if (client.getTurnDetectionType() === 'server_vad') {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Hello! I am an AI assistant trained to help you and your information is protected. How can I help you?`,
+        },
+      ]);
+    } catch (error) {
+      console.error('Error during connection:', error);
+      setVadState('error');
+      // Handle connection errors appropriately
     }
   }, []);
 
@@ -216,52 +227,6 @@ export function ConsolePage() {
     const client = clientRef.current;
     client.deleteItem(id);
   }, []);
-
-  /**
-   * In push-to-talk mode, start recording
-   * .appendInputAudio() for each sample
-   */
-  const startRecording = async () => {
-    setIsRecording(true);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    const trackSampleOffset = await wavStreamPlayer.interrupt();
-    if (trackSampleOffset?.trackId) {
-      const { trackId, offset } = trackSampleOffset;
-      await client.cancelResponse(trackId, offset);
-    }
-    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  };
-
-  /**
-   * In push-to-talk mode, stop recording
-   */
-  const stopRecording = async () => {
-    setIsRecording(false);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.pause();
-    client.createResponse();
-  };
-
-  /**
-   * Switch between Manual <> VAD mode for communication
-   */
-  const changeTurnEndType = async (value: string) => {
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    if (value === 'none' && wavRecorder.getStatus() === 'recording') {
-      await wavRecorder.pause();
-    }
-    client.updateSession({
-      turn_detection: value === 'none' ? null : { type: 'server_vad' },
-    });
-    if (value === 'server_vad' && client.isConnected()) {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
-    setCanPushToTalk(value === 'none');
-  };
 
   /**
    * Auto-scroll the event logs
@@ -527,6 +492,9 @@ export function ConsolePage() {
 
     setItems(client.conversation.getItems());
 
+    // Set initial turn detection mode to VAD
+    client.updateSession({ turn_detection: { type: 'server_vad' } });
+
     return () => {
       // cleanup; resets to defaults
       client.reset();
@@ -557,6 +525,14 @@ export function ConsolePage() {
       </div>
       <div className="content-main">
         <div className="content-logs">
+          {/* Add VAD status indicator */}
+          {isConnected && (
+            <div className={`vad-status ${vadState}`}>
+              {vadState === 'listening' && 'Listening for voice...'}
+              {vadState === 'processing' && 'Processing voice...'}
+              {vadState === 'error' && 'Error: Please check microphone access'}
+            </div>
+          )}
           <div className="content-block events">
             <div className="visualization">
               <div className="visualization-entry client">
@@ -696,22 +672,6 @@ export function ConsolePage() {
             </div>
           </div>
           <div className="content-actions">
-            <Toggle
-              defaultValue={false}
-              labels={['manual', 'vad']}
-              values={['none', 'server_vad']}
-              onChange={(_, value) => changeTurnEndType(value)}
-            />
-            <div className="spacer" />
-            {isConnected && canPushToTalk && (
-              <Button
-                label={isRecording ? 'release to send' : 'push to talk'}
-                buttonStyle={isRecording ? 'alert' : 'regular'}
-                disabled={!isConnected || !canPushToTalk}
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-              />
-            )}
             <div className="spacer" />
             <Button
               label={isConnected ? 'disconnect' : 'connect'}
