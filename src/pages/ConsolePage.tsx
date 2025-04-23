@@ -11,6 +11,9 @@
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
+// Add Tavily API key from environment
+const TAVILY_API_KEY = process.env.REACT_APP_TAVILY_API_KEY || '';
+
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
@@ -45,6 +48,97 @@ interface RealtimeEvent {
   count?: number;
   event: { [key: string]: any };
 }
+
+// Add interface for shelter search results
+interface ShelterSearchResult {
+  name: string;
+  address: string;
+  phone: string;
+  description: string;
+  distance?: string;
+  services?: string[];
+}
+
+// Add interface for location
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+  city?: string;
+  state?: string;
+  country?: string;
+}
+
+// Add interface for cache entry
+interface ShelterCacheEntry {
+  results: ShelterSearchResult[];
+  timestamp: number;
+  location: string;
+  services?: string[];
+}
+
+// Add cache implementation
+const SHELTER_CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+class ShelterCache {
+  private cache: { [key: string]: ShelterCacheEntry } = {};
+
+  private getKey(location: string, services?: string[]): string {
+    return `${location}:${services?.sort().join(',') || ''}`;
+  }
+
+  private isEntryValid(entry: ShelterCacheEntry): boolean {
+    return Date.now() - entry.timestamp < SHELTER_CACHE_EXPIRY;
+  }
+
+  get(location: string, services?: string[]): ShelterSearchResult[] | null {
+    const key = this.getKey(location, services);
+    const entry = this.cache[key];
+    if (entry && this.isEntryValid(entry)) {
+      console.log('📦 Using cached results for:', location);
+      return entry.results;
+    }
+    return null;
+  }
+
+  set(location: string, results: ShelterSearchResult[], services?: string[]): void {
+    const key = this.getKey(location, services);
+    this.cache[key] = {
+      results,
+      timestamp: Date.now(),
+      location,
+      services
+    };
+    console.log('📦 Cached results for:', location);
+  }
+
+  // Add method to clear expired entries
+  clearExpired(): void {
+    const now = Date.now();
+    Object.keys(this.cache).forEach(key => {
+      if (now - this.cache[key].timestamp >= SHELTER_CACHE_EXPIRY) {
+        delete this.cache[key];
+        console.log('🗑️ Cleared expired cache entry for:', this.cache[key].location);
+      }
+    });
+  }
+}
+
+// Initialize cache
+const shelterCache = new ShelterCache();
+
+// Add cache helper functions with explicit return types
+const getCachedResults = (location: string, services?: string[]): ShelterSearchResult[] | null => {
+  return shelterCache.get(location, services);
+};
+
+const setCachedResults = (location: string, results: ShelterSearchResult[], services?: string[]): void => {
+  shelterCache.set(location, results, services);
+};
+
+// Add periodic cleanup of expired cache entries
+setInterval(() => {
+  shelterCache.clearExpired();
+}, SHELTER_CACHE_EXPIRY);
 
 export function ConsolePage() {
   /**
@@ -117,6 +211,9 @@ export function ConsolePage() {
     lng: -122.418137,
   });
   const [marker, setMarker] = useState<Coordinates | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   /**
    * Utility for formatting the timing of logs
@@ -327,6 +424,46 @@ export function ConsolePage() {
   }, []);
 
   /**
+   * Move getCurrentLocation inside the component
+   */
+  const getCurrentLocation = useCallback(() => {
+    return new Promise<UserLocation>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          // Reverse geocode to get city name
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await response.json();
+            
+            resolve({
+              latitude,
+              longitude,
+              city: data.address?.city || data.address?.town,
+              state: data.address?.state,
+              country: data.address?.country
+            });
+          } catch (error) {
+            // If reverse geocoding fails, still return coordinates
+            resolve({ latitude, longitude });
+          }
+        },
+        (error) => {
+          reject(error);
+        }
+      );
+    });
+  }, []);
+
+  /**
    * Core RealtimeClient and audio capture setup
    * Set all of our instructions, tools, events and more
    */
@@ -453,6 +590,166 @@ export function ConsolePage() {
       }
     );
     
+    // Update the search_shelters tool implementation
+    client.addTool(
+      {
+        name: 'search_shelters',
+        description: 'Searches for domestic violence shelters and support services in a given location.',
+        parameters: {
+          type: 'object',
+          properties: {
+            location: {
+              type: 'string',
+              description: 'City or location to search for shelters. If not provided, will use user\'s current location.',
+            },
+            services: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              description: 'Specific services needed (e.g., emergency housing, counseling, legal aid)',
+            },
+            useCurrentLocation: {
+              type: 'boolean',
+              description: 'Whether to use the user\'s current location instead of the provided location',
+            },
+          },
+          required: [],
+        },
+      },
+      async ({ location, services, useCurrentLocation }: { 
+        location?: string; 
+        services?: string[]; 
+        useCurrentLocation?: boolean 
+      }) => {
+        if (!TAVILY_API_KEY) {
+          console.error('❌ Tavily API key is not configured');
+          throw new Error('Tavily API key is not configured');
+        }
+
+        try {
+          let searchLocation = location || '';
+          
+          // If useCurrentLocation is true or no location provided, get current location
+          if (useCurrentLocation || !location) {
+            try {
+              console.log('📍 Attempting to get current location...');
+              const currentLocation = await getCurrentLocation();
+              console.log('📍 Current location obtained:', {
+                city: currentLocation.city,
+                state: currentLocation.state,
+                country: currentLocation.country,
+                coordinates: `${currentLocation.latitude},${currentLocation.longitude}`
+              });
+              setUserLocation(currentLocation);
+              searchLocation = currentLocation.city || `${currentLocation.latitude},${currentLocation.longitude}`;
+            } catch (error) {
+              console.error('❌ Error getting location:', error);
+              setLocationError('Could not get your current location. Please specify a location.');
+              throw new Error('Could not get current location. Please specify a location.');
+            }
+          }
+
+          // Check cache first
+          const cachedResults = getCachedResults(searchLocation, services);
+          if (cachedResults) {
+            return {
+              location: searchLocation,
+              shelters: cachedResults,
+              total_results: cachedResults.length,
+              isCurrentLocation: useCurrentLocation || !location,
+              fromCache: true
+            };
+          }
+
+          const searchQuery = `domestic violence shelters ${searchLocation} ${
+            services ? services.join(' ') : ''
+          } emergency housing support services`;
+
+          console.log('🔍 Making Tavily API request:', {
+            query: searchQuery,
+            location: searchLocation,
+            services: services || [],
+            timestamp: new Date().toISOString()
+          });
+
+          const response = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${TAVILY_API_KEY}`,
+            },
+            body: JSON.stringify({
+              query: searchQuery,
+              search_depth: 'advanced',
+              include_answer: true,
+              include_raw_content: true,
+              max_results: 5,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Tavily API error:', {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText,
+              timestamp: new Date().toISOString()
+            });
+            throw new Error(`Tavily API error: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log('✅ Tavily API response received:', {
+            totalResults: data.results?.length || 0,
+            searchUrl: data.search_url,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Process and format the results
+          const shelters: ShelterSearchResult[] = data.results.map((result: any) => {
+            console.log('🏠 Processing shelter result:', {
+              title: result.title,
+              url: result.url,
+              contentLength: result.content?.length || 0
+            });
+            return {
+              name: result.title,
+              address: result.url,
+              phone: '', // Will be extracted from content if available
+              description: result.content,
+              services: services || [],
+            };
+          });
+
+          // Cache the results
+          setCachedResults(searchLocation, shelters, services);
+
+          console.log('✨ Search completed successfully:', {
+            location: searchLocation,
+            totalShelters: shelters.length,
+            timestamp: new Date().toISOString()
+          });
+
+          return {
+            location: searchLocation,
+            shelters,
+            total_results: shelters.length,
+            search_url: data.search_url,
+            isCurrentLocation: useCurrentLocation || !location,
+            fromCache: false
+          };
+        } catch (error) {
+          console.error('❌ Error in shelter search:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            timestamp: new Date().toISOString()
+          });
+          throw error;
+        }
+      }
+    );
+    
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
       setRealtimeEvents((realtimeEvents) => {
@@ -495,17 +792,34 @@ export function ConsolePage() {
     // Set initial turn detection mode to VAD
     client.updateSession({ turn_detection: { type: 'server_vad' } });
 
+    // Add error handler for rate limits
+    client.on('error', async (error: any) => {
+      if (error.message?.includes('429')) {
+        console.warn('🔥 Rate limited (429) – restarting session after cooldown...');
+        setRateLimited(true);
+        await disconnectConversation();
+        await new Promise((r) => setTimeout(r, 10000)); // 10 sec backoff
+        setRateLimited(false);
+        await connectConversation();
+      }
+    });
+
     return () => {
       // cleanup; resets to defaults
       client.reset();
     };
-  }, []);
+  }, [getCurrentLocation]);
 
   /**
    * Render the application
    */
   return (
     <div data-component="ConsolePage">
+      {rateLimited && (
+        <div className="rate-limit-alert">
+          ⚠️ You're being rate-limited. Retrying shortly...
+        </div>
+      )}
       <div className="content-top">
         <div className="content-title">
           <img src="/openai-logomark.svg" />
@@ -525,7 +839,6 @@ export function ConsolePage() {
       </div>
       <div className="content-main">
         <div className="content-logs">
-          {/* Add VAD status indicator */}
           {isConnected && (
             <div className={`vad-status ${vadState}`}>
               {vadState === 'listening' && 'Listening for voice...'}
@@ -562,7 +875,6 @@ export function ConsolePage() {
                       <div
                         className="event-summary"
                         onClick={() => {
-                          // toggle event details
                           const id = event.event_id;
                           const expanded = { ...expandedEvents };
                           if (expanded[id]) {
@@ -630,11 +942,9 @@ export function ConsolePage() {
                       </div>
                     </div>
                     <div className={`speaker-content`}>
-                      {/* tool response */}
                       {conversationItem.type === 'function_call_output' && (
                         <div>{conversationItem.formatted.output}</div>
                       )}
-                      {/* tool call */}
                       {!!conversationItem.formatted.tool && (
                         <div>
                           {conversationItem.formatted.tool.name}(
