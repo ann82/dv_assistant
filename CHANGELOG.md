@@ -98,52 +98,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shelter search functionality with Tavily API integration
 - Comprehensive logging for API calls and cache operations
 - Class-based caching implementation for shelter search results
-- Type-safe cache management with private methods
-- Encapsulated cache logic for better maintainability
-- Automatic cache cleanup for expired entries
-- Periodic cache maintenance with setInterval
+- Twilio SDK integration for call and message handling
+- Initial setup for Twilio webhook endpoints
+- Environment variables for Twilio configuration
+- Twilio credential setup documentation
+- Twilio webhook endpoints for voice and messaging
 
 ### Changed
-- Improved error handling for API calls
-- Enhanced user experience during rate limits
-- Updated shelter search functionality with caching
-- Refactored cache implementation to use class-based approach
-- Improved type safety in cache operations
-- Enhanced cache key generation and validation
-- Optimized cache memory usage
-- Restored and improved UI components:
-  - Connect/disconnect button
-  - Map component for shelter locations
-  - Conversation display
-  - VAD status indicator
+- Updated dependencies to include Twilio SDK
+- Modified relay server to handle Twilio webhooks
+- Added Express server for Twilio webhook handling
+- Separated WebSocket and HTTP servers to different ports
+- Configured Twilio webhook URLs for voice and messaging endpoints
+- Updated ngrok tunnel configuration for public access
 
-### Technical Improvements
-- Added TypeScript interfaces for cache entries
-- Enhanced error handling and logging
-- Implemented robust caching layer
-- Improved code organization with class-based structure
-- Added private methods for internal cache operations
-- Added explicit return types for cache functions
-- Implemented automatic cache cleanup
-- Enhanced type safety throughout the application
+### Security
+- Added secure storage for Twilio credentials
+- Implemented webhook authentication
+- Added rate limiting for Twilio endpoints
+- Added environment variable validation for Twilio credentials
 
-### Performance
-- Added caching for location-based shelter search results
-- Implemented efficient API call handling
-- Reduced redundant API calls with cache
-- Optimized cache key generation
-- Improved memory usage with encapsulated cache implementation
-- Added automatic cleanup of expired cache entries
-- Enhanced cache hit/miss logging
+### Documentation
+- Added Twilio integration suggestions to Suggestions.md
+- Updated CHANGELOG.md with Twilio-related changes
+- Added Twilio credential setup instructions
+- Documented webhook endpoint structure
+- Added ngrok configuration documentation
 
-### User Experience
-- Enhanced query handling for shelter searches
-- Improved result presentation
-- Faster response times with caching
-- Better error messages and logging
-- More reliable shelter search results
-- Improved UI responsiveness
-- Enhanced visual feedback for cache operations
+### Fixed
+- Fixed Twilio request validation by using instance auth token instead of environment variable
+- Updated Twilio webhook validation to properly handle incoming requests
+- Corrected message webhook endpoint from '/twilio/messages' to '/twilio/message'
+
+### Changed
+- Enhanced Twilio request logging for better debugging
+- Updated server initialization to include detailed Twilio debugging
+- Modified TwilioHandler class to store auth token as instance variable
+
+### Added
+- Added detailed logging for Twilio request validation
+- Added comprehensive request debugging for voice and message webhooks
+- Added validation for Twilio CallSid parameter
+
+### Documentation
+- Added notes about Twilio trial account limitations
+- Updated webhook configuration instructions
+- Added troubleshooting steps for common Twilio issues
 
 ## [Unreleased]
 
