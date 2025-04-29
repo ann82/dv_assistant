@@ -1,3 +1,15 @@
+import React from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { RealtimeClient } from '@openai/realtime-api-beta';
+import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
+import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
+import { instructions } from '../utils/conversation_config.js';
+import { WavRenderer } from '../utils/wav_renderer';
+import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
+import { Button } from '../components/button/Button';
+import { Map } from '../components/Map';
+import './ConsolePage.scss';
+
 /**
  * Running a local relay server will allow you to hide your API key
  * and run custom logic on the server
@@ -13,21 +25,6 @@ const LOCAL_RELAY_SERVER_URL: string =
 
 // Add Tavily API key from environment
 const TAVILY_API_KEY = process.env.REACT_APP_TAVILY_API_KEY || '';
-
-import { useEffect, useRef, useCallback, useState } from 'react';
-
-import { RealtimeClient } from '@openai/realtime-api-beta';
-import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
-import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { instructions } from '../utils/conversation_config.js';
-import { WavRenderer } from '../utils/wav_renderer';
-
-import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
-import { Button } from '../components/button/Button';
-import { Map } from '../components/Map';
-
-import './ConsolePage.scss';
-import { isJsxOpeningLikeElement } from 'typescript';
 
 /**
  * Type for result from get_weather() function call
@@ -590,7 +587,7 @@ export function ConsolePage() {
       }
     );
     
-    // Update the search_shelters tool implementation
+    // Add search_shelters tool
     client.addTool(
       {
         name: 'search_shelters',
@@ -653,99 +650,56 @@ export function ConsolePage() {
           // Check cache first
           const cachedResults = getCachedResults(searchLocation, services);
           if (cachedResults) {
-            return {
-              location: searchLocation,
-              shelters: cachedResults,
-              total_results: cachedResults.length,
-              isCurrentLocation: useCurrentLocation || !location,
-              fromCache: true
-            };
+            console.log('📦 Using cached results for:', searchLocation);
+            return cachedResults;
           }
 
-          const searchQuery = `domestic violence shelters ${searchLocation} ${
-            services ? services.join(' ') : ''
-          } emergency housing support services`;
+          // Build search query
+          let query = `domestic violence shelters in ${searchLocation}`;
+          if (services && services.length > 0) {
+            query += ` that offer ${services.join(', ')}`;
+          }
 
-          console.log('🔍 Making Tavily API request:', {
-            query: searchQuery,
-            location: searchLocation,
-            services: services || [],
-            timestamp: new Date().toISOString()
-          });
-
+          // Make API request to Tavily
+          console.log('🔍 Searching for shelters with query:', query);
           const response = await fetch('https://api.tavily.com/search', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${TAVILY_API_KEY}`,
+              'Authorization': `Bearer ${TAVILY_API_KEY}`
             },
             body: JSON.stringify({
-              query: searchQuery,
+              query,
               search_depth: 'advanced',
+              max_results: 10,
               include_answer: true,
-              include_raw_content: true,
-              max_results: 5,
-            }),
+              include_raw_content: true
+            })
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Tavily API error:', {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorText,
-              timestamp: new Date().toISOString()
-            });
-            throw new Error(`Tavily API error: ${response.statusText}`);
+            throw new Error(`Failed to search shelters: ${response.statusText}`);
           }
 
           const data = await response.json();
-          console.log('✅ Tavily API response received:', {
-            totalResults: data.results?.length || 0,
-            searchUrl: data.search_url,
-            timestamp: new Date().toISOString()
-          });
           
-          // Process and format the results
-          const shelters: ShelterSearchResult[] = data.results.map((result: any) => {
-            console.log('🏠 Processing shelter result:', {
-              title: result.title,
-              url: result.url,
-              contentLength: result.content?.length || 0
-            });
-            return {
-              name: result.title,
-              address: result.url,
-              phone: '', // Will be extracted from content if available
-              description: result.content,
-              services: services || [],
-            };
-          });
+          // Process results
+          const results: ShelterSearchResult[] = data.results.map((result: any) => ({
+            name: result.title,
+            address: result.url,
+            phone: result.raw_content ? (result.raw_content.match(/phone:?\s*([\d-]+)/i)?.[1] || 'Not available') : 'Not available',
+            description: result.content,
+            services: services || [],
+            distance: result.raw_content ? (result.raw_content.match(/distance:?\s*([\d.]+)\s*(miles|km)/i)?.[0] || undefined) : undefined
+          }));
 
-          // Cache the results
-          setCachedResults(searchLocation, shelters, services);
+          // Cache results
+          setCachedResults(searchLocation, results, services);
 
-          console.log('✨ Search completed successfully:', {
-            location: searchLocation,
-            totalShelters: shelters.length,
-            timestamp: new Date().toISOString()
-          });
-
-          return {
-            location: searchLocation,
-            shelters,
-            total_results: shelters.length,
-            search_url: data.search_url,
-            isCurrentLocation: useCurrentLocation || !location,
-            fromCache: false
-          };
+          return results;
         } catch (error) {
-          console.error('❌ Error in shelter search:', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined,
-            timestamp: new Date().toISOString()
-          });
-          throw error;
+          console.error('❌ Error searching shelters:', error);
+          throw new Error(`Failed to search shelters: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
     );

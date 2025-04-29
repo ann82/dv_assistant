@@ -199,5 +199,3 @@ export class AudioAnalysis {
     return true;
   }
 }
-
-globalThis.AudioAnalysis = AudioAnalysis;

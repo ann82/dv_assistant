@@ -109,5 +109,3 @@ export class WavPacker {
     };
   }
 }
-
-globalThis.WavPacker = WavPacker;

@@ -156,5 +156,3 @@ export class WavStreamPlayer {
     return this.getTrackSampleOffset(true);
   }
 }
-
-globalThis.WavStreamPlayer = WavStreamPlayer;

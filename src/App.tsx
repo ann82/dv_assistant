@@ -1,3 +1,4 @@
+import React from 'react';
 import { ConsolePage } from './pages/ConsolePage';
 import './App.scss';
 

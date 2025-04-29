@@ -544,5 +544,3 @@ export class WavRecorder {
     return true;
   }
 }
-
-globalThis.WavRecorder = WavRecorder;
