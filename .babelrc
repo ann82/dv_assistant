@@ -1,9 +1,10 @@
 {
   "presets": [
     "@babel/preset-env",
-    "@babel/preset-react"
+    "@babel/preset-react",
+    "@babel/preset-typescript"
   ],
   "plugins": [
-    "react-refresh/babel"
+    ["react-refresh/babel", { "skipEnvCheck": true }]
   ]
 } 
