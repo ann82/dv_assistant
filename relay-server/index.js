@@ -1,5 +1,5 @@
 import { RealtimeRelay } from './lib/relay.js';
-import { TwilioHandler } from './lib/twilio.js';
+import { TwilioHandler, validateTwilioRequest } from './lib/twilio.js';
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -45,9 +45,9 @@ app.use(express.json());
 const twilioHandler = new TwilioHandler(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER);
 
 // Twilio webhook endpoints
-app.post('/twilio/voice', twilioHandler.validateTwilioRequest, twilioHandler.handleIncomingCall.bind(twilioHandler));
-app.post('/twilio/voice/process', twilioHandler.validateTwilioRequest, twilioHandler.handleCallProcessing.bind(twilioHandler));
-app.post('/twilio/message', twilioHandler.validateTwilioRequest, twilioHandler.handleIncomingMessage.bind(twilioHandler));
+app.post('/twilio/voice', validateTwilioRequest, (req, res) => twilioHandler.handleIncomingCall(req, res));
+app.post('/twilio/voice/process', validateTwilioRequest, (req, res) => twilioHandler.handleCallProcessing(req, res));
+app.post('/twilio/message', validateTwilioRequest, (req, res) => twilioHandler.handleIncomingMessage(req, res));
 
 // Initialize WebSocket relay
 const relay = new RealtimeRelay(OPENAI_API_KEY);

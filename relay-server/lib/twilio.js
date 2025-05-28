@@ -1,4 +1,56 @@
 import twilio from 'twilio';
+import { config } from './config.js';
+
+// Standalone validation function
+export const validateTwilioRequest = (req, res, next) => {
+  try {
+    // Log all headers for debugging
+    console.log('All Headers:', req.headers);
+    console.log('Raw Body:', req.body);
+    
+    const twilioSignature = req.headers['x-twilio-signature'];
+    const url = 'https://' + req.get('host') + req.originalUrl;
+    const params = req.body || {};
+
+    // Log request details for debugging
+    console.log('Twilio Request:', {
+      signature: twilioSignature,
+      url,
+      params,
+      method: req.method,
+      originalUrl: req.originalUrl,
+      protocol: req.protocol,
+      headers: req.headers,
+      body: req.body
+    });
+
+    // For testing purposes, allow requests without signature in development
+    if (process.env.NODE_ENV === 'development' && !twilioSignature) {
+      console.log('Development mode: Bypassing Twilio signature validation');
+      return next();
+    }
+
+    if (!twilioSignature) {
+      console.log('No Twilio signature found');
+      return res.status(403).send('No Twilio signature');
+    }
+
+    if (twilio.validateRequest(
+      config.TWILIO_AUTH_TOKEN,
+      twilioSignature,
+      url,
+      params
+    )) {
+      next();
+    } else {
+      console.log('Invalid Twilio signature');
+      res.status(403).send('Invalid Twilio request');
+    }
+  } catch (error) {
+    console.error('Error validating Twilio request:', error);
+    res.status(500).send('Error validating request');
+  }
+};
 
 /**
  * Handles Twilio voice and messaging interactions
@@ -137,32 +189,6 @@ export class TwilioHandler {
       res.status(200).send('Message processed successfully');
     } catch (error) {
       this.handleError(res, 'Error handling incoming message', error);
-    }
-  }
-
-  /**
-   * Validates incoming Twilio requests
-   */
-  validateTwilioRequest(req, res, next) {
-    const signature = req.headers['x-twilio-signature'];
-    const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-    const params = req.body;
-
-    console.log('Validating Twilio request:', {
-      signature: signature ? 'present' : 'missing',
-      url,
-      params: Object.keys(params),
-      headers: req.headers,
-      method: req.method,
-      ip: req.ip
-    });
-
-    if (twilio.validateRequest(this.authToken, signature, url, params)) {
-      console.log('Twilio request validation successful');
-      next();
-    } else {
-      console.error('Invalid Twilio signature');
-      res.status(403).send('Invalid Twilio signature');
     }
   }
 
