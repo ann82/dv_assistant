@@ -47,6 +47,19 @@ export default {
         }
       },
       {
+        test: /\.(scss|sass)$/,
+        use: [
+          'style-loader',
+          'css-loader',
+          {
+            loader: 'sass-loader',
+            options: {
+              sourceMap: isDevelopment
+            }
+          }
+        ]
+      },
+      {
         test: /\.css$/,
         use: ['style-loader', 'css-loader']
       },
