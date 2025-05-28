@@ -33,13 +33,14 @@
     "ws": "^8.18.0"
   },
   "scripts": {
-    "start": "node relay-server/server.js",
+    "start": "node relay-server/index.js",
+    "build": "npm install && webpack --mode production",
     "dev": "webpack serve --mode development",
-    "build": "webpack --mode production",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "zip": "zip -r realtime-api-console.zip . -x 'node_modules' 'node_modules/*' 'node_modules/**' '.git' '.git/*' '.git/**' '.DS_Store' '*/.DS_Store' 'package-lock.json' '*.zip' '*.tar.gz' '*.tar' '.env'",
-    "relay": "nodemon ./relay-server/index.js"
+    "relay": "nodemon ./relay-server/index.js",
+    "postinstall": "npm run build"
   },
   "eslintConfig": {
     "extends": [
