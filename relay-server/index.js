@@ -9,6 +9,14 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Log startup environment
+console.log('Starting server with environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  WS_PORT: process.env.WS_PORT,
+  LOG_LEVEL: process.env.LOG_LEVEL
+});
+
 // Memory monitoring
 const logMemoryUsage = () => {
   const used = process.memoryUsage();
@@ -21,11 +29,15 @@ setInterval(logMemoryUsage, 5 * 60 * 1000);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+console.log('Server directory:', __dirname);
+
 const app = express();
 const server = createServer(app);
 
 // Create WebSocket server
+console.log('Initializing WebSocket server...');
 const wss = new TwilioWebSocketServer(server);
+console.log('WebSocket server initialized');
 
 // Middleware
 app.use(express.json());
@@ -39,7 +51,11 @@ app.get('/health', (req, res) => {
       status: 'ok',
       timestamp: new Date().toISOString(),
       memory: process.memoryUsage(),
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT
+      }
     };
     console.log('Health check response:', healthData);
     res.status(200).json(healthData);
@@ -54,13 +70,19 @@ app.get('/health', (req, res) => {
 });
 
 // Serve static files from the React build directory
-app.use(express.static(path.join(__dirname, '../build')));
+const buildPath = path.join(__dirname, '../build');
+console.log('Serving static files from:', buildPath);
+app.use(express.static(buildPath));
 
 // Serve audio files
-app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
+const audioPath = path.join(__dirname, 'public/audio');
+console.log('Serving audio files from:', audioPath);
+app.use('/audio', express.static(audioPath));
 
 // API routes
+console.log('Setting up API routes...');
 app.use('/twilio', (await import('./routes/twilio.js')).default);
+console.log('API routes setup complete');
 
 // Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
@@ -78,6 +100,8 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+console.log(`Attempting to start server on port ${PORT}...`);
+
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
