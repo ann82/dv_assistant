@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Deployment and Audio Issues - [Current Date]
+
+### Fixed
+- Resolved 403 Forbidden errors on Twilio webhook endpoints
+- Fixed 404 Not Found errors for audio file access
+- Corrected audio file serving path configuration
+- Addressed ngrok URL expiration issues
+
+### Changed
+- Updated deployment documentation to include proper hosting options
+- Improved audio file path handling in server configuration
+- Enhanced error logging for webhook and audio file access issues
+
+### Added
+- Documentation for proper deployment options:
+  - Render.com deployment instructions
+  - Railway.app deployment instructions
+  - DigitalOcean App Platform deployment instructions
+  - Heroku deployment instructions
+- Added troubleshooting guide for common deployment issues
+- Enhanced logging for webhook validation failures
+
+## Twilio Integration Improvements - [Current Date]
+
+### Added
+- Comprehensive Twilio call logging
+  - Call details (SID, status, duration, timestamps)
+  - Call recordings information
+  - Detailed call logs with timestamps
+- Enhanced error tracking and debugging capabilities
+
+### Changed
+- Improved audio file cleanup strategy
+  - Moved cleanup to call end instead of after each response
+  - Added cleanup on call status changes (completed, failed, busy, no-answer)
+- Enhanced TwiML response handling
+  - Better sequencing of audio playback and gather elements
+  - Improved error handling in TwiML generation
+
+### Fixed
+- Audio file cleanup timing issues
+- Potential race conditions in audio file handling
+- TwiML response structure for better reliability
+
 ## Voice Activity Detection (VAD) Implementation - [Current Date]
 
 ### Major Changes
@@ -92,123 +136,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Rate limit handling with automatic retry
-- Visual alert banner for rate limits
-- Graceful disconnection/reconnection
-- Shelter search functionality with Tavily API integration
-- Comprehensive logging for API calls and cache operations
-- Class-based caching implementation for shelter search results
-- Twilio SDK integration for call and message handling
-- Initial setup for Twilio webhook endpoints
-- Environment variables for Twilio configuration
-- Twilio credential setup documentation
-- Twilio webhook endpoints for voice and messaging
+- Real-time speech recognition using Twilio's speech recognition
+- OpenAI TTS integration for high-quality voice responses
+- Multi-language support with proper language detection
+- Enhanced error handling and logging
+- Improved WebSocket connection management
+- Better audio stream handling and processing
 
 ### Changed
-- Updated dependencies to include Twilio SDK
-- Modified relay server to handle Twilio webhooks
-- Added Express server for Twilio webhook handling
-- Separated WebSocket and HTTP servers to different ports
-- Configured Twilio webhook URLs for voice and messaging endpoints
-- Updated ngrok tunnel configuration for public access
-
-### Security
-- Added secure storage for Twilio credentials
-- Implemented webhook authentication
-- Added rate limiting for Twilio endpoints
-- Added environment variable validation for Twilio credentials
-
-### Documentation
-- Added Twilio integration suggestions to Suggestions.md
-- Updated CHANGELOG.md with Twilio-related changes
-- Added Twilio credential setup instructions
-- Documented webhook endpoint structure
-- Added ngrok configuration documentation
+- Switched from client-side Web Speech API to OpenAI TTS for better quality
+- Updated Twilio webhook handling for better reliability
+- Improved audio processing pipeline
+- Enhanced conversation flow with proper pauses and prompts
+- Better error messages and debugging information
 
 ### Fixed
-- Fixed Twilio request validation by using instance auth token instead of environment variable
-- Updated Twilio webhook validation to properly handle incoming requests
-- Corrected message webhook endpoint from '/twilio/messages' to '/twilio/message'
+- Fixed language parameter issue in Whisper transcription
+- Resolved WebSocket disconnection issues
+- Fixed audio stream handling and processing
+- Corrected TwiML response generation
+- Fixed speech result processing
 
-### Changed
-- Enhanced Twilio request logging for better debugging
-- Updated server initialization to include detailed Twilio debugging
-- Modified TwilioHandler class to store auth token as instance variable
-
-### Added
-- Added detailed logging for Twilio request validation
-- Added comprehensive request debugging for voice and message webhooks
-- Added validation for Twilio CallSid parameter
-
-### Documentation
-- Added notes about Twilio trial account limitations
-- Updated webhook configuration instructions
-- Added troubleshooting steps for common Twilio issues
-
-## [Unreleased]
+## [0.1.0] - 2024-03-23
 
 ### Added
-- Rate limit handling for 429 errors with automatic retry after 10-second cooldown
-- Visual rate limit alert banner to inform users when they are being rate limited
-- Graceful disconnection and reconnection when rate limits are encountered
-- Tavily API integration for shelter search functionality
-- Location-based shelter search with support for:
-  - Current location detection
-  - Specified location search
-  - Reverse geocoding for city names
-- Comprehensive logging system for API calls including:
-  - Request/response logging
-  - Error tracking
-  - Location detection logs
-  - API rate limit monitoring
-  - Performance metrics
-- Tavily API results caching with:
-  - 24-hour cache expiration
-  - Location and service-based cache keys
-  - Automatic cache invalidation
-  - Cache hit/miss logging
-  - Memory-efficient storage
+- Initial release
+- Basic voice call handling
+- GPT-4 integration for responses
+- Whisper integration for speech-to-text
+- WebSocket server for real-time communication
+- Basic error handling and logging
+
+### Known Issues
+- Occasional WebSocket disconnections
+- Language detection needs improvement
+- Audio quality could be better
+- Response times need optimization
+
+## [1.3.0] - 2024-03-20
+
+### Added
+- Comprehensive cost tracking system
+- Per-call token usage monitoring
+- Model usage tracking (GPT-4o vs GPT-3.5)
+- Whisper API usage monitoring
+- Response length tracking
+- TTS character counting
+- Persistent cost logs in JSON format
+- Real-time cost feedback in console
+- Cost statistics and summaries
 
 ### Changed
-- Improved error handling in ConsolePage component to handle rate limit errors
-- Enhanced user experience during rate limit periods with clear visual feedback
-- Updated shelter search to use Tavily API for more accurate and comprehensive results
-- Enhanced location handling with fallback options and error recovery
-- Updated AI prompt to better handle location-based queries and shelter searches
-- Optimized API calls with caching to reduce:
-  - API rate limit exposure
-  - Response times for repeated queries
-  - Network bandwidth usage
-  - Server load
+- Updated response generator to track token usage
+- Enhanced caching system with cost metrics
+- Improved model selection logic
+- Better error handling with cost tracking
 
-### Technical Improvements
-- Added TypeScript interfaces for API responses and location data
-- Implemented robust error handling for API calls
-- Added detailed logging for debugging and monitoring
-- Improved location detection with reverse geocoding support
-- Enhanced API response processing and data formatting
-- Added caching layer for API responses
-- Implemented cache key generation and validation
-- Added cache expiration and cleanup
+## [1.2.0] - 2024-03-20
 
-### Security
-- Added environment variable handling for API keys
-- Implemented secure API key storage and usage
-- Added input validation for location data
-- Enhanced privacy guidelines in AI prompt
-- Added data protection instructions for location handling
+### Added
+- Advanced speech queue management system
+- Natural pauses between responses
+- Immediate speech cancellation on disconnect
+- Speech state tracking and recovery
+- Female voice preference with fallback options
 
-### Performance
-- Added caching for location data
-- Implemented efficient API call handling
-- Added rate limit monitoring and prevention
-- Reduced API calls through caching
-- Optimized response times for repeated queries
-- Improved memory usage with efficient cache storage
+### Changed
+- Improved speech handling reliability
+- Enhanced error recovery for speech synthesis
+- Updated disconnect behavior to properly stop speech
+- Optimized speech queue processing
 
-### User Experience
-- Improved location-based query handling
-- Enhanced shelter search result presentation
-- Added clear privacy explanations
-- Improved error messaging and recovery
-- Enhanced conversational flow for location sharing 
+### Fixed
+- Speech continuing after disconnect
+- Multiple responses speaking simultaneously
+- Speech timing issues
+- Voice selection reliability
+
+## [1.1.0] - 2024-03-20
+
+### Added
+- Client-side Web Speech API integration for TTS
+- Response caching system for common queries
+- Audio preprocessing and optimization
+- Token limiting for responses
+- Tavily search integration for factual queries
+
+### Changed
+- Moved audio output from OpenAI to client-side Web Speech API
+- Implemented GPT model tiering (GPT-3.5-turbo for simple queries, GPT-4o for complex)
+- Optimized audio input processing to reduce Whisper API calls
+- Updated response generation to use cached responses when available
+
+### Removed
+- OpenAI audio streaming integration
+- Direct audio output from server
+
+### Fixed
+- High API costs from audio streaming
+- Unnecessary GPT-4o usage for simple queries
+- Redundant audio processing
+
+## [1.0.0] - 2024-03-15
+
+### Added
+- Initial release
+- Real-time voice interaction
+- Shelter search and location services
+- Resource information and support
+- OpenAI Realtime API integration
+- WebSocket relay server 

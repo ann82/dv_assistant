@@ -1,372 +1,234 @@
-# OpenAI Realtime Console
+# Domestic Violence Support Assistant
 
-The OpenAI Realtime Console is intended as an inspector and interactive API reference
-for the OpenAI Realtime API. It comes packaged with two utility libraries,
-[openai/openai-realtime-api-beta](https://github.com/openai/openai-realtime-api-beta)
-that acts as a **Reference Client** (for browser and Node.js) and
-[`/src/lib/wavtools`](./src/lib/wavtools) which allows for simple audio
-management in the browser.
+A voice-based AI assistant that provides support and resources for people experiencing domestic violence. The system uses Twilio for voice calls, OpenAI's GPT for conversation, and Whisper for speech recognition.
 
-<img src="/readme/realtime-console-demo.png" width="800" />
+## Features
 
-# Starting the console
+- Voice-based interaction using Twilio
+- Real-time speech recognition and transcription
+- AI-powered responses using GPT-4
+- Text-to-speech using OpenAI's TTS
+- Secure and private communication
+- Multi-language support
+- Resource recommendations
+- Emergency contact information
+- Comprehensive call logging and monitoring
+- Enhanced error handling and debugging
 
-This is a React project created using `create-react-app` that is bundled via Webpack.
-Install it by extracting the contents of this package and using;
+## System Architecture
 
-```shell
-$ npm i
+The system consists of three main components:
+
+1. **Twilio WebSocket Server** (`relay-server/`)
+   - Handles incoming voice calls
+   - Manages WebSocket connections
+   - Processes audio streams
+   - Coordinates with AI services
+   - Provides detailed call logging
+   - Manages audio file lifecycle
+
+2. **AI Services** (`relay-server/services/`)
+   - Speech-to-text using Whisper
+   - Conversation handling using GPT-4
+   - Text-to-speech using OpenAI TTS
+   - Audio processing and management
+
+3. **Web Interface** (`web/`)
+   - Admin dashboard
+   - Call monitoring
+   - Resource management
+   - Analytics
+   - Call logs and debugging information
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+
+- Twilio account with a phone number
+- OpenAI API key
+- ngrok or similar for local development
+
+### Environment Variables
+
+Create a `.env` file in the `relay-server` directory:
+
+```env
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_number
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+LOG_LEVEL=info  # Options: debug, info, warn, error
 ```
 
-Start your server with:
+### Installation
 
-```shell
-$ npm start
+1. Install dependencies:
+```bash
+cd relay-server
+npm install
 ```
 
-It should be available via `localhost:3000`.
-
-# Table of contents
-
-1. [Using the console](#using-the-console)
-   1. [Using a relay server](#using-a-relay-server)
-1. [Realtime API reference client](#realtime-api-reference-client)
-   1. [Sending streaming audio](#sending-streaming-audio)
-   1. [Adding and using tools](#adding-and-using-tools)
-   1. [Interrupting the model](#interrupting-the-model)
-   1. [Reference client events](#reference-client-events)
-1. [Wavtools](#wavtools)
-   1. [WavRecorder quickstart](#wavrecorder-quickstart)
-   1. [WavStreamPlayer quickstart](#wavstreamplayer-quickstart)
-1. [Acknowledgements and contact](#acknowledgements-and-contact)
-
-# Using the console
-
-The console requires an OpenAI API key (**user key** or **project key**) that has access to the
-Realtime API. You'll be prompted on startup to enter it. It will be saved via `localStorage` and can be
-changed at any time from the UI.
-
-To start a session you'll need to **connect**. This will require microphone access.
-You can then choose between **manual** (Push-to-talk) and **vad** (Voice Activity Detection)
-conversation modes, and switch between them at any time.
-
-There are two functions enabled;
-
-- `get_weather`: Ask for the weather anywhere and the model will do its best to pinpoint the
-  location, show it on a map, and get the weather for that location. Note that it doesn't
-  have location access, and coordinates are "guessed" from the model's training data so
-  accuracy might not be perfect.
-- `set_memory`: You can ask the model to remember information for you, and it will store it in
-  a JSON blob on the left.
-
-You can freely interrupt the model at any time in push-to-talk or VAD mode.
-
-## Using a relay server
-
-If you would like to build a more robust implementation and play around with the reference
-client using your own server, we have included a Node.js [Relay Server](/relay-server/index.js).
-
-```shell
-$ npm run relay
+2. Start the server:
+```bash
+npm start
 ```
 
-It will start automatically on `localhost:8081`.
+3. Set up Twilio webhook:
+   - Voice webhook URL: `https://your-domain/twilio/voice`
+   - Status callback URL: `https://your-domain/twilio/status`
 
-**You will need to create a `.env` file** with the following configuration:
+## Deployment
 
-```conf
-OPENAI_API_KEY=YOUR_API_KEY
-REACT_APP_LOCAL_RELAY_SERVER_URL=http://localhost:8081
+### Local Development with ngrok
+For local development, you can use ngrok to create a temporary public URL:
+1. Install ngrok: `npm install -g ngrok`
+2. Start your server: `npm start`
+3. Start ngrok: `ngrok http 3000`
+4. Update your Twilio webhook URL with the ngrok URL
+
+Note: ngrok URLs are temporary and will change each time you restart ngrok. For production, use a proper hosting service.
+
+### Production Deployment
+For production deployment, we recommend using one of these hosting services:
+
+1. **Render.com** (Recommended)
+   - Free tier available
+   - Easy deployment from GitHub
+   - Automatic SSL certificates
+   - Steps:
+     1. Create an account on render.com
+     2. Connect your GitHub repository
+     3. Create a new Web Service
+     4. Set build command: `npm install`
+     5. Set start command: `node relay-server/server.js`
+     6. Add your environment variables
+     7. Deploy
+
+2. **Railway.app**
+   - Free tier available
+   - Simple deployment process
+   - Good for Node.js applications
+
+3. **DigitalOcean App Platform**
+   - Paid but very reliable
+   - Good for production workloads
+   - Built-in monitoring
+
+4. **Heroku**
+   - Free tier available
+   - Well-established platform
+   - Good for Node.js applications
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **403 Forbidden Errors**
+   - Check if your Twilio webhook URL is correct
+   - Verify that your Twilio credentials are valid
+   - Ensure your server is accessible from the internet
+
+2. **404 Not Found for Audio Files**
+   - Verify that audio files are in the correct directory
+   - Check file permissions
+   - Ensure the static file serving is configured correctly
+
+3. **Webhook Validation Failures**
+   - Verify your Twilio Auth Token
+   - Check if the request is coming from Twilio
+   - Ensure your server is using HTTPS
+
+4. **Audio Playback Issues**
+   - Check if the audio files are being generated correctly
+   - Verify the audio file paths in the TwiML response
+   - Ensure the audio files are accessible via the public URL
+
+## Usage
+
+1. Call the Twilio phone number
+2. The system will:
+   - Play a welcome message
+   - Listen for your input
+   - Process your request using GPT
+   - Respond with helpful information
+   - Continue the conversation
+   - Log all call activities and status changes
+
+## Development
+
+### Project Structure
+
+```
+relay-server/
+├── lib/
+│   ├── config.js
+│   └── twilio.js
+├── routes/
+│   └── twilio.js
+├── services/
+│   └── audioService.js
+├── websocketServer.js
+├── server.js
+└── package.json
+
+web/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── package.json
 ```
 
-You will need to restart both your React app and relay server for the `.env.` changes
-to take effect. The local server URL is loaded via [`ConsolePage.tsx`](/src/pages/ConsolePage.tsx).
-To stop using the relay server at any time, simply delete the environment
-variable or set it to empty string.
+### Running Tests
 
-```javascript
-/**
- * Running a local relay server will allow you to hide your API key
- * and run custom logic on the server
- *
- * Set the local relay server address to:
- * REACT_APP_LOCAL_RELAY_SERVER_URL=http://localhost:8081
- *
- * This will also require you to set OPENAI_API_KEY= in a `.env` file
- * You can run it with `npm run relay`, in parallel with `npm start`
- */
-const LOCAL_RELAY_SERVER_URL: string =
-  process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
+```bash
+npm test
 ```
 
-This server is **only a simple message relay**, but it can be extended to:
+### Debugging
 
-- Hide API credentials if you would like to ship an app to play with online
-- Handle certain calls you would like to keep secret (e.g. `instructions`) on
-  the server directly
-- Restrict what types of events the client can receive and send
+The system provides comprehensive logging for debugging:
 
-You will have to implement these features yourself.
+1. **Call Logs**
+   - Call details (SID, status, duration)
+   - Recording information
+   - Status changes
+   - Error events
 
-# Realtime API reference client
+2. **Audio Processing**
+   - File creation and cleanup
+   - TTS generation
+   - Stream handling
 
-The latest reference client and documentation are available on GitHub at
-[openai/openai-realtime-api-beta](https://github.com/openai/openai-realtime-api-beta).
+3. **Error Tracking**
+   - Detailed error messages
+   - Stack traces
+   - Call context information
 
-You can use this client yourself in any React (front-end) or Node.js project.
-For full documentation, refer to the GitHub repository, but you can use the
-guide here as a primer to get started.
+## Security
 
-```javascript
-import { RealtimeClient } from '/src/lib/realtime-api-beta/index.js';
+- All communications are encrypted
+- No call recordings are stored
+- Secure handling of sensitive information
+- Regular security audits
+- Proper cleanup of temporary audio files
 
-const client = new RealtimeClient({ apiKey: process.env.OPENAI_API_KEY });
+## Contributing
 
-// Can set parameters ahead of connecting
-client.updateSession({ instructions: 'You are a great, upbeat friend.' });
-client.updateSession({ voice: 'alloy' });
-client.updateSession({ turn_detection: 'server_vad' });
-client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-// Set up event handling
-client.on('conversation.updated', ({ item, delta }) => {
-  const items = client.conversation.getItems(); // can use this to render all items
-  /* includes all changes to conversations, delta may be populated */
-});
+## License
 
-// Connect to Realtime API
-await client.connect();
-
-// Send an item and triggers a generation
-client.sendUserMessageContent([{ type: 'text', text: `How are you?` }]);
-```
-
-## Sending streaming audio
-
-To send streaming audio, use the `.appendInputAudio()` method. If you're in `turn_detection: 'disabled'` mode,
-then you need to use `.generate()` to tell the model to respond.
-
-```javascript
-// Send user audio, must be Int16Array or ArrayBuffer
-// Default audio format is pcm16 with sample rate of 24,000 Hz
-// This populates 1s of noise in 0.1s chunks
-for (let i = 0; i < 10; i++) {
-  const data = new Int16Array(2400);
-  for (let n = 0; n < 2400; n++) {
-    const value = Math.floor((Math.random() * 2 - 1) * 0x8000);
-    data[n] = value;
-  }
-  client.appendInputAudio(data);
-}
-// Pending audio is committed and model is asked to generate
-client.createResponse();
-```
-
-## Adding and using tools
-
-Working with tools is easy. Just call `.addTool()` and set a callback as the second parameter.
-The callback will be executed with the parameters for the tool, and the result will be automatically
-sent back to the model.
-
-```javascript
-// We can add tools as well, with callbacks specified
-client.addTool(
-  {
-    name: 'get_weather',
-    description:
-      'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-    parameters: {
-      type: 'object',
-      properties: {
-        lat: {
-          type: 'number',
-          description: 'Latitude',
-        },
-        lng: {
-          type: 'number',
-          description: 'Longitude',
-        },
-        location: {
-          type: 'string',
-          description: 'Name of the location',
-        },
-      },
-      required: ['lat', 'lng', 'location'],
-    },
-  },
-  async ({ lat, lng, location }) => {
-    const result = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-    );
-    const json = await result.json();
-    return json;
-  }
-);
-```
-
-## Interrupting the model
-
-You may want to manually interrupt the model, especially in `turn_detection: 'disabled'` mode.
-To do this, we can use:
-
-```javascript
-// id is the id of the item currently being generated
-// sampleCount is the number of audio samples that have been heard by the listener
-client.cancelResponse(id, sampleCount);
-```
-
-This method will cause the model to immediately cease generation, but also truncate the
-item being played by removing all audio after `sampleCount` and clearing the text
-response. By using this method you can interrupt the model and prevent it from "remembering"
-anything it has generated that is ahead of where the user's state is.
-
-## Reference client events
-
-There are five main client events for application control flow in `RealtimeClient`.
-Note that this is only an overview of using the client, the full Realtime API
-event specification is considerably larger, if you need more control check out the GitHub repository:
-[openai/openai-realtime-api-beta](https://github.com/openai/openai-realtime-api-beta).
-
-```javascript
-// errors like connection failures
-client.on('error', (event) => {
-  // do thing
-});
-
-// in VAD mode, the user starts speaking
-// we can use this to stop audio playback of a previous response if necessary
-client.on('conversation.interrupted', () => {
-  /* do something */
-});
-
-// includes all changes to conversations
-// delta may be populated
-client.on('conversation.updated', ({ item, delta }) => {
-  // get all items, e.g. if you need to update a chat window
-  const items = client.conversation.getItems();
-  switch (item.type) {
-    case 'message':
-      // system, user, or assistant message (item.role)
-      break;
-    case 'function_call':
-      // always a function call from the model
-      break;
-    case 'function_call_output':
-      // always a response from the user / application
-      break;
-  }
-  if (delta) {
-    // Only one of the following will be populated for any given event
-    // delta.audio = Int16Array, audio added
-    // delta.transcript = string, transcript added
-    // delta.arguments = string, function arguments added
-  }
-});
-
-// only triggered after item added to conversation
-client.on('conversation.item.appended', ({ item }) => {
-  /* item status can be 'in_progress' or 'completed' */
-});
-
-// only triggered after item completed in conversation
-// will always be triggered after conversation.item.appended
-client.on('conversation.item.completed', ({ item }) => {
-  /* item status will always be 'completed' */
-});
-```
-
-# Wavtools
-
-Wavtools contains easy management of PCM16 audio streams in the browser, both
-recording and playing.
-
-## WavRecorder Quickstart
-
-```javascript
-import { WavRecorder } from '/src/lib/wavtools/index.js';
-
-const wavRecorder = new WavRecorder({ sampleRate: 24000 });
-wavRecorder.getStatus(); // "ended"
-
-// request permissions, connect microphone
-await wavRecorder.begin();
-wavRecorder.getStatus(); // "paused"
-
-// Start recording
-// This callback will be triggered in chunks of 8192 samples by default
-// { mono, raw } are Int16Array (PCM16) mono & full channel data
-await wavRecorder.record((data) => {
-  const { mono, raw } = data;
-});
-wavRecorder.getStatus(); // "recording"
-
-// Stop recording
-await wavRecorder.pause();
-wavRecorder.getStatus(); // "paused"
-
-// outputs "audio/wav" audio file
-const audio = await wavRecorder.save();
-
-// clears current audio buffer and starts recording
-await wavRecorder.clear();
-await wavRecorder.record();
-
-// get data for visualization
-const frequencyData = wavRecorder.getFrequencies();
-
-// Stop recording, disconnects microphone, output file
-await wavRecorder.pause();
-const finalAudio = await wavRecorder.end();
-
-// Listen for device change; e.g. if somebody disconnects a microphone
-// deviceList is array of MediaDeviceInfo[] + `default` property
-wavRecorder.listenForDeviceChange((deviceList) => {});
-```
-
-## WavStreamPlayer Quickstart
-
-```javascript
-import { WavStreamPlayer } from '/src/lib/wavtools/index.js';
-
-const wavStreamPlayer = new WavStreamPlayer({ sampleRate: 24000 });
-
-// Connect to audio output
-await wavStreamPlayer.connect();
-
-// Create 1s of empty PCM16 audio
-const audio = new Int16Array(24000);
-// Queue 3s of audio, will start playing immediately
-wavStreamPlayer.add16BitPCM(audio, 'my-track');
-wavStreamPlayer.add16BitPCM(audio, 'my-track');
-wavStreamPlayer.add16BitPCM(audio, 'my-track');
-
-// get data for visualization
-const frequencyData = wavStreamPlayer.getFrequencies();
-
-// Interrupt the audio (halt playback) at any time
-// To restart, need to call .add16BitPCM() again
-const trackOffset = await wavStreamPlayer.interrupt();
-trackOffset.trackId; // "my-track"
-trackOffset.offset; // sample number
-trackOffset.currentTime; // time in track
-```
-
-# Acknowledgements and contact
-
-Thanks for checking out the Realtime Console. We hope you have fun with the Realtime API.
-Special thanks to the whole Realtime API team for making this possible. Please feel free
-to reach out, ask questions, or give feedback by creating an issue on the repository.
-You can also reach out and let us know what you think directly!
-
-- OpenAI Developers / [@OpenAIDevs](https://x.com/OpenAIDevs)
-- Jordan Sitkin / API / [@dustmason](https://x.com/dustmason)
-- Mark Hudnall / API / [@landakram](https://x.com/landakram)
-- Peter Bakkum / API / [@pbbakkum](https://x.com/pbbakkum)
-- Atty Eleti / API / [@athyuttamre](https://x.com/athyuttamre)
-- Jason Clark / API / [@onebitToo](https://x.com/onebitToo)
-- Karolis Kosas / Design / [@karoliskosas](https://x.com/karoliskosas)
-- Keith Horwood / API + DX / [@keithwhor](https://x.com/keithwhor)
-- Romain Huet / DX / [@romainhuet](https://x.com/romainhuet)
-- Katia Gil Guzman / DX / [@kagigz](https://x.com/kagigz)
-- Ilan Bigio / DX / [@ilanbigio](https://x.com/ilanbigio)
-- Kevin Whinnery / DX / [@kevinwhinnery](https://x.com/kevinwhinnery)
+MIT License - see LICENSE file for details
