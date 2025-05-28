@@ -125,9 +125,42 @@ For local development, you can use ngrok to create a temporary public URL:
 Note: ngrok URLs are temporary and will change each time you restart ngrok. For production, use a proper hosting service.
 
 ### Production Deployment
-For production deployment, we recommend using Render.com:
+For production deployment, we recommend using Render.com or Railway.app:
 
-1. **Render.com Setup**
+1. **Railway.app Setup**
+   - Create an account on [Railway.app](https://railway.app)
+   - Install the Railway CLI: `npm i -g @railway/cli`
+   - Login to Railway: `railway login`
+   - Initialize your project: `railway init`
+   - Link your repository: `railway link`
+   - Add the following environment variables in Railway dashboard:
+     ```
+     # OpenAI Configuration
+     OPENAI_API_KEY=your_openai_api_key
+
+     # Twilio Configuration
+     TWILIO_ACCOUNT_SID=your_twilio_account_sid
+     TWILIO_AUTH_TOKEN=your_twilio_auth_token
+     TWILIO_PHONE_NUMBER=your_twilio_phone_number
+
+     # Server Configuration
+     NODE_ENV=production
+     PORT=3000
+     ```
+   - Deploy your application:
+     ```bash
+     # Deploy from CLI
+     railway up
+     
+     # Or deploy from GitHub
+     # 1. Connect your GitHub repository in Railway dashboard
+     # 2. Enable automatic deployments
+     ```
+   - Update your Twilio webhook URLs to point to your Railway domain:
+     - Voice webhook: `https://your-railway-domain.railway.app/twilio/voice`
+     - Status callback: `https://your-railway-domain.railway.app/twilio/status`
+
+2. **Render.com Setup**
    - Create an account on render.com
    - Connect your GitHub repository
    - Create a new Web Service
@@ -149,11 +182,6 @@ For production deployment, we recommend using Render.com:
      NODE_ENV=production
      PORT=10000  # Render will override this
      ```
-
-2. **Alternative Hosting Options**
-   - Railway.app
-   - DigitalOcean App Platform
-   - Heroku
 
 ### Build Optimization
 

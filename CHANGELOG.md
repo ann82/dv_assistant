@@ -289,4 +289,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory issues during build process
 - Large bundle sizes
 - Slow build times
-- Excessive memory usage in production builds 
+- Excessive memory usage in production builds
+
+## [1.6.0] - 2024-03-25
+
+### Added
+- Railway.app deployment configuration
+- Railway CLI integration
+- Health check endpoint for Railway
+- Automatic deployment setup
+- Railway-specific environment configuration
+
+### Changed
+- Updated deployment documentation
+- Enhanced deployment options
+- Improved health check implementation
+- Updated webhook configuration for Railway
+
+### Fixed
+- Deployment configuration issues
+- Health check timeout settings
+- Environment variable handling 
