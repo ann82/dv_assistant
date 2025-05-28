@@ -1,59 +1,55 @@
-import { RealtimeRelay } from './lib/relay.js';
-import { TwilioHandler, validateTwilioRequest } from './lib/twilio.js';
 import express from 'express';
-import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { TwilioWebSocketServer } from './websocketServer.js';
+import { config } from './lib/config.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
 
-// Load environment variables from root directory
-dotenv.config({ path: path.join(rootDir, '.env'), override: true });
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
-
-if (!OPENAI_API_KEY) {
-  console.error(
-    `Environment variable "OPENAI_API_KEY" is required.\n` +
-      `Please set it in your .env file.`
-  );
-  process.exit(1);
-}
-
-if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-  console.error(
-    `Twilio credentials are required.\n` +
-      `Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in your .env file.`
-  );
-  process.exit(1);
-}
-
-const HTTP_PORT = parseInt(process.env.HTTP_PORT) || 8081;
-const WS_PORT = parseInt(process.env.WS_PORT) || 8083;
-
-// Initialize Express app for Twilio webhooks
 const app = express();
-app.use(express.urlencoded({ extended: true }));
+const server = createServer(app);
+
+// Create WebSocket server
+const wss = new TwilioWebSocketServer(server);
+
+// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Initialize Twilio handler
-const twilioHandler = new TwilioHandler(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER);
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, '../build')));
 
-// Twilio webhook endpoints
-app.post('/twilio/voice', validateTwilioRequest, (req, res) => twilioHandler.handleIncomingCall(req, res));
-app.post('/twilio/voice/process', validateTwilioRequest, (req, res) => twilioHandler.handleCallProcessing(req, res));
-app.post('/twilio/message', validateTwilioRequest, (req, res) => twilioHandler.handleIncomingMessage(req, res));
+// Serve audio files
+app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
 
-// Initialize WebSocket relay
-const relay = new RealtimeRelay(OPENAI_API_KEY);
+// API routes
+app.use('/twilio', (await import('./routes/twilio.js')).default);
 
-// Start servers
-app.listen(HTTP_PORT, () => {
-  console.log(`HTTP server listening on port ${HTTP_PORT}`);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
-relay.listen(WS_PORT); // WebSocket server on different port
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../build', 'index.html'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
