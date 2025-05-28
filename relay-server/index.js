@@ -33,7 +33,24 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint - must be before static file serving
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  try {
+    console.log('Health check requested');
+    const healthData = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      memory: process.memoryUsage(),
+      uptime: process.uptime()
+    };
+    console.log('Health check response:', healthData);
+    res.status(200).json(healthData);
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ 
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Serve static files from the React build directory
@@ -52,8 +69,11 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Application error:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+  });
 });
 
 // Start server
@@ -62,6 +82,7 @@ server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check available at: http://localhost:${PORT}/health`);
+  console.log('Server startup complete');
 }).on('error', (err) => {
   console.error('Failed to start server:', err);
   process.exit(1);
