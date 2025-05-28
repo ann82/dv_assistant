@@ -14,6 +14,7 @@ A voice-based AI assistant that provides support and resources for people experi
 - Emergency contact information
 - Comprehensive call logging and monitoring
 - Enhanced error handling and debugging
+- Optimized build process for better performance
 
 ## System Architecture
 
@@ -39,6 +40,28 @@ The system consists of three main components:
    - Resource management
    - Analytics
    - Call logs and debugging information
+
+## Build and Performance Optimization
+
+The project includes several optimizations for better build performance and reduced memory usage:
+
+1. **Memory Management**
+   - Limited Node.js memory usage to 512MB
+   - Optimized chunk sizes for better loading
+   - Filesystem caching for faster builds
+   - Performance budgets for bundle sizes
+
+2. **Build Process**
+   - Code splitting for better loading times
+   - Vendor chunking for third-party dependencies
+   - Production-only optimizations
+   - Minification and compression
+
+3. **Dependencies**
+   - Optimized package structure
+   - Separated development and production dependencies
+   - Removed unnecessary packages
+   - Better dependency management
 
 ## Setup
 
@@ -132,6 +155,27 @@ For production deployment, we recommend using Render.com:
    - DigitalOcean App Platform
    - Heroku
 
+### Build Optimization
+
+The project includes several build optimizations to ensure efficient deployment:
+
+1. **Memory Management**
+   - Node.js memory limit set to 512MB
+   - Optimized chunk sizes
+   - Filesystem caching
+   - Performance budgets
+
+2. **Build Process**
+   - Code splitting
+   - Vendor chunking
+   - Production optimizations
+   - Minification
+
+3. **Dependencies**
+   - Optimized package structure
+   - Development/production separation
+   - Removed unnecessary packages
+
 ### Troubleshooting
 
 #### Common Issues
@@ -155,6 +199,12 @@ For production deployment, we recommend using Render.com:
    - Check if the audio files are being generated correctly
    - Verify the audio file paths in the TwiML response
    - Ensure the audio files are accessible via the public URL
+
+5. **Build Memory Issues**
+   - Check the `.npmrc` configuration
+   - Verify webpack memory settings
+   - Ensure proper chunk sizes
+   - Monitor build performance
 
 ## Development
 
@@ -207,6 +257,12 @@ The system provides comprehensive logging for debugging:
    - Detailed error messages
    - Stack traces
    - Call context information
+
+4. **Build Performance**
+   - Bundle size monitoring
+   - Chunk analysis
+   - Memory usage tracking
+   - Build time metrics
 
 ## Security
 

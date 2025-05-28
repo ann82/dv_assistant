@@ -2,6 +2,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
 import webpack from 'webpack';
+import TerserPlugin from 'terser-webpack-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,8 +88,45 @@ export default {
   devtool: isDevelopment ? 'source-map' : false,
   optimization: {
     minimize: !isDevelopment,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          compress: {
+            drop_console: !isDevelopment,
+            drop_debugger: !isDevelopment
+          }
+        }
+      })
+    ],
     splitChunks: {
-      chunks: 'all'
+      chunks: 'all',
+      maxSize: 244000,
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+          priority: 10
+        },
+        common: {
+          name: 'common',
+          minChunks: 2,
+          chunks: 'all',
+          priority: -20
+        }
+      }
+    },
+    runtimeChunk: 'single'
+  },
+  performance: {
+    hints: 'warning',
+    maxEntrypointSize: 512000,
+    maxAssetSize: 512000
+  },
+  cache: {
+    type: 'filesystem',
+    buildDependencies: {
+      config: [__filename]
     }
   }
 }; 

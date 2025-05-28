@@ -267,4 +267,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shelter search and location services
 - Resource information and support
 - OpenAI Realtime API integration
-- WebSocket relay server 
+- WebSocket relay server
+
+## [1.5.0] - 2024-03-25
+
+### Added
+- Memory optimization for build process
+- Webpack code splitting and chunk optimization
+- Filesystem caching for faster builds
+- Performance budgets for bundle sizes
+- TerserPlugin for better minification
+
+### Changed
+- Optimized package.json dependencies
+- Improved webpack configuration
+- Enhanced build process for better memory usage
+- Updated npm configuration for better performance
+- Split dependencies between production and development
+
+### Fixed
+- Memory issues during build process
+- Large bundle sizes
+- Slow build times
+- Excessive memory usage in production builds 
