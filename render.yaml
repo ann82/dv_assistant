@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: openai-realtime-console
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: standard
+    memory: 512MB
+    disk: 1GB
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production 

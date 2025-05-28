@@ -9,6 +9,15 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Memory monitoring
+const logMemoryUsage = () => {
+  const used = process.memoryUsage();
+  console.log(`Memory usage: ${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+};
+
+// Log memory usage every 5 minutes
+setInterval(logMemoryUsage, 5 * 60 * 1000);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
