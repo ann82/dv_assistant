@@ -31,6 +31,11 @@ const wss = new TwilioWebSocketServer(server);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check endpoint - must be before static file serving
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Serve static files from the React build directory
 app.use(express.static(path.join(__dirname, '../build')));
 
@@ -39,11 +44,6 @@ app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
 
 // API routes
 app.use('/twilio', (await import('./routes/twilio.js')).default);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
 
 // Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
@@ -61,4 +61,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Health check available at: http://localhost:${PORT}/health`);
 });
