@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2024-03-24
+
+### Added
+- Webpack configuration for production builds
+- Proper static file serving configuration
+- Health check endpoint for monitoring
+- Enhanced error handling middleware
+- Production deployment configuration for Render.com
+
+### Changed
+- Updated server configuration to use environment variables
+- Improved static file serving for audio files
+- Enhanced build process with proper webpack configuration
+- Updated deployment documentation
+- Moved audio files to `relay-server/public/audio` directory
+
+### Fixed
+- Audio file serving path issues
+- Static file serving configuration
+- Build process for production deployment
+- Environment variable handling
+
 ## Deployment and Audio Issues - [Current Date]
 
 ### Fixed

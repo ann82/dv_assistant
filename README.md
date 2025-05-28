@@ -51,7 +51,7 @@ The system consists of three main components:
 
 ### Environment Variables
 
-Create a `.env` file in the `relay-server` directory:
+Create a `.env` file in the root directory:
 
 ```env
 # Twilio Configuration
@@ -72,16 +72,21 @@ LOG_LEVEL=info  # Options: debug, info, warn, error
 
 1. Install dependencies:
 ```bash
-cd relay-server
 npm install
 ```
 
-2. Start the server:
+2. Start the development server:
 ```bash
+npm run dev
+```
+
+3. For production build:
+```bash
+npm run build
 npm start
 ```
 
-3. Set up Twilio webhook:
+4. Set up Twilio webhook:
    - Voice webhook URL: `https://your-domain/twilio/voice`
    - Status callback URL: `https://your-domain/twilio/status`
 
@@ -97,35 +102,35 @@ For local development, you can use ngrok to create a temporary public URL:
 Note: ngrok URLs are temporary and will change each time you restart ngrok. For production, use a proper hosting service.
 
 ### Production Deployment
-For production deployment, we recommend using one of these hosting services:
+For production deployment, we recommend using Render.com:
 
-1. **Render.com** (Recommended)
-   - Free tier available
-   - Easy deployment from GitHub
-   - Automatic SSL certificates
-   - Steps:
-     1. Create an account on render.com
-     2. Connect your GitHub repository
-     3. Create a new Web Service
-     4. Set build command: `npm install`
-     5. Set start command: `node relay-server/server.js`
-     6. Add your environment variables
-     7. Deploy
+1. **Render.com Setup**
+   - Create an account on render.com
+   - Connect your GitHub repository
+   - Create a new Web Service
+   - Configure the following:
+     - Build Command: `npm run build`
+     - Start Command: `npm start`
+     - Node Version: 18 (or latest LTS)
+   - Add the following environment variables:
+     ```
+     # OpenAI Configuration
+     OPENAI_API_KEY=your_openai_api_key
 
-2. **Railway.app**
-   - Free tier available
-   - Simple deployment process
-   - Good for Node.js applications
+     # Twilio Configuration
+     TWILIO_ACCOUNT_SID=your_twilio_account_sid
+     TWILIO_AUTH_TOKEN=your_twilio_auth_token
+     TWILIO_PHONE_NUMBER=your_twilio_phone_number
 
-3. **DigitalOcean App Platform**
-   - Paid but very reliable
-   - Good for production workloads
-   - Built-in monitoring
+     # Server Configuration
+     NODE_ENV=production
+     PORT=10000  # Render will override this
+     ```
 
-4. **Heroku**
-   - Free tier available
-   - Well-established platform
-   - Good for Node.js applications
+2. **Alternative Hosting Options**
+   - Railway.app
+   - DigitalOcean App Platform
+   - Heroku
 
 ### Troubleshooting
 
@@ -137,7 +142,7 @@ For production deployment, we recommend using one of these hosting services:
    - Ensure your server is accessible from the internet
 
 2. **404 Not Found for Audio Files**
-   - Verify that audio files are in the correct directory
+   - Verify that audio files are in the correct directory (`relay-server/public/audio`)
    - Check file permissions
    - Ensure the static file serving is configured correctly
 
@@ -151,39 +156,29 @@ For production deployment, we recommend using one of these hosting services:
    - Verify the audio file paths in the TwiML response
    - Ensure the audio files are accessible via the public URL
 
-## Usage
-
-1. Call the Twilio phone number
-2. The system will:
-   - Play a welcome message
-   - Listen for your input
-   - Process your request using GPT
-   - Respond with helpful information
-   - Continue the conversation
-   - Log all call activities and status changes
-
 ## Development
 
 ### Project Structure
 
 ```
-relay-server/
-├── lib/
-│   ├── config.js
-│   └── twilio.js
-├── routes/
-│   └── twilio.js
-├── services/
-│   └── audioService.js
-├── websocketServer.js
-├── server.js
-└── package.json
-
-web/
+├── relay-server/
+│   ├── lib/
+│   │   ├── config.js
+│   │   └── twilio.js
+│   ├── routes/
+│   │   └── twilio.js
+│   ├── services/
+│   │   └── audioService.js
+│   ├── public/
+│   │   └── audio/
+│   ├── websocketServer.js
+│   └── index.js
 ├── src/
 │   ├── components/
 │   ├── pages/
 │   └── services/
+├── public/
+├── webpack.config.js
 └── package.json
 ```
 
