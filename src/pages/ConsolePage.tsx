@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
+import { SpeechHandler } from '../lib/speech.js';
 import { instructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
@@ -154,14 +155,10 @@ export function ConsolePage() {
   /**
    * Instantiate:
    * - WavRecorder (speech input)
-   * - WavStreamPlayer (speech output)
    * - RealtimeClient (API client)
    */
   const wavRecorderRef = useRef<WavRecorder>(
     new WavRecorder({ sampleRate: 24000 })
-  );
-  const wavStreamPlayerRef = useRef<WavStreamPlayer>(
-    new WavStreamPlayer({ sampleRate: 24000 })
   );
   const clientRef = useRef<RealtimeClient>(
     new RealtimeClient(
@@ -212,6 +209,9 @@ export function ConsolePage() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Add speech handler
+  const speechHandlerRef = useRef<SpeechHandler>(new SpeechHandler());
+
   /**
    * Utility for formatting the timing of logs
    */
@@ -247,12 +247,11 @@ export function ConsolePage() {
 
   /**
    * Connect to conversation:
-   * WavRecorder taks speech input, WavStreamPlayer output, client is API client
+   * WavRecorder taks speech input, RealtimeClient is API client
    */
   const connectConversation = useCallback(async () => {
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
 
     try {
       // Set state variables
@@ -264,9 +263,6 @@ export function ConsolePage() {
 
       // Connect to microphone
       await wavRecorder.begin();
-
-      // Connect to audio output
-      await wavStreamPlayer.connect();
 
       // Connect to realtime API
       await client.connect();
@@ -307,14 +303,14 @@ export function ConsolePage() {
     });
     setMarker(null);
 
+    // Stop speech synthesis
+    speechHandlerRef.current.stop();
+
     const client = clientRef.current;
     client.disconnect();
 
     const wavRecorder = wavRecorderRef.current;
     await wavRecorder.end();
-
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    await wavStreamPlayer.interrupt();
   }, []);
 
   const deleteConversationItem = useCallback(async (id: string) => {
@@ -360,10 +356,6 @@ export function ConsolePage() {
     const clientCanvas = clientCanvasRef.current;
     let clientCtx: CanvasRenderingContext2D | null = null;
 
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    const serverCanvas = serverCanvasRef.current;
-    let serverCtx: CanvasRenderingContext2D | null = null;
-
     const render = () => {
       if (isLoaded) {
         if (clientCanvas) {
@@ -382,28 +374,6 @@ export function ConsolePage() {
               clientCtx,
               result.values,
               '#0099ff',
-              10,
-              0,
-              8
-            );
-          }
-        }
-        if (serverCanvas) {
-          if (!serverCanvas.width || !serverCanvas.height) {
-            serverCanvas.width = serverCanvas.offsetWidth;
-            serverCanvas.height = serverCanvas.offsetHeight;
-          }
-          serverCtx = serverCtx || serverCanvas.getContext('2d');
-          if (serverCtx) {
-            serverCtx.clearRect(0, 0, serverCanvas.width, serverCanvas.height);
-            const result = wavStreamPlayer.analyser
-              ? wavStreamPlayer.getFrequencies('voice')
-              : { values: new Float32Array([0]) };
-            WavRenderer.drawBars(
-              serverCanvas,
-              serverCtx,
-              result.values,
-              '#009900',
               10,
               0,
               8
@@ -466,7 +436,6 @@ export function ConsolePage() {
    */
   useEffect(() => {
     // Get refs
-    const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
     const shelters = [
       { id: 1, name: 'La Casa de las Madres',lat: 37.7610277, lng: -122.4690144, location: 'San Francisco', allows_children: true },
@@ -719,24 +688,24 @@ export function ConsolePage() {
     });
     client.on('error', (event: any) => console.error(event));
     client.on('conversation.interrupted', async () => {
-      const trackSampleOffset = await wavStreamPlayer.interrupt();
-      if (trackSampleOffset?.trackId) {
-        const { trackId, offset } = trackSampleOffset;
-        await client.cancelResponse(trackId, offset);
-      }
+      await client.cancelResponse('', 0);
     });
     client.on('conversation.updated', async ({ item, delta }: any) => {
       const items = client.conversation.getItems();
-      if (delta?.audio) {
-        wavStreamPlayer.add16BitPCM(delta.audio, item.id);
-      }
-      if (item.status === 'completed' && item.formatted.audio?.length) {
-        const wavFile = await WavRecorder.decode(
-          item.formatted.audio,
-          24000,
-          24000
-        );
-        item.formatted.file = wavFile;
+      if (item.status === 'completed' && item.role === 'assistant') {
+        // Only speak important responses
+        const text = item.formatted.text || item.formatted.transcript;
+        if (text && 
+            !text.includes('function_call_output') && 
+            !text.includes('tool') && 
+            !text.includes('I apologize') && 
+            !text.includes('encountered an error')) {
+          try {
+            await speechHandlerRef.current.speak(text);
+          } catch (error) {
+            console.error('Error speaking text:', error);
+          }
+        }
       }
       setItems(items);
     });
@@ -763,6 +732,18 @@ export function ConsolePage() {
       client.reset();
     };
   }, [getCurrentLocation]);
+
+  // Initialize speech handler
+  useEffect(() => {
+    const initSpeech = async () => {
+      try {
+        await speechHandlerRef.current.init();
+      } catch (error) {
+        console.error('Error initializing speech:', error);
+      }
+    };
+    initSpeech();
+  }, []);
 
   /**
    * Render the application
@@ -804,9 +785,6 @@ export function ConsolePage() {
             <div className="visualization">
               <div className="visualization-entry client">
                 <canvas ref={clientCanvasRef} />
-              </div>
-              <div className="visualization-entry server">
-                <canvas ref={serverCanvasRef} />
               </div>
             </div>
             <div className="content-block-title">events</div>
@@ -882,15 +860,11 @@ export function ConsolePage() {
                   <div className="conversation-item" key={conversationItem.id}>
                     <div className={`speaker ${conversationItem.role || ''}`}>
                       <div>
-                        {(
-                          conversationItem.role || conversationItem.type
-                        ).replaceAll('_', ' ')}
+                        {conversationItem.role === 'assistant' ? 'Harbor' : 'You'}
                       </div>
                       <div
                         className="close"
-                        onClick={() =>
-                          deleteConversationItem(conversationItem.id)
-                        }
+                        onClick={() => deleteConversationItem(conversationItem.id)}
                       >
                         <X />
                       </div>
@@ -923,12 +897,6 @@ export function ConsolePage() {
                               '(truncated)'}
                           </div>
                         )}
-                      {conversationItem.formatted.file && (
-                        <audio
-                          src={conversationItem.formatted.file.url}
-                          controls
-                        />
-                      )}
                     </div>
                   </div>
                 );
