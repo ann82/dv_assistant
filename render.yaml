@@ -9,6 +9,7 @@ services:
     disk: 1GB
     healthCheckPath: /health
     autoDeploy: true
+    restartPolicyType: always
     envVars:
       - key: NODE_ENV
         value: production 
