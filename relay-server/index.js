@@ -34,10 +34,19 @@ console.log('Server directory:', __dirname);
 const app = express();
 const server = createServer(app);
 
-// Create WebSocket server
-console.log('Initializing WebSocket server...');
-const wss = new TwilioWebSocketServer(server);
-console.log('WebSocket server initialized');
+// Initialize WebSocket server and audio service
+console.log('Initializing WebSocket server and audio service...');
+let wss;
+try {
+  wss = new TwilioWebSocketServer(server);
+  console.log('WebSocket server and audio service initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize WebSocket server:', error);
+  process.exit(1);
+}
+
+// Make WebSocket server available globally
+global.wss = wss;
 
 // Middleware
 app.use(express.json());
@@ -55,6 +64,10 @@ app.get('/health', (req, res) => {
       env: {
         NODE_ENV: process.env.NODE_ENV,
         PORT: process.env.PORT
+      },
+      services: {
+        websocket: wss ? 'initialized' : 'not initialized',
+        audioService: wss?.audioService ? 'initialized' : 'not initialized'
       }
     };
     console.log('Health check response:', healthData);

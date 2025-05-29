@@ -21,6 +21,14 @@ router.setWebSocketServer = (server) => {
   wsServer = server;
 };
 
+// Get the global WebSocket server instance
+const getWebSocketServer = () => {
+  if (!global.wss) {
+    throw new Error('WebSocket server or audio service not initialized');
+  }
+  return global.wss;
+};
+
 // Function to fetch and log Twilio call details
 async function logTwilioCallDetails(callSid) {
   try {
@@ -125,9 +133,8 @@ router.post('/voice', (req, res) => {
     }, 'How can I help you today?');
 
     // Register the call with WebSocket server
-    if (wsServer) {
-      wsServer.registerCall(req.body.CallSid);
-    }
+    const wss = getWebSocketServer();
+    wss.registerCall(req.body.CallSid);
 
     // Start media stream
     const connect = twiml.connect();
@@ -165,7 +172,8 @@ router.post('/status', async (req, res) => {
       case 'busy':
       case 'no-answer':
         // Clean up audio files for this call
-        if (wsServer && wsServer.audioService) {
+        const wss = getWebSocketServer();
+        if (wss && wss.audioService) {
           const audioDir = path.join(__dirname, '..', 'public', 'audio');
           fsSync.readdir(audioDir, (err, files) => {
             if (err) {
@@ -222,7 +230,8 @@ router.post('/voice/process', async (req, res) => {
       confidence: req.body.Confidence
     });
 
-    if (!wsServer || !wsServer.audioService) {
+    const wss = getWebSocketServer();
+    if (!wss || !wss.audioService) {
       throw new Error('WebSocket server or audio service not initialized');
     }
 
@@ -230,7 +239,7 @@ router.post('/voice/process', async (req, res) => {
     
     // Get GPT response for the speech result
     console.log('Getting GPT response...');
-    const gptResponse = await wsServer.audioService.getGptReply(req.body.SpeechResult);
+    const gptResponse = await wss.audioService.getGptReply(req.body.SpeechResult);
     console.log('GPT Response:', gptResponse);
 
     if (!gptResponse || !gptResponse.text) {
@@ -293,7 +302,7 @@ router.post('/voice/process', async (req, res) => {
 
     // Generate TTS for the response
     console.log('Generating TTS...');
-    const ttsResponse = await wsServer.audioService.generateTTS(truncatedText);
+    const ttsResponse = await wss.audioService.generateTTS(truncatedText);
     console.log('TTS Response:', ttsResponse);
 
     if (!ttsResponse || !ttsResponse.audioPath) {
