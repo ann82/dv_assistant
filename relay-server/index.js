@@ -70,12 +70,12 @@ app.get('/health', (req, res) => {
 });
 
 // Serve static files from the React build directory
-const buildPath = path.join(__dirname, '../build');
+const buildPath = path.join(__dirname, '..', 'build');
 console.log('Serving static files from:', buildPath);
 app.use(express.static(buildPath));
 
 // Serve audio files
-const audioPath = path.join(__dirname, 'public/audio');
+const audioPath = path.join(__dirname, 'public', 'audio');
 console.log('Serving audio files from:', audioPath);
 app.use('/audio', express.static(audioPath));
 
@@ -86,7 +86,7 @@ console.log('API routes setup complete');
 
 // Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../build', 'index.html'));
+  res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 // Error handling middleware
