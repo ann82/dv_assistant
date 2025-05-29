@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2024-03-29
+
+### Added
+- Enhanced health check endpoint with detailed system information
+- Comprehensive server startup logging
+- Memory usage monitoring and reporting
+- Detailed error tracking for deployment issues
+
+### Changed
+- Updated server directory structure for better organization
+- Improved static file serving configuration
+- Enhanced error handling middleware with better logging
+- Updated Railway deployment configuration
+
+### Fixed
+- Resolved missing uuid package dependency
+- Fixed package-lock.json synchronization issues
+- Corrected server startup directory issues
+- Addressed health check endpoint failures
+
 ## [1.4.0] - 2024-03-24
 
 ### Added
@@ -268,28 +288,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resource information and support
 - OpenAI Realtime API integration
 - WebSocket relay server
-
-## [1.5.0] - 2024-03-25
-
-### Added
-- Memory optimization for build process
-- Webpack code splitting and chunk optimization
-- Filesystem caching for faster builds
-- Performance budgets for bundle sizes
-- TerserPlugin for better minification
-
-### Changed
-- Optimized package.json dependencies
-- Improved webpack configuration
-- Enhanced build process for better memory usage
-- Updated npm configuration for better performance
-- Split dependencies between production and development
-
-### Fixed
-- Memory issues during build process
-- Large bundle sizes
-- Slow build times
-- Excessive memory usage in production builds
 
 ## [1.6.0] - 2024-03-25
 

@@ -160,6 +160,29 @@ For production deployment, we recommend using Render.com or Railway.app:
      - Voice webhook: `https://your-railway-domain.railway.app/twilio/voice`
      - Status callback: `https://your-railway-domain.railway.app/twilio/status`
 
+   **Health Check Configuration**
+   - The application includes a health check endpoint at `/health`
+   - Railway automatically monitors this endpoint
+   - The health check provides:
+     - Server status
+     - Memory usage
+     - Uptime
+     - Environment information
+   - Configure in `railway.toml`:
+     ```toml
+     [deploy]
+     healthcheckPath = "/health"
+     healthcheckTimeout = 100
+     restartPolicyType = "always"
+     ```
+
+   **Troubleshooting Deployment**
+   - Check Railway logs for detailed error messages
+   - Verify all environment variables are set
+   - Ensure package.json and package-lock.json are in sync
+   - Monitor memory usage through the health check endpoint
+   - Check server startup logs for any initialization issues
+
 2. **Render.com Setup**
    - Create an account on render.com
    - Connect your GitHub repository
