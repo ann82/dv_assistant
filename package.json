@@ -18,13 +18,14 @@
   },
   "scripts": {
     "start": "node relay-server/index.js",
-    "build": "webpack --mode production",
+    "build": "NODE_ENV=production webpack --mode production",
     "dev": "webpack serve --mode development",
     "relay": "nodemon ./relay-server/index.js",
-    "test": "vitest run",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:esm": "vitest run"
+    "test": "NODE_ENV=test vitest run",
+    "test:watch": "NODE_ENV=test vitest",
+    "test:coverage": "NODE_ENV=test vitest run --coverage",
+    "test:jest": "NODE_ENV=test jest",
+    "test:jest:watch": "NODE_ENV=test jest --watch"
   },
   "devDependencies": {
     "@babel/core": "^7.27.3",

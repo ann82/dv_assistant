@@ -45,23 +45,72 @@ The system consists of three main components:
 
 The project includes several optimizations for better build performance and reduced memory usage:
 
-1. **Memory Management**
+1. **Module System**
+   - ES modules for production builds
+   - CommonJS transformation for tests
+   - Proper module compatibility in all environments
+   - Optimized module loading and transformation
+
+2. **Memory Management**
    - Limited Node.js memory usage to 512MB
    - Optimized chunk sizes for better loading
    - Filesystem caching for faster builds
    - Performance budgets for bundle sizes
 
-2. **Build Process**
+3. **Build Process**
    - Code splitting for better loading times
    - Vendor chunking for third-party dependencies
    - Production-only optimizations
    - Minification and compression
+   - Environment-specific configurations
 
-3. **Dependencies**
+4. **Dependencies**
    - Optimized package structure
    - Separated development and production dependencies
    - Removed unnecessary packages
    - Better dependency management
+
+### Build Configuration
+
+The project uses a modern build setup with the following features:
+
+1. **Webpack Configuration**
+   - Production and development modes
+   - Code splitting and lazy loading
+   - Asset optimization
+   - Source map generation
+   - Hot module replacement for development
+
+2. **Babel Configuration**
+   - ES modules support
+   - React and TypeScript presets
+   - Environment-specific transformations
+   - Test environment optimizations
+
+3. **Test Configuration**
+   - Vitest for ESM tests
+   - Jest for CommonJS tests
+   - Environment-specific test settings
+   - Coverage reporting
+
+### Build Commands
+
+```bash
+# Production build
+npm run build
+
+# Development server
+npm run dev
+
+# Run tests
+npm test
+
+# Watch mode for tests
+npm run test:watch
+
+# Test coverage
+npm run test:coverage
+```
 
 ## Setup
 
