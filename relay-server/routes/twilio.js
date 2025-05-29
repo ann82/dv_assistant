@@ -221,8 +221,8 @@ router.post('/recording', (req, res) => {
   }
 });
 
-// Handle speech results
-router.post('/voice/process', async (req, res) => {
+// Refactored handler for /voice/process
+export async function handleTwilioWebhook(req, res) {
   try {
     console.log('Processing speech result:', {
       callSid: req.body.CallSid,
@@ -236,7 +236,6 @@ router.post('/voice/process', async (req, res) => {
     }
 
     const twiml = new twilio.twiml.VoiceResponse();
-    
     // Get GPT response for the speech result
     console.log('Getting GPT response...');
     const gptResponse = await wss.audioService.getGptReply(req.body.SpeechResult);
@@ -264,7 +263,6 @@ router.post('/voice/process', async (req, res) => {
             break;
           }
         }
-        
         // If we found a complete resource, use it
         if (lastCompleteResource) {
           const lastResourceIndex = truncatedText.lastIndexOf(lastCompleteResource) + lastCompleteResource.length;
@@ -278,9 +276,9 @@ router.post('/voice/process', async (req, res) => {
             // If no period found, find the last space
             const lastSpace = truncatedText.substring(0, maxResponseLength).lastIndexOf(' ');
             if (lastSpace > 0) {
-              truncatedText = truncatedText.substring(0, lastSpace) + "...";
+              truncatedText = truncatedText.substring(0, lastSpace) + '...';
             } else {
-              truncatedText = truncatedText.substring(0, maxResponseLength) + "...";
+              truncatedText = truncatedText.substring(0, maxResponseLength) + '...';
             }
           }
         }
@@ -292,9 +290,9 @@ router.post('/voice/process', async (req, res) => {
         } else {
           const lastSpace = truncatedText.substring(0, maxResponseLength).lastIndexOf(' ');
           if (lastSpace > 0) {
-            truncatedText = truncatedText.substring(0, lastSpace) + "...";
+            truncatedText = truncatedText.substring(0, lastSpace) + '...';
           } else {
-            truncatedText = truncatedText.substring(0, maxResponseLength) + "...";
+            truncatedText = truncatedText.substring(0, maxResponseLength) + '...';
           }
         }
       }
@@ -314,23 +312,54 @@ router.post('/voice/process', async (req, res) => {
     const audioUrl = `https://${domain}${ttsResponse.audioPath}`;
     console.log('Audio URL:', audioUrl);
 
-    // Verify the audio file exists
-    if (!fsSync.existsSync(ttsResponse.fullPath)) {
-      console.error('Audio file not found:', {
-        fullPath: ttsResponse.fullPath,
-        audioPath: ttsResponse.audioPath,
-        size: ttsResponse.size,
-        cwd: process.cwd()
-      });
-      throw new Error('Audio file not found: ' + ttsResponse.fullPath);
+    // Verify the audio file exists and is completely written
+    console.log('Verifying audio file...');
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryDelay = 1000; // 1 second
+
+    while (retryCount < maxRetries) {
+      try {
+        // Check if file exists
+        if (!fsSync.existsSync(ttsResponse.fullPath)) {
+          throw new Error('Audio file not found: ' + ttsResponse.fullPath);
+        }
+        // Get file stats
+        const stats = await fs.stat(ttsResponse.fullPath);
+        // Verify file size is greater than 0
+        if (stats.size === 0) {
+          throw new Error('Audio file is empty');
+        }
+        // Verify file is not being written to
+        const initialSize = stats.size;
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+        const finalSize = (await fs.stat(ttsResponse.fullPath)).size;
+        if (initialSize !== finalSize) {
+          throw new Error('Audio file is still being written');
+        }
+        console.log('Audio file verified:', {
+          path: ttsResponse.fullPath,
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime
+        });
+        // File is ready, break the retry loop
+        break;
+      } catch (error) {
+        retryCount++;
+        if (retryCount === maxRetries) {
+          console.error('Failed to verify audio file after retries:', error);
+          throw error;
+        }
+        console.log(`Retry ${retryCount}/${maxRetries} - Waiting for audio file to be ready...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
     }
 
     // First play the response
     twiml.play(audioUrl);
-
     // Add a pause to let the user respond
     twiml.pause({ length: 2 });
-
     // Then set up the next gather
     const gather = twiml.gather({
       input: 'speech',
@@ -342,31 +371,25 @@ router.post('/voice/process', async (req, res) => {
       language: 'en-US',
       timeout: 10
     });
-
     gather.say({
       voice: 'Polly.Amy',
       language: 'en-US'
     }, 'How else can I help you?');
-
     const twimlString = twiml.toString();
     console.log('Generated TwiML:', twimlString);
-    
     res.type('text/xml');
     res.send(twimlString);
   } catch (error) {
     console.error('Error processing speech result:', error);
     console.error('Error stack:', error.stack);
-    
     // Generate error TwiML
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say({
       voice: 'Polly.Amy',
       language: 'en-US'
     }, 'I apologize, but I encountered an error. Please try again.');
-
     // Add a pause
     twiml.pause({ length: 1 });
-
     // Set up the next gather
     const gather = twiml.gather({
       input: 'speech',
@@ -377,18 +400,18 @@ router.post('/voice/process', async (req, res) => {
       enhanced: 'true',
       language: 'en-US'
     });
-
     gather.say({
       voice: 'Polly.Amy',
       language: 'en-US'
     }, 'How can I help you?');
-
     const twimlString = twiml.toString();
     console.log('Error TwiML:', twimlString);
-    
     res.type('text/xml');
     res.send(twimlString);
   }
-});
+}
+
+// Attach the named handler to the router
+router.post('/voice/process', handleTwilioWebhook);
 
 export default router; 

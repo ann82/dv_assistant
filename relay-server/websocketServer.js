@@ -210,4 +210,57 @@ export class TwilioWebSocketServer {
       }));
     }
   }
+
+  // --- Test-friendly methods for compatibility with generic WebSocketServer tests ---
+  addClient(callSid, ws) {
+    this.activeCalls.set(callSid, { ws, timestamp: Date.now(), status: 'connected' });
+  }
+
+  removeClient(callSid) {
+    this.activeCalls.delete(callSid);
+  }
+
+  getClient(callSid) {
+    const entry = this.activeCalls.get(callSid);
+    return entry ? entry.ws : undefined;
+  }
+
+  getClientCount() {
+    return this.activeCalls.size;
+  }
+
+  sendToClient(callSid, message) {
+    const entry = this.activeCalls.get(callSid);
+    if (entry && entry.ws && entry.ws.readyState === 1) {
+      try {
+        entry.ws.send(JSON.stringify(message));
+      } catch (err) {
+        this.activeCalls.delete(callSid);
+      }
+    }
+  }
+
+  broadcast(message) {
+    for (const [callSid, entry] of this.activeCalls.entries()) {
+      if (entry.ws && entry.ws.readyState === 1) {
+        try {
+          entry.ws.send(JSON.stringify(message));
+        } catch (err) {
+          this.activeCalls.delete(callSid);
+        }
+      }
+    }
+  }
+
+  close() {
+    for (const [callSid, entry] of this.activeCalls.entries()) {
+      if (entry.ws && typeof entry.ws.close === 'function') {
+        entry.ws.close();
+      }
+    }
+    this.activeCalls.clear();
+    if (this.wss && typeof this.wss.close === 'function') {
+      this.wss.close();
+    }
+  }
 } 

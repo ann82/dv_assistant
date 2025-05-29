@@ -113,6 +113,45 @@ npm start
    - Voice webhook URL: `https://your-domain/twilio/voice`
    - Status callback URL: `https://your-domain/twilio/status`
 
+### Testing
+
+The project includes a comprehensive and robust test suite for the Twilio webhook handler, WebSocket server, and audio service logic:
+
+1. Run tests:
+```bash
+npm test
+```
+
+2. Test Coverage:
+   - Webhook request validation
+   - Error handling scenarios
+   - Mock service interactions (Twilio, WebSocket, file system)
+   - Response formatting
+   - Edge cases and error conditions
+   - WebSocket connection and event handling
+   - Audio file verification and error simulation
+
+3. Test Structure:
+   - Extensive use of mock implementations for Twilio, WebSocket, and file system modules
+   - Isolated test cases for each scenario
+   - Proper error handling verification
+   - Response validation
+   - Event-driven logic simulation
+
+4. Common Test Scenarios:
+   - Valid webhook requests
+   - Invalid request handling
+   - Service and file system errors
+   - WebSocket connection/disconnection
+   - Response formatting
+   - Error message validation
+
+**Recent Improvements:**
+- Improved reliability and coverage of the test suite
+- Robust mocking for Twilio, WebSocket, and file system interactions
+- Fixed issues with mock handler registration and event simulation
+- All tests now pass, ensuring high confidence in code changes
+
 ## Deployment
 
 ### Local Development with ngrok

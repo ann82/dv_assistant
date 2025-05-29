@@ -196,8 +196,6 @@ export function ConsolePage() {
     [key: string]: boolean;
   }>({});
   const [isConnected, setIsConnected] = useState(false);
-  const [canPushToTalk, setCanPushToTalk] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [vadState, setVadState] = useState<'listening' | 'processing' | 'error' | null>(null);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
   const [coords, setCoords] = useState<Coordinates | null>({

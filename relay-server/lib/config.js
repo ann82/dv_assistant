@@ -3,7 +3,7 @@ dotenv.config();
 
 export const config = {
   // API Keys
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-key',
   TAVILY_API_KEY: process.env.TAVILY_API_KEY,
   ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
   
@@ -20,7 +20,7 @@ export const config = {
   SILENCE_DURATION: 0.5, // seconds
   
   // Model Settings
-  GPT4_MODEL: 'gpt-4-turbo-preview',
+  GPT4_MODEL: 'gpt-4',
   GPT35_MODEL: 'gpt-3.5-turbo',
   
   // Logging

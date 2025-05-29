@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { config } from './config.js';
+import { AudioService } from '../services/audioService.js';
 
 // Standalone validation function
 export const validateTwilioRequest = (req, res, next) => {
@@ -62,6 +63,7 @@ export class TwilioHandler {
     this.phoneNumber = phoneNumber;
     this.activeCalls = new Map();
     this.messageHistory = new Map();
+    this.audioService = new AudioService();
     console.log('TwilioHandler initialized with account SID:', accountSid.slice(0, 3) + '...');
   }
 
@@ -230,7 +232,13 @@ export class TwilioHandler {
    * Processes input with AI (placeholder)
    */
   async processWithAI(input) {
-    // TODO: Integrate with your AI system
-    return `I received your message: "${input}". This is a placeholder response.`;
+    // Use AudioService to get GPT reply
+    try {
+      const gptReply = await this.audioService.getGptReply(input);
+      return gptReply.text || gptReply;
+    } catch (error) {
+      console.error('Error in processWithAI:', error);
+      return 'Sorry, I was unable to process your request.';
+    }
   }
 } 

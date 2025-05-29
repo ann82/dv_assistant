@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2024-03-31
+
+### Added
+- Enhanced test suite for Twilio webhook handler and WebSocket server
+- Comprehensive mock implementations for external services
+- Detailed test cases for audio service logic
+
+### Changed
+- Improved test structure and organization
+- Enhanced mock function initialization and management
+- Better error handling in test scenarios
+
+### Fixed
+- Resolved issues with mock handler registration
+- Fixed event simulation in WebSocket tests
+- Corrected Twilio mock implementation
+- Addressed test failures related to mock function calls
+- Fixed hoisting issues with mock functions
+
+## [1.6.0] - 2024-03-30
+
+### Added
+- Comprehensive test suite for Twilio webhook handler
+- Mock implementations for Twilio services
+- Enhanced error handling in webhook routes
+- Detailed test cases for various webhook scenarios
+
+### Changed
+- Refactored Twilio webhook handler for better error handling
+- Updated test structure for better organization
+- Improved mock function initialization
+- Enhanced error message formatting
+
+### Fixed
+- Resolved mock function reference errors in tests
+- Fixed undefined property access in webhook handler
+- Corrected error message assertions in tests
+- Addressed test failures related to mock function calls
+- Fixed hoisting issues with mock functions
+
 ## [1.5.0] - 2024-03-29
 
 ### Added
@@ -198,6 +238,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed audio stream handling and processing
 - Corrected TwiML response generation
 - Fixed speech result processing
+
+### Improved
+- Test suite reliability and coverage for Twilio webhook handler, WebSocket server, and audio service
+- Robust mocking for Twilio, WebSocket, and file system modules in tests
+- Event-driven logic and handler registration simulation in tests
+
+### Fixed
+- Issues with mock handler registration and event simulation in WebSocket and Twilio tests
+- All tests now pass, ensuring high confidence in code changes
 
 ## [0.1.0] - 2024-03-23
 
