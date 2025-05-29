@@ -314,18 +314,15 @@ router.post('/voice/process', async (req, res) => {
     const audioUrl = `https://${domain}${ttsResponse.audioPath}`;
     console.log('Audio URL:', audioUrl);
 
-    // Verify the audio file exists using the fullPath from the TTS response
-    const audioPath = ttsResponse.fullPath || path.join(process.cwd(), 'public', 'audio', path.basename(ttsResponse.audioPath));
-    console.log('Checking audio file at:', audioPath);
-    
-    if (!fsSync.existsSync(audioPath)) {
-      console.error('Audio file not found. Available paths:', {
+    // Verify the audio file exists
+    if (!fsSync.existsSync(ttsResponse.fullPath)) {
+      console.error('Audio file not found:', {
         fullPath: ttsResponse.fullPath,
         audioPath: ttsResponse.audioPath,
-        checkedPath: audioPath,
+        size: ttsResponse.size,
         cwd: process.cwd()
       });
-      throw new Error('Audio file not found: ' + audioPath);
+      throw new Error('Audio file not found: ' + ttsResponse.fullPath);
     }
 
     // First play the response

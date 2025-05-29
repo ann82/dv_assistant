@@ -4,12 +4,29 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
 export class AudioService {
   constructor() {
     this.audioBuffer = new Map(); // Store audio chunks by callSid
+    this.audioDir = path.join(process.cwd(), 'public', 'audio');
+    this.ensureAudioDirectory();
+  }
+
+  // Ensure audio directory exists
+  async ensureAudioDirectory() {
+    try {
+      await fs.mkdir(this.audioDir, { recursive: true });
+      console.log('Audio directory ensured at:', this.audioDir);
+    } catch (error) {
+      console.error('Error creating audio directory:', error);
+      throw error;
+    }
   }
 
   // Decode Twilio's μ-law audio to PCM
@@ -118,16 +135,15 @@ export class AudioService {
   // Generate TTS using OpenAI TTS
   async generateTTS(text) {
     try {
-      // Create a temporary file to store the audio
+      // Create a temporary file
       const fileName = `${uuidv4()}.mp3`;
-      const filePath = path.join('public', 'audio', fileName);
-      const fullPath = path.join(process.cwd(), filePath);
+      const filePath = path.join(this.audioDir, fileName);
       
-      // Create directory if it doesn't exist
-      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      // Ensure directory exists
+      await this.ensureAudioDirectory();
 
       console.log('Generating TTS for text:', text.substring(0, 100) + '...');
-      console.log('Saving to:', fullPath);
+      console.log('Saving to:', filePath);
 
       // Use OpenAI TTS
       const response = await openai.audio.speech.create({
@@ -138,22 +154,33 @@ export class AudioService {
 
       // Save the audio file
       const buffer = Buffer.from(await response.arrayBuffer());
-      await fs.writeFile(fullPath, buffer);
+      await fs.writeFile(filePath, buffer);
 
       // Verify the file was created
-      if (!fsSync.existsSync(fullPath)) {
-        throw new Error('Failed to create audio file: ' + fullPath);
+      if (!fsSync.existsSync(filePath)) {
+        throw new Error('Failed to create audio file: ' + filePath);
       }
+
+      // Get file stats to verify size
+      const stats = await fs.stat(filePath);
+      console.log('TTS audio file stats:', {
+        size: stats.size,
+        created: stats.birthtime,
+        path: filePath
+      });
 
       console.log('TTS audio generated successfully:', {
         text: text.substring(0, 100) + '...',
         filePath: `/audio/${fileName}`,
-        fullPath
+        fullPath: filePath,
+        size: stats.size
       });
 
       return {
         text,
-        audioPath: `/audio/${fileName}`
+        audioPath: `/audio/${fileName}`,
+        fullPath: filePath,
+        size: stats.size
       };
     } catch (error) {
       console.error('Error generating TTS:', error);
