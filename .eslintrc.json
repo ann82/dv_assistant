@@ -1,0 +1,13 @@
+{
+  "parserOptions": {
+    "sourceType": "module"
+  },
+  "env": {
+    "es2022": true,
+    "browser": true,
+    "node": true
+  },
+  "globals": {
+    "globalThis": "readonly"
+  }
+}
