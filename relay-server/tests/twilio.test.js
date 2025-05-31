@@ -1,45 +1,57 @@
-var audioServiceMocks = {
-  transcribeWithWhisper: undefined,
-  getGptReply: undefined,
-  generateTTS: undefined
-};
-
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { handleTwilioWebhook } from '../src/routes/twilio.js';
-import { AudioService } from '../src/services/audioService.js';
-import fs from 'fs/promises';
-import path from 'path';
+import twilio from 'twilio';
+import { config } from '../lib/config.js';
 
-vi.mock('../src/services/audioService.js', () => ({
-  AudioService: vi.fn().mockImplementation(() => audioServiceMocks)
-}));
+var mockAudioService;
+var mockTwilioClient;
+var mockValidateRequest;
 
-// Mock config
-vi.mock('../src/lib/config.js', () => ({
+vi.mock('../src/services/audioService.js', () => {
+  // Assign the mock object if not already assigned
+  if (!mockAudioService) {
+    mockAudioService = {
+      transcribeWithWhisper: vi.fn().mockResolvedValue('test transcription'),
+      getGptReply: vi.fn().mockResolvedValue({
+        text: 'test response',
+        model: 'gpt-4',
+        inputTokens: 10,
+        outputTokens: 20
+      }),
+      generateTTS: vi.fn().mockResolvedValue({
+        text: 'test response',
+        audioPath: '/audio/test.mp3',
+        fullPath: '/path/to/test.mp3',
+        size: 1024,
+        chunks: 1,
+        cached: false
+      })
+    };
+  }
+  return {
+    AudioService: vi.fn().mockImplementation(() => mockAudioService)
+  };
+});
+
+vi.mock('../lib/config.js', () => ({
   config: {
     TWILIO_ACCOUNT_SID: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    TWILIO_AUTH_TOKEN: 'test-auth-token'
+    TWILIO_AUTH_TOKEN: 'test-auth-token',
+    TWILIO_PHONE_NUMBER: '+1234567890',
+    twilio: {
+      accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      authToken: 'test-auth-token',
+      phoneNumber: '+1234567890'
+    }
   }
 }));
 
-// Mock Twilio client
 vi.mock('twilio', () => {
-  const mockTwilioClient = {
-    calls: vi.fn().mockReturnValue({
-      fetch: vi.fn().mockResolvedValue({
-        sid: 'test-call-sid',
-        status: 'in-progress',
-        duration: '0'
-      })
-    }),
-    recordings: {
-      list: vi.fn().mockResolvedValue([])
-    }
+  return {
+    default: () => mockTwilioClient,
+    validateRequest: mockValidateRequest
   };
-  return vi.fn().mockReturnValue(mockTwilioClient);
 });
 
-// Mock fs promises
 vi.mock('fs/promises', () => ({
   default: {
     access: vi.fn(),
@@ -51,6 +63,10 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn()
 }));
 
+import { handleTwilioWebhook } from '../src/routes/twilio.js';
+import fs from 'fs/promises';
+import path from 'path';
+
 // Mock global WebSocket server
 global.wss = {
   registerCall: vi.fn()
@@ -60,18 +76,18 @@ describe('Twilio Route Handler', () => {
   let mockReq;
   let mockRes;
   let mockNext;
-  let audioService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    audioServiceMocks.transcribeWithWhisper = vi.fn().mockResolvedValue('test transcription');
-    audioServiceMocks.getGptReply = vi.fn().mockResolvedValue({
+    // Always reset the mock object
+    mockAudioService.transcribeWithWhisper.mockReset().mockResolvedValue('test transcription');
+    mockAudioService.getGptReply.mockReset().mockResolvedValue({
       text: 'test response',
       model: 'gpt-4',
       inputTokens: 10,
       outputTokens: 20
     });
-    audioServiceMocks.generateTTS = vi.fn().mockResolvedValue({
+    mockAudioService.generateTTS.mockReset().mockResolvedValue({
       text: 'test response',
       audioPath: '/audio/test.mp3',
       fullPath: '/path/to/test.mp3',
@@ -104,17 +120,30 @@ describe('Twilio Route Handler', () => {
     // Setup mock next function
     mockNext = vi.fn();
 
-    // Get AudioService instance
-    audioService = new AudioService();
+    mockTwilioClient = {
+      messages: { 
+        create: vi.fn().mockResolvedValue({ 
+          sid: 'test_message_sid',
+          status: 'sent'
+        })
+      },
+      calls: { 
+        create: vi.fn().mockResolvedValue({ 
+          sid: 'test_call_sid',
+          status: 'in-progress'
+        })
+      }
+    };
+    mockValidateRequest = vi.fn().mockReturnValue(true);
   });
 
   describe('Transcription Handling', () => {
     it('should handle transcription requests', async () => {
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
-      expect(audioServiceMocks.transcribeWithWhisper).toHaveBeenCalledWith('test speech result');
-      expect(audioServiceMocks.getGptReply).toHaveBeenCalledWith('test transcription');
-      expect(audioServiceMocks.generateTTS).toHaveBeenCalledWith('test response');
+      expect(mockAudioService.transcribeWithWhisper).toHaveBeenCalledWith('test speech result');
+      expect(mockAudioService.getGptReply).toHaveBeenCalledWith('test transcription');
+      expect(mockAudioService.generateTTS).toHaveBeenCalledWith('test response');
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
@@ -138,7 +167,7 @@ describe('Twilio Route Handler', () => {
     it('should generate and verify TTS audio', async () => {
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
-      expect(audioServiceMocks.generateTTS).toHaveBeenCalledWith('test response');
+      expect(mockAudioService.generateTTS).toHaveBeenCalledWith('test response');
       expect(fs.stat).toHaveBeenCalledWith('/path/to/test.mp3');
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({
         audioPath: '/audio/test.mp3'
@@ -146,7 +175,7 @@ describe('Twilio Route Handler', () => {
     });
 
     it('should handle TTS generation errors', async () => {
-      audioServiceMocks.generateTTS.mockRejectedValueOnce(new Error('TTS generation failed'));
+      mockAudioService.generateTTS.mockRejectedValueOnce(new Error('TTS generation failed'));
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
@@ -178,7 +207,7 @@ describe('Twilio Route Handler', () => {
     });
 
     it('should handle transcription errors', async () => {
-      audioServiceMocks.transcribeWithWhisper.mockRejectedValueOnce(new Error('Transcription failed'));
+      mockAudioService.transcribeWithWhisper.mockRejectedValueOnce(new Error('Transcription failed'));
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
@@ -188,7 +217,7 @@ describe('Twilio Route Handler', () => {
     });
 
     it('should handle GPT response errors', async () => {
-      audioServiceMocks.getGptReply.mockRejectedValueOnce(new Error('GPT response failed'));
+      mockAudioService.getGptReply.mockRejectedValueOnce(new Error('GPT response failed'));
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
@@ -209,8 +238,71 @@ describe('Twilio Route Handler', () => {
 
       await handleTwilioWebhook(mockReq, mockRes, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Failed to send response to client'
+      });
     });
+  });
+});
+
+describe('Twilio Client Tests', () => {
+  let twilioClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    twilioClient = twilio(config.twilio.accountSid, config.twilio.authToken);
+  });
+
+  it('should create a message successfully', async () => {
+    const message = await twilioClient.messages.create({
+      body: 'Test message',
+      to: '+1234567890',
+      from: config.twilio.phoneNumber
+    });
+
+    expect(message.sid).toBe('test_message_sid');
+    expect(message.status).toBe('sent');
+    expect(twilioClient.messages.create).toHaveBeenCalledWith({
+      body: 'Test message',
+      to: '+1234567890',
+      from: config.twilio.phoneNumber
+    });
+  });
+
+  it('should create a call successfully', async () => {
+    const call = await twilioClient.calls.create({
+      to: '+1234567890',
+      from: config.twilio.phoneNumber,
+      url: 'http://example.com/voice'
+    });
+
+    expect(call.sid).toBe('test_call_sid');
+    expect(call.status).toBe('in-progress');
+    expect(twilioClient.calls.create).toHaveBeenCalledWith({
+      to: '+1234567890',
+      from: config.twilio.phoneNumber,
+      url: 'http://example.com/voice'
+    });
+  });
+
+  it('should handle message creation errors', async () => {
+    twilioClient.messages.create.mockRejectedValueOnce(new Error('Failed to create message'));
+
+    await expect(twilioClient.messages.create({
+      body: 'Test message',
+      to: '+1234567890',
+      from: config.twilio.phoneNumber
+    })).rejects.toThrow('Failed to create message');
+  });
+
+  it('should handle call creation errors', async () => {
+    twilioClient.calls.create.mockRejectedValueOnce(new Error('Failed to create call'));
+
+    await expect(twilioClient.calls.create({
+      to: '+1234567890',
+      from: config.twilio.phoneNumber,
+      url: 'http://example.com/voice'
+    })).rejects.toThrow('Failed to create call');
   });
 }); 

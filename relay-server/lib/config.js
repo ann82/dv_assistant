@@ -3,7 +3,7 @@ dotenv.config();
 
 export const config = {
   // API Keys
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-key',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'sk-test-key',
   TAVILY_API_KEY: process.env.TAVILY_API_KEY,
   ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
   

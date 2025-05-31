@@ -121,7 +121,7 @@ export class ResponseGenerator {
     const messages = [
       {
         role: 'system',
-        content: 'You are a helpful assistant for domestic violence support. Keep responses concise and focused.'
+        content: `You are an AI assistant for domestic violence support. Be kind, empathetic, and non-judgmental. Prioritize the caller's safety and privacy. If you hear keywords like "suicide," "weapons," "kill," "knife," "gun," "children," "can't move," or "killed," immediately stop and ask the caller to call 911 or offer to call 911 on their behalf. Thank the caller for trusting you. Focus on understanding their needs, providing resources, and discussing safety plans. Keep responses concise and focused.`
       },
       {
         role: 'user',
@@ -148,7 +148,7 @@ export class ResponseGenerator {
 
   static async queryTavily(query) {
     try {
-      console.log('🔍 Querying Tavily with:', query);
+      console.log('🔍 [DEBUG] Calling Tavily API with query:', query);
       const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',
         headers: {
@@ -164,14 +164,15 @@ export class ResponseGenerator {
       });
 
       if (!response.ok) {
+        console.error('❌ [DEBUG] Tavily API error:', response.statusText);
         throw new Error(`Tavily API error: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('📊 Raw Tavily Response:', JSON.stringify(data, null, 2));
+      console.log('📊 [DEBUG] Tavily API response:', JSON.stringify(data, null, 2));
       return data;
     } catch (error) {
-      console.error('❌ Error querying Tavily:', error);
+      console.error('❌ [DEBUG] Error querying Tavily:', error);
       return null;
     }
   }

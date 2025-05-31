@@ -16,6 +16,24 @@ A voice-based AI assistant that provides support and resources for people experi
 - Enhanced error handling and debugging
 - Optimized build process for better performance
 
+### Voice Call Support
+- Real-time voice conversation with AI assistant
+- Natural language processing for understanding user needs
+- Resource recommendations based on conversation context
+- Multi-language support (currently optimized for English)
+
+### SMS Integration
+- Call summary delivery via SMS
+- Consent-based communication
+- Opt-out functionality
+- Secure message handling
+
+### Privacy and Consent
+- Explicit consent collection at call start
+- User-controlled communication preferences
+- Secure storage of call summaries
+- Easy opt-out process
+
 ## System Architecture
 
 The system consists of three main components:
@@ -140,6 +158,8 @@ NODE_ENV=development
 LOG_LEVEL=info  # Options: debug, info, warn, error
 ```
 
+**Note:** For local testing, no real Twilio or OpenAI credentials are required due to comprehensive mocks. The test script in `package.json` sets `OPENAI_API_KEY` automatically.
+
 ### Installation
 
 1. Install dependencies:
@@ -174,14 +194,15 @@ npm test
 2. Test Coverage:
    - Webhook request validation
    - Error handling scenarios
-   - Mock service interactions (Twilio, WebSocket, file system)
+   - Mock service interactions (Twilio, WebSocket, file system, OpenAI)
    - Response formatting
    - Edge cases and error conditions
    - WebSocket connection and event handling
    - Audio file verification and error simulation
 
 3. Test Structure:
-   - Extensive use of mock implementations for Twilio, WebSocket, and file system modules
+   - Extensive use of advanced mock implementations for Twilio, OpenAI, WebSocket, and file system modules
+   - All external dependencies are mocked before imports to ensure isolation and reliability
    - Isolated test cases for each scenario
    - Proper error handling verification
    - Response validation
@@ -196,10 +217,61 @@ npm test
    - Error message validation
 
 **Recent Improvements:**
+- Unified and advanced mocking for Twilio, OpenAI, WebSocket, and file system modules
+- Mocked `twilio.twiml.VoiceResponse` with all required methods for TwiML response generation
+- Mocked config to include a `twilio` object with `accountSid`, `authToken`, and `phoneNumber`
+- Test script in `package.json` now sets `OPENAI_API_KEY` automatically for all test runs
 - Improved reliability and coverage of the test suite
-- Robust mocking for Twilio, WebSocket, and file system interactions
-- Fixed issues with mock handler registration and event simulation
 - All tests now pass, ensuring high confidence in code changes
+
+**Example: Advanced Mocking in Tests**
+```js
+vi.mock('twilio', () => {
+  class VoiceResponse {
+    constructor() {
+      this.say = vi.fn();
+      this.play = vi.fn();
+      this.gather = vi.fn().mockReturnValue({
+        say: vi.fn(),
+        play: vi.fn(),
+        pause: vi.fn()
+      });
+      this.pause = vi.fn();
+      this.connect = vi.fn().mockReturnValue({ stream: vi.fn() });
+      this.toString = vi.fn().mockReturnValue('<Response></Response>');
+    }
+  }
+  const twilio = vi.fn().mockImplementation(() => ({
+    calls: { fetch: vi.fn() },
+    messages: { create: vi.fn() },
+    recordings: { list: vi.fn() }
+  }));
+  twilio.twiml = { VoiceResponse };
+  twilio.validateRequest = vi.fn().mockReturnValue(true);
+  return {
+    default: twilio,
+    twiml: { VoiceResponse },
+    validateRequest: vi.fn().mockReturnValue(true)
+  };
+});
+
+vi.mock('../relay-server/lib/config.js', () => ({
+  config: {
+    TWILIO_ACCOUNT_SID: 'ACxxxx...',
+    TWILIO_AUTH_TOKEN: 'test-auth-token',
+    twilio: {
+      accountSid: 'ACxxxx...',
+      authToken: 'test-auth-token',
+      phoneNumber: '+1234567890'
+    }
+  }
+}));
+```
+
+### Troubleshooting
+
+- If tests fail due to missing config properties, ensure the config mock includes the `twilio` object with `accountSid`, `authToken`, and `phoneNumber`.
+- If you see errors about missing environment variables, confirm that the test script in `package.json` sets `OPENAI_API_KEY` or set it manually in your shell.
 
 ## Deployment
 
@@ -422,3 +494,68 @@ The system provides comprehensive logging for debugging:
 ## License
 
 MIT License - see LICENSE file for details
+
+## Call Flow
+
+1. **Initial Contact**
+   - User calls the support line
+   - System plays welcome message
+   - Requests consent for SMS follow-up
+   - User provides verbal consent
+
+2. **Main Conversation**
+   - AI assistant engages in conversation
+   - Provides support and resources
+   - Tracks conversation for summary
+
+3. **Call Conclusion**
+   - Call ends naturally or by user
+   - System generates conversation summary
+   - Sends SMS if consent was given
+   - Stores summary for record-keeping
+
+## SMS Features
+
+### Consent Management
+- Explicit consent requested at call start
+- Clear opt-out instructions
+- Respect for user preferences
+- Secure consent tracking
+
+### Message Types
+- Call summaries
+- Resource recommendations
+- Follow-up information
+- Opt-out confirmations
+
+### Security
+- End-to-end encryption
+- Secure storage
+- Privacy-focused design
+- Compliance with regulations
+
+## Tavily Integration and Response Generation
+
+### Tavily Integration
+- **Frontend (React App):**  
+  The frontend uses Tavily to search for domestic violence shelters. It sends a POST request to the Tavily API with a query like `domestic violence shelters in [location]` and processes the results to display shelter information.
+
+- **Backend (Relay Server):**  
+  The backend uses Tavily as a fallback for factual queries. If a query is deemed factual (e.g., shelter searches), the backend calls `queryTavily()` to get real-time data. The response is then formatted and cached for future use.
+
+### Why Different Prompts?
+- **Frontend Prompt:**  
+  The frontend uses `conversation_config.js` (a detailed prompt for domestic violence support) as the system prompt for the OpenAI Realtime API client. This prompt is tailored for interactive, empathetic conversations.
+
+- **Backend Prompt:**  
+  The backend uses simpler, hardcoded prompts in `relay-server/lib/response.js` and `relay-server/services/callSummaryService.js`. For example:
+  ```js
+  {
+    role: 'system',
+    content: 'You are a helpful assistant for domestic violence support. Keep responses concise and focused.'
+  }
+  ```
+  These prompts are designed for:
+  - **Efficiency:** The backend prioritizes quick, concise responses for phone calls and summaries.
+  - **Cost Control:** The backend uses lower token limits (e.g., `DEFAULT_MAX_TOKENS: 150`) to minimize costs.
+  - **Different Use Cases:** The backend handles both real-time responses (via Tavily) and summaries, which require different tones and formats.

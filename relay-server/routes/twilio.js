@@ -6,19 +6,28 @@ import path from 'path';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import { fileURLToPath } from 'url';
+import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 const twilioClient = twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
+const twilioVoiceHandler = new TwilioVoiceHandler(
+  config.twilio.accountSid,
+  config.twilio.authToken,
+  config.twilio.phoneNumber
+);
 
 // Store WebSocket server instance
 let wsServer = null;
 
-// Method to set WebSocket server instance
-router.setWebSocketServer = (server) => {
+// Add a setter for the WebSocket server
+router.setWebSocketServer = (server, mockServer) => {
   wsServer = server;
+  if (mockServer) {
+    twilioVoiceHandler.setWebSocketServer(mockServer);
+  }
 };
 
 // Get the global WebSocket server instance
@@ -157,49 +166,17 @@ router.post('/voice', (req, res) => {
 // Handle call status updates
 router.post('/status', async (req, res) => {
   try {
-    const callSid = req.body.CallSid;
-    const callStatus = req.body.CallStatus;
-
-    console.log(`Call ${callSid} status: ${callStatus}`);
-
-    // Log Twilio call details when status changes
-    await logTwilioCallDetails(callSid);
-
-    // Handle different call statuses
-    switch (callStatus) {
-      case 'completed':
-      case 'failed':
-      case 'busy':
-      case 'no-answer':
-        // Clean up audio files for this call
-        const wss = getWebSocketServer();
-        if (wss && wss.audioService) {
-          const audioDir = path.join(__dirname, '..', 'public', 'audio');
-          fsSync.readdir(audioDir, (err, files) => {
-            if (err) {
-              console.error('Error reading audio directory:', err);
-              return;
-            }
-            files.forEach(file => {
-              if (file.endsWith('.mp3')) {
-                const filePath = path.join(audioDir, file);
-                cleanupAudioFile(filePath);
-              }
-            });
-          });
-        }
-        break;
-      case 'in-progress':
-        // Log call start
-        break;
-      default:
-        console.log(`Unhandled call status: ${callStatus}`);
+    const { CallSid, CallStatus } = req.body;
+    
+    if (!CallSid || !CallStatus) {
+      return res.status(400).send('Missing required parameters');
     }
 
+    await twilioVoiceHandler.handleCallStatusUpdate(CallSid, CallStatus);
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error handling call status:', error);
-    res.status(500).send('Error processing call status');
+    console.error('Error handling call status update:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
@@ -413,5 +390,237 @@ export async function handleTwilioWebhook(req, res) {
 
 // Attach the named handler to the router
 router.post('/voice/process', handleTwilioWebhook);
+
+// Handle incoming SMS messages
+router.post('/sms', async (req, res) => {
+  try {
+    const { From, Body } = req.body;
+    console.log('Received SMS:', { from: From, body: Body });
+
+    const twiml = new twilio.twiml.MessagingResponse();
+    
+    // Check if this is a consent message
+    const consentKeywords = ['yes', 'agree', 'consent', 'ok', 'okay', 'sure'];
+    const isConsentMessage = consentKeywords.some(keyword => 
+      Body.toLowerCase().includes(keyword)
+    );
+
+    // Check if this is an opt-out message
+    const optOutKeywords = ['stop', 'unsubscribe', 'opt out', 'cancel'];
+    const isOptOutMessage = optOutKeywords.some(keyword => 
+      Body.toLowerCase().includes(keyword)
+    );
+
+    if (isOptOutMessage) {
+      // Handle opt-out
+      twiml.message('You have been unsubscribed from follow-up messages. You will no longer receive SMS updates.');
+      // TODO: Update user's consent status in database
+    } else if (isConsentMessage) {
+      // Handle consent
+      twiml.message('Thank you for your consent. You will receive follow-up messages about your call summary and support resources.');
+      // TODO: Update user's consent status in database
+    } else {
+      // Default response without assuming consent
+      twiml.message('Thank you for your message. Would you like to receive follow-up messages about your call summary and support resources? Please reply with "yes" to consent.');
+    }
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  } catch (error) {
+    console.error('Error handling SMS:', error);
+    res.status(500).send('Error processing SMS');
+  }
+});
+
+// Handle consent response
+router.post('/consent', async (req, res) => {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+  
+  try {
+    console.log(`[Request ${requestId}] Processing consent request:`, {
+      timestamp: new Date().toISOString(),
+      headers: req.headers,
+      body: req.body,
+      memoryUsage: process.memoryUsage()
+    });
+
+    const { CallSid, From, SpeechResult } = req.body;
+    
+    // Enhanced validation
+    if (!CallSid || !From || !SpeechResult) {
+      console.warn(`[Request ${requestId}] Missing required parameters:`, {
+        callSid: CallSid,
+        from: From,
+        hasSpeechResult: !!SpeechResult,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(400).send('Missing required parameters');
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(From)) {
+      console.warn(`[Request ${requestId}] Invalid phone number format:`, {
+        phoneNumber: From,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(400).send('Invalid phone number format');
+    }
+
+    // Validate speech result
+    if (SpeechResult.length < 1 || SpeechResult.length > 1000) {
+      console.warn(`[Request ${requestId}] Invalid speech result length:`, {
+        length: SpeechResult.length,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(400).send('Invalid speech result');
+    }
+
+    console.log(`[Request ${requestId}] Processing consent response:`, {
+      callSid: CallSid,
+      from: From,
+      speechResult: SpeechResult,
+      timestamp: new Date().toISOString(),
+      processingTime: Date.now() - startTime
+    });
+
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Enhanced keyword matching with confidence scores
+    const consentKeywords = [
+      { word: 'yes', score: 1.0 },
+      { word: 'yeah', score: 0.9 },
+      { word: 'sure', score: 0.8 },
+      { word: 'okay', score: 0.8 },
+      { word: 'ok', score: 0.7 },
+      { word: 'agree', score: 0.9 },
+      { word: 'please', score: 0.6 },
+      { word: 'go ahead', score: 0.8 }
+    ];
+    
+    const optOutKeywords = [
+      { word: 'no', score: 1.0 },
+      { word: 'nope', score: 0.9 },
+      { word: 'don\'t', score: 0.8 },
+      { word: 'stop', score: 0.9 },
+      { word: 'cancel', score: 0.8 },
+      { word: 'opt out', score: 1.0 }
+    ];
+    
+    // Calculate consent score
+    const consentScore = consentKeywords.reduce((max, { word, score }) => {
+      const match = SpeechResult.toLowerCase().includes(word);
+      return match ? Math.max(max, score) : max;
+    }, 0);
+
+    const optOutScore = optOutKeywords.reduce((max, { word, score }) => {
+      const match = SpeechResult.toLowerCase().includes(word);
+      return match ? Math.max(max, score) : max;
+    }, 0);
+
+    const isConsent = consentScore > optOutScore && consentScore >= 0.7;
+    const isOptOut = optOutScore > consentScore && optOutScore >= 0.7;
+
+    console.log(`[Request ${requestId}] Consent analysis:`, {
+      consentScore,
+      optOutScore,
+      isConsent,
+      isOptOut,
+      timestamp: new Date().toISOString()
+    });
+
+    // Store consent status with enhanced logging
+    const wss = getWebSocketServer();
+    if (wss) {
+      const call = wss.activeCalls.get(CallSid);
+      if (call) {
+        const previousConsent = call.hasConsent;
+        call.hasConsent = isConsent;
+        call.consentTimestamp = new Date().toISOString();
+        call.consentResponse = SpeechResult;
+        call.consentScores = {
+          consent: consentScore,
+          optOut: optOutScore
+        };
+        wss.activeCalls.set(CallSid, call);
+
+        console.log(`[Request ${requestId}] Consent status updated:`, {
+          callSid: CallSid,
+          from: From,
+          previousConsent,
+          newConsent: isConsent,
+          timestamp: call.consentTimestamp,
+          response: SpeechResult,
+          scores: call.consentScores,
+          processingTime: Date.now() - startTime
+        });
+      } else {
+        console.warn(`[Request ${requestId}] No active call found for consent response:`, {
+          callSid: CallSid,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    // Acknowledge consent decision with appropriate message
+    if (isConsent) {
+      twiml.say({
+        voice: 'Polly.Amy',
+        language: 'en-US'
+      }, 'Thank you. You will receive a summary and resources after the call.');
+    } else if (isOptOut) {
+      twiml.say({
+        voice: 'Polly.Amy',
+        language: 'en-US'
+      }, 'Understood. You will not receive any follow-up messages.');
+    } else {
+      // Handle unclear response
+      twiml.say({
+        voice: 'Polly.Amy',
+        language: 'en-US'
+      }, 'I didn\'t quite understand. For your privacy, I\'ll assume you don\'t want follow-up messages. You can always call back if you change your mind.');
+    }
+
+    // Add a pause
+    twiml.pause({ length: 1 });
+
+    // Continue with the main conversation
+    twiml.say({
+      voice: 'Polly.Amy',
+      language: 'en-US'
+    }, 'How can I help you today?');
+
+    // Set up the next gather for the main conversation
+    const gather = twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: 'auto',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US'
+    });
+
+    const twimlString = twiml.toString();
+    console.log(`[Request ${requestId}] Sending TwiML response:`, {
+      length: twimlString.length,
+      processingTime: Date.now() - startTime,
+      timestamp: new Date().toISOString()
+    });
+
+    res.type('text/xml');
+    res.send(twimlString);
+  } catch (error) {
+    console.error(`[Request ${requestId}] Error handling consent:`, {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+      processingTime: Date.now() - startTime,
+      memoryUsage: process.memoryUsage()
+    });
+    res.status(500).send('Error processing consent');
+  }
+});
 
 export default router; 

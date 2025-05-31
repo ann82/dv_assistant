@@ -242,6 +242,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced error handling and logging
 - Improved WebSocket connection management
 - Better audio stream handling and processing
+- Advanced mocking patterns for Twilio, WebSocket, and file system modules in all test suites
+- Dependency injection and handler patching for TwilioVoiceHandler and related classes in tests
+- Custom test stubs for WebSocket message handling and connection simulation
+- Documentation for extending and maintaining test mocks
 
 ### Changed
 - Switched from client-side Web Speech API to OpenAI TTS for better quality
@@ -249,6 +253,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved audio processing pipeline
 - Enhanced conversation flow with proper pauses and prompts
 - Better error messages and debugging information
+- Improved test reliability and isolation by ensuring all external dependencies are mocked
+- Updated test setup to register WebSocket connections in mock server state for accurate assertions
+- Enhanced test coverage for edge cases, error handling, and event-driven logic
 
 ### Fixed
 - Fixed language parameter issue in Whisper transcription
@@ -256,14 +263,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed audio stream handling and processing
 - Corrected TwiML response generation
 - Fixed speech result processing
-
-### Improved
-- Test suite reliability and coverage for Twilio webhook handler, WebSocket server, and audio service
-- Robust mocking for Twilio, WebSocket, and file system modules in tests
-- Event-driven logic and handler registration simulation in tests
-
-### Fixed
-- Issues with mock handler registration and event simulation in WebSocket and Twilio tests
+- Resolved issues with missing or incorrect mocks in Twilio and WebSocket tests
+- Fixed test failures related to handler registration and event simulation
 - All tests now pass, ensuring high confidence in code changes
 
 ## [0.1.0] - 2024-03-23
@@ -374,4 +375,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Deployment configuration issues
 - Health check timeout settings
-- Environment variable handling 
+- Environment variable handling
+
+## [1.9.0] - 2024-03-21
+
+### Added
+- Consent-based SMS feature for call summaries
+- Initial consent request at the start of each call
+- SMS opt-out functionality
+- Call summary storage in dedicated directory
+
+### Changed
+- Modified call flow to include consent request
+- Updated SMS handling to respect user consent
+- Enhanced call summary delivery process
+
+### Security
+- Added explicit consent tracking for SMS communications
+- Implemented proper opt-out handling
+
+## [1.9.1] - 2024-06-01
+
+### Added
+- Advanced and unified mocking for Twilio, OpenAI, WebSocket, and file system modules in all test suites.
+- Mocked `twilio.twiml.VoiceResponse` with all required methods for TwiML response generation.
+- Mocked config to include a `twilio` object with `accountSid`, `authToken`, and `phoneNumber` for all tests.
+- Test script in `package.json` now sets `OPENAI_API_KEY` automatically for all test runs.
+
+### Changed
+- Improved test reliability and isolation by ensuring all external dependencies are mocked before imports.
+- Updated test documentation and troubleshooting steps in README.
+
+### Fixed
+- Resolved test failures due to missing or incomplete mocks for Twilio and config.
+- Fixed issues with environment variable timing for OpenAI API key in tests. 

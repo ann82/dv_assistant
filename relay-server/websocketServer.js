@@ -1,6 +1,8 @@
 import { WebSocketServer } from 'ws';
 import { AudioService } from './services/audioService.js';
-import { config } from './lib/config.js';
+import { CallSummaryService } from './services/callSummaryService.js';
+import path from 'path';
+import fsSync from 'fs';
 
 export class TwilioWebSocketServer {
   constructor(server) {
@@ -31,16 +33,28 @@ export class TwilioWebSocketServer {
       }
     });
 
+    this.callSummaryService = new CallSummaryService();
     this.setupWebSocket();
   }
 
   // Method to register a call when TwiML is generated
-  registerCall(callSid) {
-    console.log('Registering call:', callSid);
-    this.activeCalls.set(callSid, {
-      timestamp: Date.now(),
-      status: 'registered'
-    });
+  registerCall(callSid, from) {
+    if (!this.activeCalls.has(callSid)) {
+      this.activeCalls.set(callSid, {
+        from,
+        startTime: Date.now(),
+        hasConsent: false,
+        conversationHistory: []
+      });
+    } else {
+      // Reset consent and history for existing call
+      this.activeCalls.set(callSid, {
+        ...this.activeCalls.get(callSid),
+        from,
+        hasConsent: false,
+        conversationHistory: []
+      });
+    }
   }
 
   setupWebSocket() {
@@ -188,9 +202,21 @@ export class TwilioWebSocketServer {
       const transcript = await this.audioService.transcribeWithWhisper(audioBuffer);
       console.log('Transcript:', transcript);
 
+      // Add user's message to history
+      this.callSummaryService.addToHistory(callSid, {
+        role: 'user',
+        content: transcript
+      });
+
       console.log('Getting GPT response...');
       const gptResponse = await this.audioService.getGptReply(transcript);
       console.log('GPT Response:', gptResponse.text);
+
+      // Add assistant's response to history
+      this.callSummaryService.addToHistory(callSid, {
+        role: 'assistant',
+        content: gptResponse.text
+      });
 
       const ttsResponse = await this.audioService.generateTTS(gptResponse.text);
 
@@ -208,6 +234,29 @@ export class TwilioWebSocketServer {
         type: 'error',
         message: 'Error processing audio'
       }));
+    }
+  }
+
+  async handleCallEnd(callSid) {
+    try {
+      // Generate call summary
+      const call = this.activeCalls.get(callSid);
+      let summary = null;
+      if (call) {
+        try {
+          summary = await this.callSummaryService.generateSummary(call.conversationHistory);
+        } catch (error) {
+          summary = null;
+        }
+        this.activeCalls.delete(callSid);
+        return summary;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Error handling call end:', error);
+      this.activeCalls.delete(callSid);
+      return null;
     }
   }
 
@@ -261,6 +310,14 @@ export class TwilioWebSocketServer {
     this.activeCalls.clear();
     if (this.wss && typeof this.wss.close === 'function') {
       this.wss.close();
+    }
+  }
+
+  addToHistory(callSid, message) {
+    const call = this.activeCalls.get(callSid);
+    if (call) {
+      if (!call.conversationHistory) call.conversationHistory = [];
+      call.conversationHistory.push(message);
     }
   }
 } 
