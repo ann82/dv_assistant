@@ -14,9 +14,9 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 const twilioClient = twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
 const twilioVoiceHandler = new TwilioVoiceHandler(
-  config.twilio.accountSid,
-  config.twilio.authToken,
-  config.twilio.phoneNumber
+  config.TWILIO_ACCOUNT_SID,
+  config.TWILIO_AUTH_TOKEN,
+  config.TWILIO_PHONE_NUMBER
 );
 
 // Store WebSocket server instance
