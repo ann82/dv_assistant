@@ -1,9 +1,11 @@
 import { WebSocket as RealWebSocket } from 'ws';
 import { config } from './config.js';
 import { ResponseGenerator } from './response.js';
-import { validateRequest as twilioValidateRequest } from 'twilio';
-import { TwilioWebSocketServer } from '../websocketServer.js';
 import twilio from 'twilio';
+import { TwilioWebSocketServer } from '../websocketServer.js';
+
+// Get validateRequest from twilio package
+const { validateRequest: twilioValidateRequest } = twilio;
 
 // Constants for better maintainability
 const CALL_STATUS = {
