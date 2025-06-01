@@ -377,22 +377,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Health check timeout settings
 - Environment variable handling
 
-## [1.9.0] - 2024-03-21
+## [1.9.0] - 2024-04-01
 
 ### Added
-- Consent-based SMS feature for call summaries
-- Initial consent request at the start of each call
-- SMS opt-out functionality
-- Call summary storage in dedicated directory
+- Centralized configuration system in `relay-server/lib/config.js`
+- Backward compatibility for Twilio configuration
+- Enhanced configuration documentation
 
 ### Changed
-- Modified call flow to include consent request
-- Updated SMS handling to respect user consent
-- Enhanced call summary delivery process
+- Updated Twilio configuration structure
+- Improved environment variable handling
+- Enhanced configuration documentation in README
 
-### Security
-- Added explicit consent tracking for SMS communications
-- Implemented proper opt-out handling
+### Fixed
+- Resolved Twilio configuration access issues
+- Fixed `config.twilio` undefined error in deployment
+- Corrected environment variable loading in production
 
 ## [1.9.1] - 2024-06-01
 

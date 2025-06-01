@@ -28,7 +28,16 @@ export const config = {
 
   PORT: process.env.PORT || 3000,
   WS_PORT: process.env.WS_PORT || 3001,
+  
+  // Twilio Configuration
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
+  
+  // Twilio object for backward compatibility
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER
+  }
 }; 

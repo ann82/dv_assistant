@@ -160,6 +160,31 @@ LOG_LEVEL=info  # Options: debug, info, warn, error
 
 **Note:** For local testing, no real Twilio or OpenAI credentials are required due to comprehensive mocks. The test script in `package.json` sets `OPENAI_API_KEY` automatically.
 
+### Configuration
+
+The application uses a centralized configuration system in `relay-server/lib/config.js`. The configuration includes:
+
+1. **API Keys**
+   - OpenAI API key
+   - Tavily API key
+   - ElevenLabs API key
+
+2. **Twilio Configuration**
+   - Account SID
+   - Auth Token
+   - Phone Number
+   - Both top-level and nested `twilio` object for backward compatibility
+
+3. **Voice Settings**
+   - ElevenLabs Voice ID
+   - Audio processing parameters
+   - Response settings
+
+4. **Server Settings**
+   - Port configuration
+   - WebSocket port
+   - Logging level
+
 ### Installation
 
 1. Install dependencies:
