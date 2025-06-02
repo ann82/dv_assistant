@@ -143,6 +143,9 @@ export class TwilioVoiceHandler {
   }
 
   setupWebSocketHandlers(ws, callSid, res) {
+    let responseTimeout;
+    let isResponding = false;
+
     ws.on('open', () => {
       console.log(`WebSocket connected for call ${callSid}`);
     });
@@ -151,26 +154,56 @@ export class TwilioVoiceHandler {
       try {
         const event = JSON.parse(data);
         if (event.type === 'response.text') {
+          isResponding = true;
+          
+          // Clear any existing timeout
+          if (responseTimeout) {
+            clearTimeout(responseTimeout);
+          }
+
+          // Set a timeout for the response
+          responseTimeout = setTimeout(() => {
+            if (isResponding) {
+              console.log(`Response timeout for call ${callSid}`);
+              const twiml = this.generateTwiML("I'm sorry, but I'm having trouble processing your request. Please try again.", true);
+              this.sendTwiMLResponse(res, twiml);
+              isResponding = false;
+            }
+          }, 10000); // 10 second timeout
+
           // Don't gather input if the response indicates the end of conversation
           const shouldGather = !event.text.toLowerCase().includes('goodbye') && 
                              !event.text.toLowerCase().includes('take care') &&
                              !event.text.toLowerCase().includes('bye');
           
           const twiml = this.generateTwiML(event.text, shouldGather);
-          this.sendTwiMLResponse(res, twiml);
+          await this.sendTwiMLResponse(res, twiml);
+          
+          // Clear the timeout after successful response
+          clearTimeout(responseTimeout);
+          isResponding = false;
         }
       } catch (error) {
         console.error('Error handling WebSocket message:', error);
+        // Send error response to Twilio
+        const twiml = this.generateTwiML("I'm sorry, but I encountered an error. Please try again.", true);
+        await this.sendTwiMLResponse(res, twiml);
       }
     });
 
     ws.on('close', () => {
       console.log(`WebSocket closed for call ${callSid}`);
+      if (responseTimeout) {
+        clearTimeout(responseTimeout);
+      }
       this.activeCalls.delete(callSid);
     });
 
     ws.on('error', (error) => {
       console.error(`WebSocket error for call ${callSid}:`, error);
+      if (responseTimeout) {
+        clearTimeout(responseTimeout);
+      }
       this.activeCalls.delete(callSid);
     });
   }
@@ -217,12 +250,19 @@ export class TwilioVoiceHandler {
       .replace(/'/g, '&apos;');
   }
 
-  sendTwiMLResponse(res, twiml) {
-    res.writeHead(200, {
-      'Content-Type': 'text/xml',
-      'Content-Length': Buffer.byteLength(twiml)
-    });
-    res.end(twiml);
+  async sendTwiMLResponse(res, twiml) {
+    try {
+      res.set('Content-Type', 'text/xml');
+      await new Promise((resolve, reject) => {
+        res.send(twiml, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    } catch (error) {
+      console.error('Error sending TwiML response:', error);
+      throw error;
+    }
   }
 
   sendErrorResponse(res, status, message) {

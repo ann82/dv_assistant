@@ -5,13 +5,42 @@ import { encode } from 'gpt-tokenizer';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
+// Log levels in order of severity
+const LOG_LEVELS = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3
+};
+
+// Get current log level from config
+const currentLogLevel = LOG_LEVELS[config.LOG_LEVEL?.toLowerCase() || 'info'];
+
+// Helper function to log messages
+function log(level, message, data = {}) {
+  if (LOG_LEVELS[level] <= currentLogLevel) {
+    const logEntry = {
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      ...data
+    };
+    
+    if (level === 'error') {
+      console.error(JSON.stringify(logEntry));
+    } else {
+      console.log(JSON.stringify(logEntry));
+    }
+  }
+}
+
 export class ResponseGenerator {
   static async getResponse(input, context = {}) {
     try {
       // Check cache first
       const cachedResponse = responseCache.getCachedResponse(input);
       if (cachedResponse) {
-        console.log('📦 [DEBUG] Using cached response');
+        log('debug', 'Using cached response', { input });
         return {
           ...cachedResponse,
           requestType: context.requestType || 'web'
@@ -20,6 +49,7 @@ export class ResponseGenerator {
 
       // Check if this is a request for more details
       if (this.isDetailRequest(input)) {
+        log('debug', 'Processing detail request', { input });
         const detailResponse = await this.getDetailedResponse(input, context);
         if (detailResponse) {
           return {
@@ -30,13 +60,17 @@ export class ResponseGenerator {
       }
 
       // Try Tavily search first for factual queries
-      console.log('🔍 [DEBUG] Checking if query is factual:', input);
+      log('debug', 'Checking if query is factual', { input });
       if (this.isFactualQuery(input)) {
-        console.log('✅ [DEBUG] Query is factual, attempting Tavily search');
+        log('info', 'Query is factual, attempting Tavily search', { input });
         const tavilyResponse = await this.queryTavily(input);
-        console.log('📊 [DEBUG] Tavily response received:', tavilyResponse ? 'Yes' : 'No');
+        log('debug', 'Tavily response received', { 
+          hasResponse: !!tavilyResponse,
+          hasAnswer: !!tavilyResponse?.answer 
+        });
+        
         if (tavilyResponse && this.isSufficientResponse(tavilyResponse)) {
-          console.log('✅ [DEBUG] Tavily response is sufficient');
+          log('info', 'Tavily response is sufficient');
           const response = this.formatTavilyResponse(tavilyResponse, context.requestType || 'web');
           // Store full details in cache for later use
           responseCache.setCachedResponse(input, response.fullDetails, {
@@ -46,7 +80,6 @@ export class ResponseGenerator {
             whisperUsed: false,
             isDetailed: true
           });
-          // Return only the summary
           return {
             text: response.summary,
             source: 'tavily',
@@ -57,10 +90,10 @@ export class ResponseGenerator {
             requestType: context.requestType || 'web'
           };
         } else {
-          console.log('❌ [DEBUG] Tavily response not sufficient, falling back to GPT');
+          log('info', 'Tavily response not sufficient, falling back to GPT');
         }
       } else {
-        console.log('❌ [DEBUG] Query is not factual, skipping Tavily');
+        log('debug', 'Query is not factual, skipping Tavily');
       }
 
       // Determine which GPT model to use
@@ -94,7 +127,10 @@ export class ResponseGenerator {
         requestType: context.requestType || 'web'
       };
     } catch (error) {
-      console.error('Error generating response:', error);
+      log('error', 'Error generating response', { 
+        error: error.message,
+        stack: error.stack
+      });
       return {
         text: 'I apologize, but I encountered an error processing your request.',
         source: 'error',
@@ -152,7 +188,8 @@ export class ResponseGenerator {
 
   static async queryTavily(query) {
     try {
-      console.log('🔍 [DEBUG] Calling Tavily API with query:', query);
+      log('info', 'Calling Tavily API', { query });
+
       const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',
         headers: {
@@ -168,15 +205,24 @@ export class ResponseGenerator {
       });
 
       if (!response.ok) {
-        console.error('❌ [DEBUG] Tavily API error:', response.statusText);
+        log('error', 'Tavily API error', {
+          status: response.status,
+          statusText: response.statusText
+        });
         throw new Error(`Tavily API error: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('📊 [DEBUG] Tavily API response:', JSON.stringify(data, null, 2));
+      log('info', 'Tavily API response received', {
+        hasAnswer: !!data.answer,
+        resultCount: data.results?.length || 0
+      });
       return data;
     } catch (error) {
-      console.error('❌ [DEBUG] Error querying Tavily:', error);
+      log('error', 'Error querying Tavily', {
+        error: error.message,
+        stack: error.stack
+      });
       return null;
     }
   }

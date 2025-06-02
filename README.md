@@ -196,7 +196,7 @@ TWILIO_PHONE_NUMBER=your_twilio_number
 PORT=3000
 WS_PORT=3001
 NODE_ENV=development
-LOG_LEVEL=debug  # Options: debug, info, warn, error
+LOG_LEVEL=debug  # Options: error, warn, info, debug
 ```
 
 **Note:** For local testing, no real Twilio or OpenAI credentials are required due to comprehensive mocks. The test script in `package.json` sets `OPENAI_API_KEY` automatically.
@@ -605,3 +605,39 @@ MIT License - see LICENSE file for details
 ### Tavily Integration
 - **Frontend (React App):**  
   The frontend uses Tavily to search for domestic violence shelters. It sends a POST request to the Tavily API with a query like `domestic violence shelters in [location]`
+
+### Logging System
+
+The application uses a structured logging system that integrates with Railway:
+
+1. **Log Levels**
+   - `error`: Critical errors and failures
+   - `warn`: Warning messages
+   - `info`: Important operational information
+   - `debug`: Detailed debugging information
+
+2. **Configuration**
+   ```env
+   LOG_LEVEL=debug  # Options: error, warn, info, debug
+   ```
+
+3. **Log Format**
+   ```json
+   {
+     "level": "debug|info|warn|error",
+     "message": "Human readable message",
+     "timestamp": "ISO timestamp",
+     "additional": "context data"
+   }
+   ```
+
+4. **Viewing Logs**
+   - **Railway CLI**:
+     ```bash
+     railway logs
+     ```
+   - **Railway Dashboard**:
+     - Go to project
+     - Click service
+     - Click "Logs" tab
+     - Filter by level, service, or time range

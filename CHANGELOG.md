@@ -425,4 +425,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed repeated "How may I help" prompts in Twilio calls
 - Resolved cache memory growth issues
-- Improved error handling in Tavily API integration 
+- Improved error handling in Tavily API integration
+
+## [1.11.0] - 2024-04-01
+
+### Added
+- Enhanced logging system with structured JSON output
+- Log level configuration support
+- Detailed API call tracking
+- Performance monitoring logs
+
+### Changed
+- Improved Tavily API error handling
+- Updated logging format for better Railway integration
+- Enhanced debug information for API calls
+
+### Fixed
+- Fixed 499 status code issues in Twilio calls
+- Improved error tracking in API calls
+- Better handling of API timeouts 
