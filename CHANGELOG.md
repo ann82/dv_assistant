@@ -408,4 +408,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Resolved test failures due to missing or incomplete mocks for Twilio and config.
-- Fixed issues with environment variable timing for OpenAI API key in tests. 
+- Fixed issues with environment variable timing for OpenAI API key in tests.
+
+## [1.10.0] - 2024-04-01
+
+### Added
+- Enhanced cache system with size limits and monitoring
+- Improved Twilio voice conversation flow
+- Added detailed debug logging for Tavily API calls
+
+### Changed
+- Updated cache cleanup interval from 24 hours to 5 minutes
+- Modified Twilio voice prompts to be context-aware
+- Improved conversation ending detection
+
+### Fixed
+- Fixed repeated "How may I help" prompts in Twilio calls
+- Resolved cache memory growth issues
+- Improved error handling in Tavily API integration 

@@ -11,13 +11,9 @@ export class ResponseGenerator {
       // Check cache first
       const cachedResponse = responseCache.getCachedResponse(input);
       if (cachedResponse) {
+        console.log('📦 [DEBUG] Using cached response');
         return {
-          text: cachedResponse.text,
-          source: 'cache',
-          model: cachedResponse.model || config.GPT35_MODEL,
-          inputTokens: cachedResponse.inputTokens || 0,
-          outputTokens: cachedResponse.outputTokens || 0,
-          whisperUsed: false,
+          ...cachedResponse,
           requestType: context.requestType || 'web'
         };
       }
@@ -34,9 +30,13 @@ export class ResponseGenerator {
       }
 
       // Try Tavily search first for factual queries
+      console.log('🔍 [DEBUG] Checking if query is factual:', input);
       if (this.isFactualQuery(input)) {
+        console.log('✅ [DEBUG] Query is factual, attempting Tavily search');
         const tavilyResponse = await this.queryTavily(input);
+        console.log('📊 [DEBUG] Tavily response received:', tavilyResponse ? 'Yes' : 'No');
         if (tavilyResponse && this.isSufficientResponse(tavilyResponse)) {
+          console.log('✅ [DEBUG] Tavily response is sufficient');
           const response = this.formatTavilyResponse(tavilyResponse, context.requestType || 'web');
           // Store full details in cache for later use
           responseCache.setCachedResponse(input, response.fullDetails, {
@@ -56,7 +56,11 @@ export class ResponseGenerator {
             whisperUsed: false,
             requestType: context.requestType || 'web'
           };
+        } else {
+          console.log('❌ [DEBUG] Tavily response not sufficient, falling back to GPT');
         }
+      } else {
+        console.log('❌ [DEBUG] Query is not factual, skipping Tavily');
       }
 
       // Determine which GPT model to use

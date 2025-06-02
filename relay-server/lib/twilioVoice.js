@@ -151,7 +151,12 @@ export class TwilioVoiceHandler {
       try {
         const event = JSON.parse(data);
         if (event.type === 'response.text') {
-          const twiml = this.generateTwiML(event.text);
+          // Don't gather input if the response indicates the end of conversation
+          const shouldGather = !event.text.toLowerCase().includes('goodbye') && 
+                             !event.text.toLowerCase().includes('take care') &&
+                             !event.text.toLowerCase().includes('bye');
+          
+          const twiml = this.generateTwiML(event.text, shouldGather);
           this.sendTwiMLResponse(res, twiml);
         }
       } catch (error) {
@@ -182,16 +187,25 @@ export class TwilioVoiceHandler {
     }
   }
 
-  generateTwiML(text) {
-    return `<?xml version="1.0" encoding="UTF-8"?>
+  generateTwiML(text, shouldGather = true) {
+    let twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Amy">${this.escapeXML(text)}</Say>
+  <Say voice="Polly.Amy">${this.escapeXML(text)}</Say>`;
+
+    // Only add Gather if we expect a response
+    if (shouldGather) {
+      twiml += `
   <Gather input="speech" action="/twilio/voice" method="POST" 
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"/>
+          language="en-US"/>`;
+    }
+
+    twiml += `
 </Response>`;
+
+    return twiml;
   }
 
   escapeXML(text) {

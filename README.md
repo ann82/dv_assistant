@@ -34,6 +34,45 @@ A voice-based AI assistant that provides support and resources for people experi
 - Secure storage of call summaries
 - Easy opt-out process
 
+### Cache System
+
+The application uses an intelligent caching system to improve performance and reduce API calls:
+
+1. **Size Management**
+   - Maximum cache size: 1000 entries
+   - Automatic removal of oldest entries when full
+   - 20% cleanup when size limit is reached
+
+2. **Cleanup**
+   - Automatic cleanup every 5 minutes
+   - Expired entries removed based on 24-hour TTL
+   - Memory usage monitoring and logging
+
+3. **Debug Logging**
+   - Cache size and memory usage tracking
+   - Entry removal logging
+   - Performance monitoring
+
+### Twilio Voice Integration
+
+The system provides natural voice conversations with several improvements:
+
+1. **Context-Aware Responses**
+   - Intelligent handling of conversation flow
+   - Automatic detection of conversation endings
+   - No unnecessary prompts after farewells
+
+2. **Voice Features**
+   - High-quality voice synthesis
+   - Natural conversation flow
+   - Automatic speech recognition
+   - Consent-based SMS summaries
+
+3. **Error Handling**
+   - Robust error recovery
+   - Automatic retries for failed operations
+   - Detailed error logging
+
 ## System Architecture
 
 The system consists of three main components:
@@ -144,18 +183,20 @@ npm run test:coverage
 Create a `.env` file in the root directory:
 
 ```env
+# API Keys
+TAVILY_API_KEY=your_tavily_api_key
+OPENAI_API_KEY=your_openai_api_key
+
 # Twilio Configuration
 TWILIO_ACCOUNT_SID=your_account_sid
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_PHONE_NUMBER=your_twilio_number
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
 # Server Configuration
 PORT=3000
+WS_PORT=3001
 NODE_ENV=development
-LOG_LEVEL=info  # Options: debug, info, warn, error
+LOG_LEVEL=debug  # Options: debug, info, warn, error
 ```
 
 **Note:** For local testing, no real Twilio or OpenAI credentials are required due to comprehensive mocks. The test script in `package.json` sets `OPENAI_API_KEY` automatically.
@@ -563,24 +604,4 @@ MIT License - see LICENSE file for details
 
 ### Tavily Integration
 - **Frontend (React App):**  
-  The frontend uses Tavily to search for domestic violence shelters. It sends a POST request to the Tavily API with a query like `domestic violence shelters in [location]` and processes the results to display shelter information.
-
-- **Backend (Relay Server):**  
-  The backend uses Tavily as a fallback for factual queries. If a query is deemed factual (e.g., shelter searches), the backend calls `queryTavily()` to get real-time data. The response is then formatted and cached for future use.
-
-### Why Different Prompts?
-- **Frontend Prompt:**  
-  The frontend uses `conversation_config.js` (a detailed prompt for domestic violence support) as the system prompt for the OpenAI Realtime API client. This prompt is tailored for interactive, empathetic conversations.
-
-- **Backend Prompt:**  
-  The backend uses simpler, hardcoded prompts in `relay-server/lib/response.js` and `relay-server/services/callSummaryService.js`. For example:
-  ```js
-  {
-    role: 'system',
-    content: 'You are a helpful assistant for domestic violence support. Keep responses concise and focused.'
-  }
-  ```
-  These prompts are designed for:
-  - **Efficiency:** The backend prioritizes quick, concise responses for phone calls and summaries.
-  - **Cost Control:** The backend uses lower token limits (e.g., `DEFAULT_MAX_TOKENS: 150`) to minimize costs.
-  - **Different Use Cases:** The backend handles both real-time responses (via Tavily) and summaries, which require different tones and formats.
+  The frontend uses Tavily to search for domestic violence shelters. It sends a POST request to the Tavily API with a query like `domestic violence shelters in [location]`
