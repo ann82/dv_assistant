@@ -35,126 +35,457 @@ function log(level, message, data = {}) {
 }
 
 export class ResponseGenerator {
-  static async getResponse(input, context = {}) {
-    try {
-      // Check cache first
-      const cachedResponse = responseCache.getCachedResponse(input);
-      if (cachedResponse) {
-        log('debug', 'Using cached response', { input });
-        return {
-          ...cachedResponse,
-          requestType: context.requestType || 'web'
-        };
-      }
+  static confidenceCache = new Map();
+  static CACHE_TTL = 1000 * 60 * 60; // 1 hour in milliseconds
+  static CLEANUP_INTERVAL = 1000 * 60 * 15; // 15 minutes in milliseconds
+  static lastCleanup = Date.now();
 
-      // Check if this is a request for more details
-      if (this.isDetailRequest(input)) {
-        log('debug', 'Processing detail request', { input });
-        const detailResponse = await this.getDetailedResponse(input, context);
-        if (detailResponse) {
-          return {
-            ...detailResponse,
-            requestType: context.requestType || 'web'
-          };
-        }
-      }
-
-      // Try Tavily search first for factual queries
-      log('debug', 'Checking if query is factual', { input });
-      if (this.isFactualQuery(input)) {
-        log('info', 'Query is factual, attempting Tavily search', { input });
-        const tavilyResponse = await this.queryTavily(input);
-        log('debug', 'Tavily response received', { 
-          hasResponse: !!tavilyResponse,
-          hasAnswer: !!tavilyResponse?.answer 
-        });
-        
-        if (tavilyResponse && this.isSufficientResponse(tavilyResponse)) {
-          log('info', 'Tavily response is sufficient');
-          const response = this.formatTavilyResponse(tavilyResponse, context.requestType || 'web');
-          // Store full details in cache for later use
-          responseCache.setCachedResponse(input, response.fullDetails, {
-            model: 'tavily',
-            inputTokens: 0,
-            outputTokens: 0,
-            whisperUsed: false,
-            isDetailed: true
-          });
-          return {
-            text: response.summary,
-            source: 'tavily',
-            model: 'tavily',
-            inputTokens: 0,
-            outputTokens: 0,
-            whisperUsed: false,
-            requestType: context.requestType || 'web'
-          };
-        } else {
-          log('info', 'Tavily response not sufficient, falling back to GPT');
-        }
-      } else {
-        log('debug', 'Query is not factual, skipping Tavily');
-      }
-
-      // Determine which GPT model to use
-      const useGPT4 = this.shouldUseGPT4(input, context);
-      const model = useGPT4 ? config.GPT4_MODEL : config.GPT35_MODEL;
-
-      // Generate response with strict token limit
-      const response = await this.generateGPTResponse(input, model, context);
-      
-      // Calculate token usage
-      const inputTokens = encode(input).length;
-      const outputTokens = encode(response.text).length;
-
-      // Cache the response
-      responseCache.setCachedResponse(input, response.text, {
-        model,
-        inputTokens,
-        outputTokens,
-        whisperUsed: false
-      });
-      
-      return {
-        text: response.text,
-        source: 'openai',
-        model,
-        inputTokens,
-        outputTokens,
-        whisperUsed: false,
-        transcriptLength: input.length,
-        responseLength: response.text.length,
-        requestType: context.requestType || 'web'
-      };
-    } catch (error) {
-      log('error', 'Error generating response', { 
-        error: error.message,
-        stack: error.stack
-      });
-      return {
-        text: 'I apologize, but I encountered an error processing your request.',
-        source: 'error',
-        model: config.GPT35_MODEL,
-        inputTokens: 0,
-        outputTokens: 0,
-        whisperUsed: false,
-        requestType: context.requestType || 'web'
-      };
+  // Add routing performance monitoring
+  static routingStats = {
+    totalRequests: 0,
+    byConfidence: {
+      high: { count: 0, success: 0, fallback: 0 },
+      medium: { count: 0, success: 0, fallback: 0 },
+      low: { count: 0, success: 0, fallback: 0 },
+      nonFactual: { count: 0 }
+    },
+    bySource: {
+      tavily: { count: 0, success: 0 },
+      gpt: { count: 0, success: 0 },
+      hybrid: { count: 0, success: 0 }
+    },
+    responseTimes: {
+      tavily: [],
+      gpt: [],
+      hybrid: []
     }
+  };
+
+  static cleanupCache() {
+    const now = Date.now();
+    if (now - this.lastCleanup < this.CLEANUP_INTERVAL) {
+      return; // Skip if not enough time has passed
+    }
+
+    log('debug', 'Starting cache cleanup', {
+      cacheSize: this.confidenceCache.size,
+      lastCleanup: this.lastCleanup
+    });
+
+    let expiredCount = 0;
+    for (const [key, value] of this.confidenceCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.confidenceCache.delete(key);
+        expiredCount++;
+      }
+    }
+
+    this.lastCleanup = now;
+
+    log('debug', 'Cache cleanup completed', {
+      expiredEntries: expiredCount,
+      remainingEntries: this.confidenceCache.size,
+      cleanupTime: now
+    });
+  }
+
+  static getCachedAnalysis(input) {
+    // Run cleanup if needed
+    this.cleanupCache();
+
+    const normalizedInput = input.toLowerCase().trim();
+    const cached = this.confidenceCache.get(normalizedInput);
+    
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      log('debug', 'Using cached confidence analysis', {
+        input: normalizedInput,
+        confidence: cached.analysis.confidence,
+        timestamp: cached.timestamp,
+        cacheSize: this.confidenceCache.size
+      });
+      return cached.analysis;
+    }
+    
+    return null;
+  }
+
+  static setCachedAnalysis(input, analysis) {
+    // Run cleanup if needed
+    this.cleanupCache();
+
+    const normalizedInput = input.toLowerCase().trim();
+    this.confidenceCache.set(normalizedInput, {
+      analysis,
+      timestamp: Date.now()
+    });
+    
+    log('debug', 'Cached confidence analysis', {
+      input: normalizedInput,
+      confidence: analysis.confidence,
+      timestamp: Date.now(),
+      cacheSize: this.confidenceCache.size
+    });
+  }
+
+  static getCacheStats() {
+    const now = Date.now();
+    const stats = {
+      totalEntries: this.confidenceCache.size,
+      expiredEntries: 0,
+      validEntries: 0,
+      oldestEntry: null,
+      newestEntry: null
+    };
+
+    for (const [key, value] of this.confidenceCache.entries()) {
+      const age = now - value.timestamp;
+      if (age > this.CACHE_TTL) {
+        stats.expiredEntries++;
+      } else {
+        stats.validEntries++;
+        if (!stats.oldestEntry || value.timestamp < stats.oldestEntry.timestamp) {
+          stats.oldestEntry = { key, timestamp: value.timestamp };
+        }
+        if (!stats.newestEntry || value.timestamp > stats.newestEntry.timestamp) {
+          stats.newestEntry = { key, timestamp: value.timestamp };
+        }
+      }
+    }
+
+    return stats;
+  }
+
+  static analyzeQuery(input) {
+    // Check cache first
+    const cachedAnalysis = this.getCachedAnalysis(input);
+    if (cachedAnalysis) {
+      return cachedAnalysis;
+    }
+
+    // Normalize input
+    const normalizedInput = input.toLowerCase().trim();
+    
+    // Define pattern categories with weights
+    const patternCategories = {
+      location: {
+        weight: 2.0,
+        patterns: [
+          /where (?:is|are|can I find)/i,
+          /find (?:a|an|the|some|any)/i,
+          /locate (?:a|an|the|some|any)/i,
+          /search for/i,
+          /look for/i,
+          /nearest/i,
+          /closest/i,
+          /near(?:by| me)?/i
+        ]
+      },
+      information: {
+        weight: 1.5,
+        patterns: [
+          /what (?:is|are)/i,
+          /when (?:is|are)/i,
+          /how (?:to|do|can)/i,
+          /tell me about/i,
+          /information about/i,
+          /details about/i
+        ]
+      },
+      resource: {
+        weight: 2.0,
+        patterns: [
+          /help (?:with|for|me|finding|locating|searching|a|an|the|some|any)/i,
+          /need (?:help|assistance|support)/i,
+          /looking for (?:help|assistance|support)/i,
+          /resources (?:for|about)/i,
+          /services (?:for|about)/i
+        ]
+      },
+      shelter: {
+        weight: 2.5,
+        patterns: [
+          /shelter(?:s)? (?:near|in|around|close to)/i,
+          /domestic violence (?:shelter|resource|help|support)/i,
+          /safe (?:place|house|shelter)/i,
+          /emergency (?:shelter|housing|accommodation)/i,
+          /temporary (?:housing|shelter|accommodation)/i
+        ]
+      },
+      contact: {
+        weight: 1.2,
+        patterns: [
+          /contact (?:information|details|number|phone)/i,
+          /phone (?:number|contact)/i,
+          /address (?:of|for)/i,
+          /how to (?:contact|reach|call)/i
+        ]
+      },
+      general: {
+        weight: 1.0,
+        patterns: [
+          /find/i,
+          /search/i,
+          /locate/i,
+          /where/i,
+          /what/i,
+          /when/i,
+          /how/i
+        ]
+      }
+    };
+
+    // Define shelter keywords with weights
+    const shelterKeywords = [
+      { word: 'shelter', weight: 2.0 },
+      { word: 'domestic violence', weight: 2.5 },
+      { word: 'safe house', weight: 2.0 },
+      { word: 'emergency housing', weight: 1.8 },
+      { word: 'temporary housing', weight: 1.8 },
+      { word: 'refuge', weight: 1.5 },
+      { word: 'sanctuary', weight: 1.5 },
+      { word: 'haven', weight: 1.5 }
+    ];
+
+    // Calculate pattern match score
+    let patternScore = 0;
+    let matchedPatterns = [];
+    let totalWeight = 0;
+
+    // Check each category
+    for (const [category, { weight, patterns }] of Object.entries(patternCategories)) {
+      for (const pattern of patterns) {
+        if (pattern.test(normalizedInput)) {
+          patternScore += weight;
+          totalWeight += weight;
+          matchedPatterns.push(`${category}:${pattern.toString()} (weight: ${weight})`);
+        }
+      }
+    }
+
+    // Check for shelter keywords
+    for (const { word, weight } of shelterKeywords) {
+      if (normalizedInput.includes(word)) {
+        patternScore += weight;
+        totalWeight += weight;
+        matchedPatterns.push(`keyword:${word} (weight: ${weight})`);
+      }
+    }
+
+    // Calculate confidence score
+    const confidence = totalWeight > 0 ? patternScore / totalWeight : 0;
+
+    // Determine if query is factual
+    const isFactual = confidence >= 0.3;
+
+    const analysis = {
+      isFactual,
+      confidence,
+      matches: {
+        patterns: matchedPatterns,
+        score: patternScore,
+        totalWeight
+      }
+    };
+
+    // Cache the analysis
+    this.setCachedAnalysis(input, analysis);
+
+    return analysis;
   }
 
   static isFactualQuery(input) {
-    const factualPatterns = [
-      /what is/i,
-      /where is/i,
-      /when is/i,
-      /how to/i,
-      /tell me about/i,
-      /find/i,
-      /search/i,
-      /locate/i
-    ];
-    return factualPatterns.some(pattern => pattern.test(input));
+    const analysis = this.analyzeQuery(input);
+    return analysis.isFactual;
+  }
+
+  static updateRoutingStats(confidence, source, success, fallback = false, responseTime = 0) {
+    // Update total requests
+    this.routingStats.totalRequests++;
+
+    // Update confidence level stats
+    let confidenceLevel;
+    if (confidence >= 0.7) {
+      confidenceLevel = 'high';
+    } else if (confidence >= 0.4) {
+      confidenceLevel = 'medium';
+    } else if (confidence >= 0.3) {
+      confidenceLevel = 'low';
+    } else {
+      confidenceLevel = 'nonFactual';
+    }
+
+    this.routingStats.byConfidence[confidenceLevel].count++;
+    if (success) {
+      this.routingStats.byConfidence[confidenceLevel].success++;
+    }
+    if (fallback) {
+      this.routingStats.byConfidence[confidenceLevel].fallback++;
+    }
+
+    // Update source stats
+    this.routingStats.bySource[source].count++;
+    if (success) {
+      this.routingStats.bySource[source].success++;
+    }
+
+    // Update response times
+    if (responseTime > 0) {
+      this.routingStats.responseTimes[source].push(responseTime);
+      // Keep only the last 100 response times
+      if (this.routingStats.responseTimes[source].length > 100) {
+        this.routingStats.responseTimes[source].shift();
+      }
+    }
+
+    // Log the update
+    log('debug', 'Updated routing stats', {
+      confidence,
+      confidenceLevel,
+      source,
+      success,
+      fallback,
+      responseTime,
+      stats: this.routingStats
+    });
+  }
+
+  static logRoutingPerformance() {
+    const stats = this.routingStats;
+    
+    // Calculate success rates
+    const successRates = {
+      high: stats.byConfidence.high.count ? 
+        (stats.byConfidence.high.success / stats.byConfidence.high.count * 100).toFixed(2) : 0,
+      medium: stats.byConfidence.medium.count ? 
+        (stats.byConfidence.medium.success / stats.byConfidence.medium.count * 100).toFixed(2) : 0,
+      low: stats.byConfidence.low.count ? 
+        (stats.byConfidence.low.success / stats.byConfidence.low.count * 100).toFixed(2) : 0
+    };
+
+    // Calculate average response times
+    const avgResponseTimes = {
+      tavily: this.calculateAverageResponseTime(stats.responseTimes.tavily),
+      gpt: this.calculateAverageResponseTime(stats.responseTimes.gpt),
+      hybrid: this.calculateAverageResponseTime(stats.responseTimes.hybrid)
+    };
+
+    log('info', 'Routing Performance Metrics', {
+      totalRequests: stats.totalRequests,
+      confidenceBreakdown: {
+        high: {
+          count: stats.byConfidence.high.count,
+          successRate: `${successRates.high}%`,
+          fallbackRate: stats.byConfidence.high.count ? 
+            (stats.byConfidence.high.fallback / stats.byConfidence.high.count * 100).toFixed(2) + '%' : '0%'
+        },
+        medium: {
+          count: stats.byConfidence.medium.count,
+          successRate: `${successRates.medium}%`,
+          fallbackRate: stats.byConfidence.medium.count ? 
+            (stats.byConfidence.medium.fallback / stats.byConfidence.medium.count * 100).toFixed(2) + '%' : '0%'
+        },
+        low: {
+          count: stats.byConfidence.low.count,
+          successRate: `${successRates.low}%`,
+          fallbackRate: stats.byConfidence.low.count ? 
+            (stats.byConfidence.low.fallback / stats.byConfidence.low.count * 100).toFixed(2) + '%' : '0%'
+        },
+        nonFactual: stats.byConfidence.nonFactual.count
+      },
+      sourcePerformance: {
+        tavily: {
+          count: stats.bySource.tavily.count,
+          successRate: stats.bySource.tavily.count ? 
+            (stats.bySource.tavily.success / stats.bySource.tavily.count * 100).toFixed(2) + '%' : '0%',
+          avgResponseTime: `${avgResponseTimes.tavily}ms`
+        },
+        gpt: {
+          count: stats.bySource.gpt.count,
+          successRate: stats.bySource.gpt.count ? 
+            (stats.bySource.gpt.success / stats.bySource.gpt.count * 100).toFixed(2) + '%' : '0%',
+          avgResponseTime: `${avgResponseTimes.gpt}ms`
+        },
+        hybrid: {
+          count: stats.bySource.hybrid.count,
+          successRate: stats.bySource.hybrid.count ? 
+            (stats.bySource.hybrid.success / stats.bySource.hybrid.count * 100).toFixed(2) + '%' : '0%',
+          avgResponseTime: `${avgResponseTimes.hybrid}ms`
+        }
+      }
+    });
+  }
+
+  static calculateAverageResponseTime(times) {
+    if (!times.length) return 0;
+    return (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2);
+  }
+
+  static async getResponse(input, context = {}) {
+    // Analyze query and get confidence score
+    const analysis = this.analyzeQuery(input);
+    const { confidence, isFactual } = analysis;
+
+    // Start timing the response
+    const startTime = Date.now();
+    let response;
+    let source;
+    let success = false;
+    let fallback = false;
+
+    try {
+      if (confidence >= 0.7) {
+        // High confidence - use Tavily exclusively
+        source = 'tavily';
+        response = await this.queryTavily(input);
+        success = this.isSufficientResponse(response);
+      } else if (confidence >= 0.4) {
+        // Medium confidence - try both in parallel
+        source = 'hybrid';
+        const [tavilyResponse, gptResponse] = await Promise.all([
+          this.queryTavily(input),
+          this.generateGPTResponse(input, 'gpt-3.5-turbo', context)
+        ]);
+
+        if (this.isSufficientResponse(tavilyResponse)) {
+          response = this.formatTavilyResponse(tavilyResponse);
+          success = true;
+        } else {
+          response = gptResponse;
+          success = true;
+          fallback = true;
+        }
+      } else if (confidence >= 0.3) {
+        // Low confidence - use GPT with Tavily context
+        source = 'gpt';
+        const tavilyResponse = await this.queryTavily(input);
+        const context = {
+          tavilyResults: tavilyResponse.results || [],
+          tavilyAnswer: tavilyResponse.answer || ''
+        };
+        response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
+        success = true;
+      } else {
+        // Non-factual - use GPT exclusively
+        source = 'gpt';
+        response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
+        success = true;
+      }
+    } catch (error) {
+      log('error', 'Error generating response', { error: error.message });
+      // Fallback to GPT on error
+      source = 'gpt';
+      response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
+      success = true;
+      fallback = true;
+    }
+
+    // Calculate response time
+    const responseTime = Date.now() - startTime;
+
+    // Update routing stats
+    this.updateRoutingStats(confidence, source, success, fallback, responseTime);
+
+    return response;
   }
 
   static async generateGPTResponse(input, model, context) {
@@ -188,7 +519,10 @@ export class ResponseGenerator {
 
   static async queryTavily(query) {
     try {
-      log('info', 'Calling Tavily API', { query });
+      log('info', 'Calling Tavily API', { 
+        query,
+        timestamp: new Date().toISOString()
+      });
 
       const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',
@@ -207,7 +541,8 @@ export class ResponseGenerator {
       if (!response.ok) {
         log('error', 'Tavily API error', {
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
+          query
         });
         throw new Error(`Tavily API error: ${response.statusText}`);
       }
@@ -215,44 +550,61 @@ export class ResponseGenerator {
       const data = await response.json();
       log('info', 'Tavily API response received', {
         hasAnswer: !!data.answer,
-        resultCount: data.results?.length || 0
+        resultCount: data.results?.length || 0,
+        answerLength: data.answer?.length || 0,
+        query,
+        timestamp: new Date().toISOString()
       });
       return data;
     } catch (error) {
       log('error', 'Error querying Tavily', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
+        query
       });
       return null;
     }
   }
 
   static isSufficientResponse(tavilyResponse) {
-    // Check if Tavily provided a good answer
-    return tavilyResponse?.answer && tavilyResponse.answer.length > 0;
+    // Check if Tavily provided results or an answer
+    return (tavilyResponse?.results && tavilyResponse.results.length > 0) || 
+           (tavilyResponse?.answer && tavilyResponse.answer.length > 0);
   }
 
   static formatTavilyResponse(tavilyResponse, requestType = 'web') {
-    // Extract shelter names and basic info
-    const shelters = tavilyResponse.results.map(result => ({
-      name: result.title,
-      address: result.url,
-      phone: result.raw_content ? (result.raw_content.match(/phone:?\s*([\d-]+)/i)?.[1] || 'Not available') : 'Not available',
-      description: result.content,
-      services: result.raw_content ? (result.raw_content.match(/services:?\s*([^.]+)/i)?.[1] || 'Not specified') : 'Not specified'
-    }));
+    // Extract shelter information from results
+    const shelters = tavilyResponse.results
+      .filter(result => 
+        result.title.toLowerCase().includes('shelter') || 
+        result.content.toLowerCase().includes('shelter') ||
+        result.raw_content?.toLowerCase().includes('shelter')
+      )
+      .map(result => ({
+        name: result.title,
+        address: result.url,
+        phone: this.extractPhone(result.raw_content || result.content),
+        description: result.content,
+        services: this.extractServices(result.raw_content || result.content)
+      }));
+
+    if (shelters.length === 0) {
+      return {
+        summary: "I couldn't find specific shelter information in Atlanta. Would you like me to search for domestic violence resources in your area instead?",
+        fullDetails: "No specific shelters found. Please try a different search query.",
+        shelters: []
+      };
+    }
 
     // Format based on request type
     if (requestType === 'phone') {
-      // For phone calls, be more concise and focus on essential info
-      const summary = `I found ${shelters.length} shelters. Here are the first 3:\n\n` + 
+      const summary = `I found ${shelters.length} shelters in Atlanta. Here are the first 3:\n\n` + 
         shelters.slice(0, 3).map((s, i) => 
           `${i + 1}. ${s.name}\n` +
           `   Phone: ${s.phone}\n`
         ).join('\n') +
         '\n\nWould you like to hear more details about any of these shelters?';
 
-      // Create detailed response with only essential info
       const fullDetails = shelters.map((s, i) => 
         `${i + 1}. ${s.name}\n` +
         `   Phone: ${s.phone}\n` +
@@ -265,8 +617,7 @@ export class ResponseGenerator {
         shelters
       };
     } else {
-      // For web requests, include more details
-      const summary = `I found ${shelters.length} shelters in your area:\n\n` + 
+      const summary = `I found ${shelters.length} shelters in Atlanta:\n\n` + 
         shelters.map((s, i) => 
           `${i + 1}. ${s.name}\n` +
           `   Services: ${s.services}\n` +
@@ -288,6 +639,18 @@ export class ResponseGenerator {
         shelters
       };
     }
+  }
+
+  static extractPhone(content) {
+    if (!content) return 'Not available';
+    const phoneMatch = content.match(/(?:phone|tel|telephone|call)[:\s]+([\d-()]+)/i);
+    return phoneMatch ? phoneMatch[1] : 'Not available';
+  }
+
+  static extractServices(content) {
+    if (!content) return 'Not specified';
+    const servicesMatch = content.match(/(?:services|offers|provides)[:\s]+([^.]+)/i);
+    return servicesMatch ? servicesMatch[1].trim() : 'Not specified';
   }
 
   static shouldUseGPT4(input, context) {
@@ -369,5 +732,117 @@ export class ResponseGenerator {
       return null;
     }
     return null;
+  }
+
+  static getFactualPatterns(input) {
+    const normalizedInput = input.toLowerCase().trim();
+    const patterns = [];
+
+    // Add pattern matches with their categories and weights
+    for (const [category, { weight, patterns: categoryPatterns }] of Object.entries({
+      location: {
+        weight: 2.0,
+        patterns: [
+          /where (?:is|are|can I find)/i,
+          /find (?:a|an|the|some|any)/i,
+          /locate (?:a|an|the|some|any)/i,
+          /search for/i,
+          /look for/i,
+          /nearest/i,
+          /closest/i,
+          /near(?:by| me)?/i
+        ]
+      },
+      information: {
+        weight: 1.5,
+        patterns: [
+          /what (?:is|are)/i,
+          /when (?:is|are)/i,
+          /how (?:to|do|can)/i,
+          /tell me about/i,
+          /information about/i,
+          /details about/i
+        ]
+      },
+      resource: {
+        weight: 2.0,
+        patterns: [
+          /help (?:with|for|me|finding|locating|searching|a|an|the|some|any)/i,
+          /need (?:help|assistance|support)/i,
+          /looking for (?:help|assistance|support)/i,
+          /resources (?:for|about)/i,
+          /services (?:for|about)/i
+        ]
+      },
+      shelter: {
+        weight: 2.5,
+        patterns: [
+          /shelter(?:s)? (?:near|in|around|close to)/i,
+          /domestic violence (?:shelter|resource|help|support)/i,
+          /safe (?:place|house|shelter)/i,
+          /emergency (?:shelter|housing|accommodation)/i,
+          /temporary (?:housing|shelter|accommodation)/i
+        ]
+      },
+      contact: {
+        weight: 1.2,
+        patterns: [
+          /contact (?:information|details|number|phone)/i,
+          /phone (?:number|contact)/i,
+          /address (?:of|for)/i,
+          /how to (?:contact|reach|call)/i
+        ]
+      },
+      general: {
+        weight: 1.0,
+        patterns: [
+          /find/i,
+          /search/i,
+          /locate/i,
+          /where/i,
+          /what/i,
+          /when/i,
+          /how/i
+        ]
+      }
+    })) {
+      for (const pattern of categoryPatterns) {
+        if (pattern.test(normalizedInput)) {
+          patterns.push({
+            category,
+            pattern: pattern.toString(),
+            weight,
+            matched: true
+          });
+        }
+      }
+    }
+
+    // Add keyword matches
+    const shelterKeywords = [
+      { word: 'shelter', weight: 2.0 },
+      { word: 'domestic violence', weight: 2.5 },
+      { word: 'safe house', weight: 2.0 },
+      { word: 'emergency housing', weight: 1.8 },
+      { word: 'temporary housing', weight: 1.8 },
+      { word: 'refuge', weight: 1.5 },
+      { word: 'sanctuary', weight: 1.5 },
+      { word: 'haven', weight: 1.5 }
+    ];
+
+    for (const { word, weight } of shelterKeywords) {
+      if (normalizedInput.includes(word.toLowerCase())) {
+        patterns.push({
+          category: 'keyword',
+          pattern: word,
+          weight,
+          matched: true
+        });
+      }
+    }
+
+    return patterns
+      .filter(p => p.matched)
+      .map(p => `${p.category}:${p.pattern} (weight: ${p.weight})`);
   }
 } 
