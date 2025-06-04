@@ -67,9 +67,8 @@ export class ResponseGenerator {
       return; // Skip if not enough time has passed
     }
 
-    log('debug', 'Starting cache cleanup', {
-      cacheSize: this.confidenceCache.size,
-      lastCleanup: this.lastCleanup
+    console.log('Starting cache cleanup', {
+      timestamp: new Date().toISOString()
     });
 
     let expiredCount = 0;
@@ -82,10 +81,8 @@ export class ResponseGenerator {
 
     this.lastCleanup = now;
 
-    log('debug', 'Cache cleanup completed', {
-      expiredEntries: expiredCount,
-      remainingEntries: this.confidenceCache.size,
-      cleanupTime: now
+    console.log('Cache cleanup completed', {
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -97,11 +94,8 @@ export class ResponseGenerator {
     const cached = this.confidenceCache.get(normalizedInput);
     
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      log('debug', 'Using cached confidence analysis', {
-        input: normalizedInput,
-        confidence: cached.analysis.confidence,
-        timestamp: cached.timestamp,
-        cacheSize: this.confidenceCache.size
+      console.log('Using cached confidence analysis', {
+        timestamp: new Date().toISOString()
       });
       return cached.analysis;
     }
@@ -119,11 +113,8 @@ export class ResponseGenerator {
       timestamp: Date.now()
     });
     
-    log('debug', 'Cached confidence analysis', {
-      input: normalizedInput,
-      confidence: analysis.confidence,
-      timestamp: Date.now(),
-      cacheSize: this.confidenceCache.size
+    console.log('Cached confidence analysis', {
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -338,14 +329,8 @@ export class ResponseGenerator {
     }
 
     // Log the update
-    log('debug', 'Updated routing stats', {
-      confidence,
-      confidenceLevel,
-      source,
-      success,
-      fallback,
-      responseTime,
-      stats: this.routingStats
+    console.log('Updated routing stats', {
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -369,7 +354,7 @@ export class ResponseGenerator {
       hybrid: this.calculateAverageResponseTime(stats.responseTimes.hybrid)
     };
 
-    log('info', 'Routing Performance Metrics', {
+    console.log('Routing Performance Metrics', {
       totalRequests: stats.totalRequests,
       confidenceBreakdown: {
         high: {
@@ -479,7 +464,7 @@ export class ResponseGenerator {
         success = true;
       }
     } catch (error) {
-      log('error', 'Error generating response', { error: error.message });
+      console.error('Error generating response', { error: error.message });
       // Fallback to GPT on error
       source = 'gpt';
       response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
@@ -527,7 +512,7 @@ export class ResponseGenerator {
 
   static async queryTavily(query) {
     try {
-      log('info', 'Calling Tavily API', { 
+      console.log('Calling Tavily API', { 
         query,
         timestamp: new Date().toISOString()
       });
@@ -547,7 +532,7 @@ export class ResponseGenerator {
       });
 
       if (!response.ok) {
-        log('error', 'Tavily API error', {
+        console.error('Tavily API error', {
           status: response.status,
           statusText: response.statusText,
           query
@@ -556,7 +541,7 @@ export class ResponseGenerator {
       }
 
       const data = await response.json();
-      log('info', 'Tavily API response received', {
+      console.log('Tavily API response received', {
         hasAnswer: !!data.answer,
         resultCount: data.results?.length || 0,
         answerLength: data.answer?.length || 0,
@@ -565,7 +550,7 @@ export class ResponseGenerator {
       });
       return data;
     } catch (error) {
-      log('error', 'Error querying Tavily', {
+      console.error('Error querying Tavily', {
         error: error.message,
         stack: error.stack,
         query
