@@ -24,7 +24,7 @@ export const config = {
   GPT35_MODEL: 'gpt-3.5-turbo',
   
   // Logging
-  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
 
   PORT: process.env.PORT || 3000,
   WS_PORT: process.env.WS_PORT || 3001,
