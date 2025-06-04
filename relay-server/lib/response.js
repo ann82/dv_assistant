@@ -437,7 +437,15 @@ export class ResponseGenerator {
         // High confidence - use Tavily exclusively
         source = 'tavily';
         response = await this.queryTavily(input);
-        success = this.isSufficientResponse(response);
+        console.log('Tavily Response:', response);
+
+        if (!response || !response.results || response.results.length === 0) {
+          console.log('Tavily response insufficient, falling back to GPT.');
+          fallback = true;
+        } else {
+          console.log('Tavily response sufficient, using Tavily results.');
+          success = this.isSufficientResponse(response);
+        }
       } else if (confidence >= 0.4) {
         // Medium confidence - try both in parallel
         source = 'hybrid';
