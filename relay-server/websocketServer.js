@@ -3,6 +3,7 @@ import { AudioService } from './services/audioService.js';
 import { CallSummaryService } from './services/callSummaryService.js';
 import path from 'path';
 import fsSync from 'fs';
+import logger from './lib/logger.js';
 
 export class TwilioWebSocketServer {
   constructor(server) {
@@ -17,7 +18,7 @@ export class TwilioWebSocketServer {
     // Handle upgrade manually to get the full URL
     server.on('upgrade', (request, socket, head) => {
       // Log the full request URL for debugging
-      console.log('WebSocket Upgrade Request URL:', request.url);
+      logger.info('WebSocket Upgrade Request URL:', request.url);
       
       const pathname = new URL(request.url, `https://${request.headers.host}`).pathname;
       
@@ -59,10 +60,10 @@ export class TwilioWebSocketServer {
 
   setupWebSocket() {
     this.wss.on('connection', (ws, req) => {
-      console.log('New Twilio WebSocket connection');
+      logger.info('New Twilio WebSocket connection');
       
       // Log the full request for debugging
-      console.log('WebSocket Request:', {
+      logger.info('WebSocket Request:', {
         url: req.fullUrl || req.url,
         headers: req.headers,
         query: req.query
@@ -79,10 +80,10 @@ export class TwilioWebSocketServer {
         }
       }
       
-      console.log('Found active call:', callSid);
+      logger.info('Found active call:', callSid);
 
       if (!callSid) {
-        console.error('No active call found for WebSocket connection');
+        logger.error('No active call found for WebSocket connection');
         ws.close(1008, 'No active call found');
         return;
       }
@@ -100,7 +101,7 @@ export class TwilioWebSocketServer {
           
           // Only log non-media messages to avoid console spam
           if (message.event !== 'media') {
-            console.log('Received WebSocket message:', {
+            logger.info('Received WebSocket message:', {
               callSid,
               messageType: message.event,
               data: message
@@ -112,7 +113,7 @@ export class TwilioWebSocketServer {
               if (message.media && message.media.payload) {
                 // Only log every 100th media message to avoid console spam
                 if (parseInt(message.media.chunk) % 100 === 0) {
-                  console.log('Processing media chunk:', {
+                  logger.info('Processing media chunk:', {
                     callSid,
                     chunk: message.media.chunk,
                     track: message.media.track,
@@ -129,12 +130,12 @@ export class TwilioWebSocketServer {
               break;
 
             case 'stop':
-              console.log('Received stop event, processing audio...');
+              logger.info('Received stop event, processing audio...');
               await this.handleStreamEnd(callSid, ws);
               break;
 
             case 'start':
-              console.log('Stream started:', {
+              logger.info('Stream started:', {
                 callSid,
                 streamSid: message.streamSid,
                 startTime: message.startTime
@@ -142,7 +143,7 @@ export class TwilioWebSocketServer {
               break;
 
             case 'mark':
-              console.log('Received mark event:', {
+              logger.info('Received mark event:', {
                 callSid,
                 mark: message.mark
               });
@@ -150,7 +151,7 @@ export class TwilioWebSocketServer {
 
             case 'tts_complete':
               if (message.audioUrl) {
-                console.log('TTS complete, sending TwiML response');
+                logger.info('TTS complete, sending TwiML response');
                 const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>${message.audioUrl}</Play>
@@ -169,21 +170,21 @@ export class TwilioWebSocketServer {
               break;
 
             default:
-              console.log('Unknown event:', message.event);
+              logger.info('Unknown event:', message.event);
           }
         } catch (error) {
-          console.error('Error processing WebSocket message:', error);
+          logger.error('Error processing WebSocket message:', error);
         }
       });
 
       ws.on('close', () => {
-        console.log(`WebSocket connection closed for call ${callSid}`);
+        logger.info(`WebSocket connection closed for call ${callSid}`);
         this.audioService.clearAccumulatedAudio(callSid);
         this.activeCalls.delete(callSid);
       });
 
       ws.on('error', (error) => {
-        console.error(`WebSocket error for call ${callSid}:`, error);
+        logger.error(`WebSocket error for call ${callSid}:`, error);
         this.activeCalls.delete(callSid);
       });
     });
@@ -198,9 +199,9 @@ export class TwilioWebSocketServer {
 
       const audioBuffer = Buffer.concat(audioChunks);
 
-      console.log('Transcribing audio...');
+      logger.info('Transcribing audio...');
       const transcript = await this.audioService.transcribeWithWhisper(audioBuffer);
-      console.log('Transcript:', transcript);
+      logger.info('Transcript:', transcript);
 
       // Add user's message to history
       this.callSummaryService.addToHistory(callSid, {
@@ -208,9 +209,9 @@ export class TwilioWebSocketServer {
         content: transcript
       });
 
-      console.log('Getting GPT response...');
+      logger.info('Getting GPT response...');
       const gptResponse = await this.audioService.getGptReply(transcript);
-      console.log('GPT Response:', gptResponse.text);
+      logger.info('GPT Response:', gptResponse.text);
 
       // Add assistant's response to history
       this.callSummaryService.addToHistory(callSid, {
@@ -229,7 +230,7 @@ export class TwilioWebSocketServer {
       this.audioService.clearAccumulatedAudio(callSid);
 
     } catch (error) {
-      console.error('Error handling stream end:', error);
+      logger.error('Error handling stream end:', error);
       ws.send(JSON.stringify({
         type: 'error',
         message: 'Error processing audio'
@@ -254,7 +255,7 @@ export class TwilioWebSocketServer {
         return null;
       }
     } catch (error) {
-      console.error('Error handling call end:', error);
+      logger.error('Error handling call end:', error);
       this.activeCalls.delete(callSid);
       return null;
     }

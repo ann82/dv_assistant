@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import { fileURLToPath } from 'url';
 import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
+import logger from '../lib/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,7 +44,7 @@ async function logTwilioCallDetails(callSid) {
   try {
     // Fetch call details
     const call = await twilioClient.calls(callSid).fetch();
-    console.log('Twilio Call Details:', {
+    logger.info('Twilio Call Details:', {
       sid: call.sid,
       status: call.status,
       direction: call.direction,
@@ -57,7 +58,7 @@ async function logTwilioCallDetails(callSid) {
     // Fetch call recordings
     const recordings = await twilioClient.recordings.list({ callSid });
     if (recordings.length > 0) {
-      console.log('Call Recordings:', recordings.map(r => ({
+      logger.info('Call Recordings:', recordings.map(r => ({
         sid: r.sid,
         duration: r.duration,
         status: r.status,
@@ -67,7 +68,7 @@ async function logTwilioCallDetails(callSid) {
 
     // Fetch call logs using the correct API
     const logs = await twilioClient.calls(callSid).fetch();
-    console.log('Call Logs:', {
+    logger.info('Call Logs:', {
       timestamp: new Date().toISOString(),
       status: logs.status,
       duration: logs.duration,
@@ -78,13 +79,13 @@ async function logTwilioCallDetails(callSid) {
     });
 
   } catch (error) {
-    console.error('Error fetching Twilio call details:', error);
+    logger.error('Error fetching Twilio call details:', error);
     // Log additional error details for debugging
     if (error.code) {
-      console.error('Twilio Error Code:', error.code);
+      logger.error('Twilio Error Code:', error.code);
     }
     if (error.moreInfo) {
-      console.error('Twilio Error Info:', error.moreInfo);
+      logger.error('Twilio Error Info:', error.moreInfo);
     }
   }
 }
@@ -94,10 +95,10 @@ async function cleanupAudioFile(audioPath) {
   try {
     if (fsSync.existsSync(audioPath)) {
       await fs.unlink(audioPath);
-      console.log('Cleaned up audio file:', audioPath);
+      logger.info('Cleaned up audio file:', audioPath);
     }
   } catch (error) {
-    console.error('Error cleaning up audio file:', error);
+    logger.error('Error cleaning up audio file:', error);
   }
 }
 
@@ -106,8 +107,8 @@ router.use(validateTwilioRequest);
 
 router.post('/voice', (req, res) => {
   try {
-    console.log('Voice Route - Request Body:', req.body);
-    console.log('Voice Route - CallSid:', req.body.CallSid);
+    logger.info('Voice Route - Request Body:', req.body);
+    logger.info('Voice Route - CallSid:', req.body.CallSid);
     
     // Log Twilio call details when call starts
     logTwilioCallDetails(req.body.CallSid);
@@ -153,12 +154,12 @@ router.post('/voice', (req, res) => {
     });
 
     const twimlString = twiml.toString();
-    console.log('Generated TwiML:', twimlString);
+    logger.info('Generated TwiML:', twimlString);
     
     res.type('text/xml');
     res.send(twimlString);
   } catch (error) {
-    console.error('Error in Twilio voice route:', error);
+    logger.error('Error in Twilio voice route:', error);
     res.status(500).send('Error processing voice request');
   }
 });
@@ -175,7 +176,7 @@ router.post('/status', async (req, res) => {
     await twilioVoiceHandler.handleCallStatusUpdate(CallSid, CallStatus);
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error handling call status update:', error);
+    logger.error('Error handling call status update:', error);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -187,13 +188,13 @@ router.post('/recording', (req, res) => {
     const recordingUrl = req.body.RecordingUrl;
     const callSid = req.body.CallSid;
 
-    console.log(`Recording completed for call ${callSid}`);
-    console.log(`Recording SID: ${recordingSid}`);
-    console.log(`Recording URL: ${recordingUrl}`);
+    logger.info(`Recording completed for call ${callSid}`);
+    logger.info(`Recording SID: ${recordingSid}`);
+    logger.info(`Recording URL: ${recordingUrl}`);
 
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error handling recording:', error);
+    logger.error('Error handling recording:', error);
     res.status(500).send('Error processing recording');
   }
 });
@@ -201,7 +202,7 @@ router.post('/recording', (req, res) => {
 // Refactored handler for /voice/process
 export async function handleTwilioWebhook(req, res) {
   try {
-    console.log('Processing speech result:', {
+    logger.info('Processing speech result:', {
       callSid: req.body.CallSid,
       speechResult: req.body.SpeechResult,
       confidence: req.body.Confidence
@@ -214,9 +215,9 @@ export async function handleTwilioWebhook(req, res) {
 
     const twiml = new twilio.twiml.VoiceResponse();
     // Get GPT response for the speech result
-    console.log('Getting GPT response...');
+    logger.info('Getting GPT response...');
     const gptResponse = await wss.audioService.getGptReply(req.body.SpeechResult);
-    console.log('GPT Response:', gptResponse);
+    logger.info('GPT Response:', gptResponse);
 
     if (!gptResponse || !gptResponse.text) {
       throw new Error('Invalid GPT response');
@@ -276,9 +277,9 @@ export async function handleTwilioWebhook(req, res) {
     }
 
     // Generate TTS for the response
-    console.log('Generating TTS...');
+    logger.info('Generating TTS...');
     const ttsResponse = await wss.audioService.generateTTS(truncatedText);
-    console.log('TTS Response:', ttsResponse);
+    logger.info('TTS Response:', ttsResponse);
 
     if (!ttsResponse || !ttsResponse.audioPath) {
       throw new Error('Invalid TTS response');
@@ -287,10 +288,10 @@ export async function handleTwilioWebhook(req, res) {
     // Get the full URL for the audio file
     const domain = req.get('host');
     const audioUrl = `https://${domain}${ttsResponse.audioPath}`;
-    console.log('Audio URL:', audioUrl);
+    logger.info('Audio URL:', audioUrl);
 
     // Verify the audio file exists and is completely written
-    console.log('Verifying audio file...');
+    logger.info('Verifying audio file...');
     let retryCount = 0;
     const maxRetries = 5;
     const retryDelay = 1000; // 1 second
@@ -314,7 +315,7 @@ export async function handleTwilioWebhook(req, res) {
         if (initialSize !== finalSize) {
           throw new Error('Audio file is still being written');
         }
-        console.log('Audio file verified:', {
+        logger.info('Audio file verified:', {
           path: ttsResponse.fullPath,
           size: stats.size,
           created: stats.birthtime,
@@ -325,10 +326,10 @@ export async function handleTwilioWebhook(req, res) {
       } catch (error) {
         retryCount++;
         if (retryCount === maxRetries) {
-          console.error('Failed to verify audio file after retries:', error);
+          logger.error('Failed to verify audio file after retries:', error);
           throw error;
         }
-        console.log(`Retry ${retryCount}/${maxRetries} - Waiting for audio file to be ready...`);
+        logger.info(`Retry ${retryCount}/${maxRetries} - Waiting for audio file to be ready...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
@@ -353,12 +354,12 @@ export async function handleTwilioWebhook(req, res) {
       language: 'en-US'
     }, 'How else can I help you?');
     const twimlString = twiml.toString();
-    console.log('Generated TwiML:', twimlString);
+    logger.info('Generated TwiML:', twimlString);
     res.type('text/xml');
     res.send(twimlString);
   } catch (error) {
-    console.error('Error processing speech result:', error);
-    console.error('Error stack:', error.stack);
+    logger.error('Error processing speech result:', error);
+    logger.error('Error stack:', error.stack);
     // Generate error TwiML
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say({
@@ -382,7 +383,7 @@ export async function handleTwilioWebhook(req, res) {
       language: 'en-US'
     }, 'How can I help you?');
     const twimlString = twiml.toString();
-    console.log('Error TwiML:', twimlString);
+    logger.info('Error TwiML:', twimlString);
     res.type('text/xml');
     res.send(twimlString);
   }
@@ -395,7 +396,7 @@ router.post('/voice/process', handleTwilioWebhook);
 router.post('/sms', async (req, res) => {
   try {
     const { From, Body } = req.body;
-    console.log('Received SMS:', { from: From, body: Body });
+    logger.info('Received SMS:', { from: From, body: Body });
 
     const twiml = new twilio.twiml.MessagingResponse();
     
@@ -427,7 +428,7 @@ router.post('/sms', async (req, res) => {
     res.type('text/xml');
     res.send(twiml.toString());
   } catch (error) {
-    console.error('Error handling SMS:', error);
+    logger.error('Error handling SMS:', error);
     res.status(500).send('Error processing SMS');
   }
 });
@@ -438,7 +439,7 @@ router.post('/consent', async (req, res) => {
   const requestId = Math.random().toString(36).substring(7);
   
   try {
-    console.log(`[Request ${requestId}] Processing consent request:`, {
+    logger.info(`[Request ${requestId}] Processing consent request:`, {
       timestamp: new Date().toISOString(),
       headers: req.headers,
       body: req.body,
@@ -449,7 +450,7 @@ router.post('/consent', async (req, res) => {
     
     // Enhanced validation
     if (!CallSid || !From || !SpeechResult) {
-      console.warn(`[Request ${requestId}] Missing required parameters:`, {
+      logger.warn(`[Request ${requestId}] Missing required parameters:`, {
         callSid: CallSid,
         from: From,
         hasSpeechResult: !!SpeechResult,
@@ -461,7 +462,7 @@ router.post('/consent', async (req, res) => {
     // Validate phone number format
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
     if (!phoneRegex.test(From)) {
-      console.warn(`[Request ${requestId}] Invalid phone number format:`, {
+      logger.warn(`[Request ${requestId}] Invalid phone number format:`, {
         phoneNumber: From,
         timestamp: new Date().toISOString()
       });
@@ -470,14 +471,14 @@ router.post('/consent', async (req, res) => {
 
     // Validate speech result
     if (SpeechResult.length < 1 || SpeechResult.length > 1000) {
-      console.warn(`[Request ${requestId}] Invalid speech result length:`, {
+      logger.warn(`[Request ${requestId}] Invalid speech result length:`, {
         length: SpeechResult.length,
         timestamp: new Date().toISOString()
       });
       return res.status(400).send('Invalid speech result');
     }
 
-    console.log(`[Request ${requestId}] Processing consent response:`, {
+    logger.info(`[Request ${requestId}] Processing consent response:`, {
       callSid: CallSid,
       from: From,
       speechResult: SpeechResult,
@@ -522,7 +523,7 @@ router.post('/consent', async (req, res) => {
     const isConsent = consentScore > optOutScore && consentScore >= 0.7;
     const isOptOut = optOutScore > consentScore && optOutScore >= 0.7;
 
-    console.log(`[Request ${requestId}] Consent analysis:`, {
+    logger.info(`[Request ${requestId}] Consent analysis:`, {
       consentScore,
       optOutScore,
       isConsent,
@@ -545,7 +546,7 @@ router.post('/consent', async (req, res) => {
         };
         wss.activeCalls.set(CallSid, call);
 
-        console.log(`[Request ${requestId}] Consent status updated:`, {
+        logger.info(`[Request ${requestId}] Consent status updated:`, {
           callSid: CallSid,
           from: From,
           previousConsent,
@@ -556,7 +557,7 @@ router.post('/consent', async (req, res) => {
           processingTime: Date.now() - startTime
         });
       } else {
-        console.warn(`[Request ${requestId}] No active call found for consent response:`, {
+        logger.warn(`[Request ${requestId}] No active call found for consent response:`, {
           callSid: CallSid,
           timestamp: new Date().toISOString()
         });
@@ -603,7 +604,7 @@ router.post('/consent', async (req, res) => {
     });
 
     const twimlString = twiml.toString();
-    console.log(`[Request ${requestId}] Sending TwiML response:`, {
+    logger.info(`[Request ${requestId}] Sending TwiML response:`, {
       length: twimlString.length,
       processingTime: Date.now() - startTime,
       timestamp: new Date().toISOString()
@@ -612,7 +613,7 @@ router.post('/consent', async (req, res) => {
     res.type('text/xml');
     res.send(twimlString);
   } catch (error) {
-    console.error(`[Request ${requestId}] Error handling consent:`, {
+    logger.error(`[Request ${requestId}] Error handling consent:`, {
       error: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString(),

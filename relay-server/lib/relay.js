@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { AudioProcessor } from './audio.js';
 import { ResponseGenerator } from './response.js';
 import { costLogger } from './costLogger.js';
+import logger from './logger.js';
 
 export class RealtimeRelay {
   constructor(apiKey) {
@@ -167,6 +168,6 @@ export class RealtimeRelay {
   }
 
   log(...args) {
-    console.log(`[RealtimeRelay]`, ...args);
+    logger.info(`[RealtimeRelay]`, ...args);
   }
 }

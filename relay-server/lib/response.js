@@ -2,43 +2,19 @@ import { config } from './config.js';
 import { responseCache } from './cache.js';
 import { OpenAI } from 'openai';
 import { encode } from 'gpt-tokenizer';
+import { patternCategories, shelterKeywords } from './patternConfig.js';
+import logger from './logger.js';
+import { withRetryAndThrottle } from './apiUtils.js';
+import { cache } from './cache.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
-
-// Log levels in order of severity
-const LOG_LEVELS = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  debug: 3
-};
-
-// Get current log level from config
-const currentLogLevel = LOG_LEVELS[config.LOG_LEVEL?.toLowerCase() || 'info'];
-
-// Helper function to log messages
-function log(level, message, data = {}) {
-  if (LOG_LEVELS[level] <= currentLogLevel) {
-    const logEntry = {
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      ...data
-    };
-    
-    if (level === 'error') {
-      console.error(JSON.stringify(logEntry));
-    } else {
-      console.log(JSON.stringify(logEntry));
-    }
-  }
-}
 
 export class ResponseGenerator {
   static confidenceCache = new Map();
   static CACHE_TTL = 1000 * 60 * 60; // 1 hour in milliseconds
   static CLEANUP_INTERVAL = 1000 * 60 * 15; // 15 minutes in milliseconds
   static lastCleanup = Date.now();
+  static cleanupInterval = null;
 
   // Add routing performance monitoring
   static routingStats = {
@@ -61,14 +37,33 @@ export class ResponseGenerator {
     }
   };
 
+  // Initialize cleanup interval
+  static initializeCleanup() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupCache();
+    }, this.CLEANUP_INTERVAL);
+
+    // Ensure cleanup runs on process exit
+    process.on('SIGTERM', () => {
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+      }
+    });
+  }
+
   static cleanupCache() {
     const now = Date.now();
     if (now - this.lastCleanup < this.CLEANUP_INTERVAL) {
       return; // Skip if not enough time has passed
     }
 
-    console.log('Starting cache cleanup', {
-      timestamp: new Date().toISOString()
+    logger.info('Starting cache cleanup', {
+      timestamp: new Date().toISOString(),
+      cacheSize: this.confidenceCache.size
     });
 
     let expiredCount = 0;
@@ -81,40 +76,23 @@ export class ResponseGenerator {
 
     this.lastCleanup = now;
 
-    console.log('Cache cleanup completed', {
-      timestamp: new Date().toISOString()
+    logger.info('Cache cleanup completed', {
+      timestamp: new Date().toISOString(),
+      expiredCount,
+      remainingSize: this.confidenceCache.size
     });
   }
 
   static getCachedAnalysis(input) {
-    // Run cleanup if needed
-    this.cleanupCache();
-
     const normalizedInput = input.toLowerCase().trim();
-    const cached = this.confidenceCache.get(normalizedInput);
-    
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      console.log('Using cached confidence analysis', {
-        timestamp: new Date().toISOString()
-      });
-      return cached.analysis;
-    }
-    
-    return null;
+    return cache.get(normalizedInput);
   }
 
   static setCachedAnalysis(input, analysis) {
-    // Run cleanup if needed
-    this.cleanupCache();
-
     const normalizedInput = input.toLowerCase().trim();
-    this.confidenceCache.set(normalizedInput, {
-      analysis,
+    cache.set(normalizedInput, {
+      ...analysis,
       timestamp: Date.now()
-    });
-    
-    console.log('Cached confidence analysis', {
-      timestamp: new Date().toISOString()
     });
   }
 
@@ -156,87 +134,6 @@ export class ResponseGenerator {
     // Normalize input
     const normalizedInput = input.toLowerCase().trim();
     
-    // Define pattern categories with weights
-    const patternCategories = {
-      location: {
-        weight: 2.0,
-        patterns: [
-          /where (?:is|are|can I find)/i,
-          /find (?:a|an|the|some|any)/i,
-          /locate (?:a|an|the|some|any)/i,
-          /search for/i,
-          /look for/i,
-          /nearest/i,
-          /closest/i,
-          /near(?:by| me)?/i
-        ]
-      },
-      information: {
-        weight: 1.5,
-        patterns: [
-          /what (?:is|are)/i,
-          /when (?:is|are)/i,
-          /how (?:to|do|can)/i,
-          /tell me about/i,
-          /information about/i,
-          /details about/i
-        ]
-      },
-      resource: {
-        weight: 2.0,
-        patterns: [
-          /help (?:with|for|me|finding|locating|searching|a|an|the|some|any)/i,
-          /need (?:help|assistance|support)/i,
-          /looking for (?:help|assistance|support)/i,
-          /resources (?:for|about)/i,
-          /services (?:for|about)/i
-        ]
-      },
-      shelter: {
-        weight: 2.5,
-        patterns: [
-          /shelter(?:s)? (?:near|in|around|close to)/i,
-          /domestic violence (?:shelter|resource|help|support)/i,
-          /safe (?:place|house|shelter)/i,
-          /emergency (?:shelter|housing|accommodation)/i,
-          /temporary (?:housing|shelter|accommodation)/i
-        ]
-      },
-      contact: {
-        weight: 1.2,
-        patterns: [
-          /contact (?:information|details|number|phone)/i,
-          /phone (?:number|contact)/i,
-          /address (?:of|for)/i,
-          /how to (?:contact|reach|call)/i
-        ]
-      },
-      general: {
-        weight: 1.0,
-        patterns: [
-          /find/i,
-          /search/i,
-          /locate/i,
-          /where/i,
-          /what/i,
-          /when/i,
-          /how/i
-        ]
-      }
-    };
-
-    // Define shelter keywords with weights
-    const shelterKeywords = [
-      { word: 'shelter', weight: 2.0 },
-      { word: 'domestic violence', weight: 2.5 },
-      { word: 'safe house', weight: 2.0 },
-      { word: 'emergency housing', weight: 1.8 },
-      { word: 'temporary housing', weight: 1.8 },
-      { word: 'refuge', weight: 1.5 },
-      { word: 'sanctuary', weight: 1.5 },
-      { word: 'haven', weight: 1.5 }
-    ];
-
     // Calculate pattern match score
     let patternScore = 0;
     let matchedPatterns = [];
@@ -329,7 +226,7 @@ export class ResponseGenerator {
     }
 
     // Log the update
-    console.log('Updated routing stats', {
+    logger.info('Updated routing stats', {
       timestamp: new Date().toISOString()
     });
   }
@@ -354,7 +251,7 @@ export class ResponseGenerator {
       hybrid: this.calculateAverageResponseTime(stats.responseTimes.hybrid)
     };
 
-    console.log('Routing Performance Metrics', {
+    logger.info('Routing Performance Metrics', {
       totalRequests: stats.totalRequests,
       confidenceBreakdown: {
         high: {
@@ -416,19 +313,20 @@ export class ResponseGenerator {
     let source;
     let success = false;
     let fallback = false;
+    logger.info('Inside the getResponse');
 
     try {
       if (confidence >= 0.7) {
         // High confidence - use Tavily exclusively
         source = 'tavily';
         response = await this.queryTavily(input);
-        console.log('Tavily Response:', response);
+        logger.info('Tavily Response:', response);
 
         if (!response || !response.results || response.results.length === 0) {
-          console.log('Tavily response insufficient, falling back to GPT.');
+          logger.info('Tavily response insufficient, falling back to GPT.');
           fallback = true;
         } else {
-          console.log('Tavily response sufficient, using Tavily results.');
+          logger.info('Tavily response sufficient, using Tavily results.');
           success = this.isSufficientResponse(response);
         }
       } else if (confidence >= 0.4) {
@@ -464,7 +362,7 @@ export class ResponseGenerator {
         success = true;
       }
     } catch (error) {
-      console.error('Error generating response', { error: error.message });
+      logger.error('Error generating response', { error: error.message });
       // Fallback to GPT on error
       source = 'gpt';
       response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
@@ -493,64 +391,73 @@ export class ResponseGenerator {
       }
     ];
 
-    const response = await openai.chat.completions.create({
-      model,
-      messages,
-      max_tokens: config.DEFAULT_MAX_TOKENS,
-      temperature: 0.7,
-      presence_penalty: 0.6,
-      frequency_penalty: 0.3
+    const callOpenAIWithRetry = withRetryAndThrottle(async function callOpenAI() {
+      const response = await openai.chat.completions.create({
+        model,
+        messages,
+        max_tokens: config.DEFAULT_MAX_TOKENS,
+        temperature: 0.7,
+        presence_penalty: 0.6,
+        frequency_penalty: 0.3
+      });
+      return response;
     });
 
+    const response = await callOpenAIWithRetry();
     const text = response.choices[0].message.content;
     return {
       text,
       source: model,
-      tokens: encode(text).length
+      tokens: response.usage.total_tokens
     };
   }
 
   static async queryTavily(query) {
     try {
-      console.log('Calling Tavily API', { 
+      logger.info('Calling Tavily API', { 
         query,
         timestamp: new Date().toISOString()
       });
 
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.TAVILY_API_KEY}`
-        },
-        body: JSON.stringify({
-          query,
-          search_depth: 'advanced',
-          max_results: 5,
-          include_answer: true
-        })
-      });
-
-      if (!response.ok) {
-        console.error('Tavily API error', {
-          status: response.status,
-          statusText: response.statusText,
-          query
+      const callTavilyWithRetry = withRetryAndThrottle(async function callTavily(query) {
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.TAVILY_API_KEY}`
+          },
+          body: JSON.stringify({
+            query,
+            search_depth: 'advanced',
+            max_results: 5,
+            include_answer: true
+          })
         });
-        throw new Error(`Tavily API error: ${response.statusText}`);
-      }
 
-      const data = await response.json();
-      console.log('Tavily API response received', {
-        hasAnswer: !!data.answer,
-        resultCount: data.results?.length || 0,
-        answerLength: data.answer?.length || 0,
-        query,
-        timestamp: new Date().toISOString()
+        if (!response.ok) {
+          logger.error('Tavily API error', {
+            status: response.status,
+            statusText: response.statusText,
+            query
+          });
+          throw new Error(`Tavily API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        logger.info('Tavily API response received', {
+          hasAnswer: !!data.answer,
+          resultCount: data.results?.length || 0,
+          answerLength: data.answer?.length || 0,
+          query,
+          timestamp: new Date().toISOString()
+        });
+        return data;
       });
+
+      const data = await callTavilyWithRetry(query);
       return data;
     } catch (error) {
-      console.error('Error querying Tavily', {
+      logger.error('Error querying Tavily', {
         error: error.message,
         stack: error.stack,
         query
@@ -838,4 +745,10 @@ export class ResponseGenerator {
       .filter(p => p.matched)
       .map(p => `${p.category}:${p.pattern} (weight: ${p.weight})`);
   }
-} 
+}
+
+// Initialize cleanup when the module is loaded
+ResponseGenerator.initializeCleanup();
+
+// Export the pattern categories and keywords
+export { patternCategories, shelterKeywords }; 

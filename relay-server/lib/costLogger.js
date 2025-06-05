@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from './config.js';
+import logger from './logger.js';
 
 class CostLogger {
   constructor() {
@@ -57,7 +58,7 @@ class CostLogger {
       fs.writeFileSync(this.logFile, JSON.stringify(data, null, 2));
 
       // Log to console for immediate feedback
-      console.log(`💰 Cost Log:`, {
+      logger.info(`💰 Cost Log:`, {
         model,
         inputTokens,
         outputTokens,
@@ -68,7 +69,7 @@ class CostLogger {
 
       return logEntry;
     } catch (error) {
-      console.error('Error logging cost:', error);
+      logger.error('Error logging cost:', error);
       return null;
     }
   }
@@ -105,7 +106,7 @@ class CostLogger {
         recentLogs: data.logs.slice(-10) // Last 10 logs
       };
     } catch (error) {
-      console.error('Error getting cost stats:', error);
+      logger.error('Error getting cost stats:', error);
       return null;
     }
   }

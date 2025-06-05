@@ -12,7 +12,7 @@ export const config = {
   
   // Response Settings
   DEFAULT_MAX_TOKENS: 150, // Reduced from 1000 to minimize costs
-  CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24 hours
+  CACHE_EXPIRY: 1000 * 60 * 60, // 1 hour in milliseconds
   
   // Audio Settings
   MIN_AUDIO_DURATION: 0.5, // seconds
@@ -39,5 +39,7 @@ export const config = {
     accountSid: process.env.TWILIO_ACCOUNT_SID,
     authToken: process.env.TWILIO_AUTH_TOKEN,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER
-  }
+  },
+
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
 }; 

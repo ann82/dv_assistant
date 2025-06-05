@@ -1,20 +1,22 @@
 import twilio from 'twilio';
 import { config } from './config.js';
 import { AudioService } from '../services/audioService.js';
+import logger from './logger.js';
+import { withRetryAndThrottle } from './apiUtils.js';
 
 // Standalone validation function
 export const validateTwilioRequest = (req, res, next) => {
   try {
     // Log all headers for debugging
-    console.log('All Headers:', req.headers);
-    console.log('Raw Body:', req.body);
+    logger.info('All Headers:', req.headers);
+    logger.info('Raw Body:', req.body);
     
     const twilioSignature = req.headers['x-twilio-signature'];
     const url = 'https://' + req.get('host') + req.originalUrl;
     const params = req.body || {};
 
     // Log request details for debugging
-    console.log('Twilio Request:', {
+    logger.info('Twilio Request:', {
       signature: twilioSignature,
       url,
       params,
@@ -27,12 +29,12 @@ export const validateTwilioRequest = (req, res, next) => {
 
     // For testing purposes, allow requests without signature in development
     if (process.env.NODE_ENV === 'development' && !twilioSignature) {
-      console.log('Development mode: Bypassing Twilio signature validation');
+      logger.info('Development mode: Bypassing Twilio signature validation');
       return next();
     }
 
     if (!twilioSignature) {
-      console.log('No Twilio signature found');
+      logger.info('No Twilio signature found');
       return res.status(403).send('No Twilio signature');
     }
 
@@ -44,11 +46,11 @@ export const validateTwilioRequest = (req, res, next) => {
     )) {
       next();
     } else {
-      console.log('Invalid Twilio signature');
+      logger.info('Invalid Twilio signature');
       res.status(403).send('Invalid Twilio request');
     }
   } catch (error) {
-    console.error('Error validating Twilio request:', error);
+    logger.error('Error validating Twilio request:', error);
     res.status(500).send('Error validating request');
   }
 };
@@ -64,7 +66,7 @@ export class TwilioHandler {
     this.activeCalls = new Map();
     this.messageHistory = new Map();
     this.audioService = new AudioService();
-    console.log('TwilioHandler initialized with account SID:', accountSid.slice(0, 3) + '...');
+    logger.info('TwilioHandler initialized with account SID:', accountSid.slice(0, 3) + '...');
   }
 
   /**
@@ -72,7 +74,7 @@ export class TwilioHandler {
    */
   async handleIncomingCall(req, res) {
     try {
-      console.log('Received incoming call request:', {
+      logger.info('Received incoming call request:', {
         headers: req.headers,
         body: req.body,
         url: req.url,
@@ -85,12 +87,12 @@ export class TwilioHandler {
       // Validate required parameters
       if (!CallSid || !From) {
         const error = 'Missing required parameters: CallSid or From';
-        console.error(error);
+        logger.error(error);
         res.status(400).send(error);
         return;
       }
       
-      console.log(`Processing call from ${From} (SID: ${CallSid})`);
+      logger.info(`Processing call from ${From} (SID: ${CallSid})`);
       
       // Store call information
       this.activeCalls.set(CallSid, {
@@ -117,7 +119,7 @@ export class TwilioHandler {
       twiml.hangup();
 
       const twimlResponse = twiml.toString();
-      console.log('Sending TwiML response:', twimlResponse);
+      logger.info('Sending TwiML response:', twimlResponse);
       
       this.sendTwiMLResponse(res, twimlResponse);
     } catch (error) {
@@ -139,14 +141,14 @@ export class TwilioHandler {
       }
 
       if (!SpeechResult) {
-        console.log(`No speech detected for call ${CallSid}, requesting retry`);
+        logger.info(`No speech detected for call ${CallSid}, requesting retry`);
         twiml.say('I didn\'t catch that. Could you please repeat?');
         twiml.redirect('/twilio/voice');
         this.sendTwiMLResponse(res, twiml.toString());
         return;
       }
 
-      console.log(`Processing speech for call ${CallSid}:`, SpeechResult);
+      logger.info(`Processing speech for call ${CallSid}:`, SpeechResult);
       
       const aiResponse = await this.processWithAI(SpeechResult);
       
@@ -171,7 +173,7 @@ export class TwilioHandler {
         throw new Error('Missing required message parameters');
       }
 
-      console.log(`Processing message from ${From}:`, Body);
+      logger.info(`Processing message from ${From}:`, Body);
       
       // Store incoming message
       this.storeMessage(From, MessageSid, Body, 'incoming');
@@ -179,7 +181,11 @@ export class TwilioHandler {
       // Process and send response
       const aiResponse = await this.processWithAI(Body);
       
-      await this.client.messages.create({
+      const sendSMSWithRetry = withRetryAndThrottle(async function sendSMS(params) {
+        return await this.client.messages.create(params);
+      });
+
+      await sendSMSWithRetry({
         body: aiResponse,
         from: this.phoneNumber,
         to: From
@@ -224,7 +230,7 @@ export class TwilioHandler {
    * Handles errors consistently
    */
   handleError(res, message, error) {
-    console.error(message + ':', error);
+    logger.error(message + ':', error);
     res.status(500).send(message);
   }
 
@@ -237,7 +243,7 @@ export class TwilioHandler {
       const gptReply = await this.audioService.getGptReply(input);
       return gptReply.text || gptReply;
     } catch (error) {
-      console.error('Error in processWithAI:', error);
+      logger.error('Error in processWithAI:', error);
       return 'Sorry, I was unable to process your request.';
     }
   }

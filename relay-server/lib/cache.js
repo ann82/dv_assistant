@@ -1,103 +1,110 @@
 import { config } from './config.js';
+import logger from './logger.js';
 
-class ResponseCache {
+class Cache {
   constructor() {
     this.cache = new Map();
-    this.maxSize = 1000; // Maximum number of entries
-    this.cleanupInterval = 5 * 60 * 1000; // Clean every 5 minutes
-    this.commonResponses = new Map([
-      ['hello', 'Hello! How can I help you today?'],
-      ['hi', 'Hi there! How can I assist you?'],
-      ['help', 'I can help you find shelters, provide resources, or answer questions about domestic violence support. What do you need?'],
-      ['bye', 'Take care! Remember, help is always available.'],
-      ['thanks', 'You\'re welcome! Is there anything else you need?']
-    ]);
-
-    // Start periodic cleanup
+    this.CACHE_TTL = config.CACHE_EXPIRY || (1000 * 60 * 60); // 1 hour default
+    this.CLEANUP_INTERVAL = 1000 * 60 * 15; // 15 minutes
+    this.lastCleanup = Date.now();
+    
+    // Start background cleanup
     this.startCleanup();
   }
 
-  getCachedResponse(input) {
-    // Normalize input
-    const normalizedInput = input.toLowerCase().trim();
-    
-    // Check common responses first
-    if (this.commonResponses.has(normalizedInput)) {
-      return {
-        text: this.commonResponses.get(normalizedInput),
-        source: 'common_responses'
-      };
+  get(key) {
+    const value = this.cache.get(key);
+    if (!value) return null;
+
+    // Check if entry is expired
+    if (Date.now() - value.timestamp > this.CACHE_TTL) {
+      this.cache.delete(key);
+      return null;
     }
-    
-    // Check cache
-    const cached = this.cache.get(normalizedInput);
-    if (cached && Date.now() - cached.timestamp < config.CACHE_EXPIRY) {
-      return {
-        text: cached.response,
-        source: 'cache'
-      };
-    }
-    
-    return null;
+
+    return value.data;
   }
 
-  setCachedResponse(input, response) {
-    const normalizedInput = input.toLowerCase().trim();
-    
-    // Check if we need to make space
-    if (this.cache.size >= this.maxSize) {
-      this.removeOldestEntries(Math.floor(this.maxSize * 0.2)); // Remove 20% of entries
-    }
-    
-    this.cache.set(normalizedInput, {
-      response,
+  set(key, value) {
+    this.cache.set(key, {
+      data: value,
       timestamp: Date.now()
     });
   }
 
-  clearExpired() {
+  delete(key) {
+    this.cache.delete(key);
+  }
+
+  cleanup() {
     const now = Date.now();
+    if (now - this.lastCleanup < this.CLEANUP_INTERVAL) {
+      return;
+    }
+
+    logger.info('Starting cache cleanup', {
+      timestamp: new Date().toISOString(),
+      cacheSize: this.cache.size
+    });
+
     let expiredCount = 0;
-    
     for (const [key, value] of this.cache.entries()) {
-      if (now - value.timestamp >= config.CACHE_EXPIRY) {
+      if (now - value.timestamp > this.CACHE_TTL) {
         this.cache.delete(key);
         expiredCount++;
       }
     }
-    
-    if (expiredCount > 0) {
-      console.log(`🧹 [DEBUG] Cleared ${expiredCount} expired cache entries`);
-    }
-  }
 
-  removeOldestEntries(count) {
-    const entries = Array.from(this.cache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, count);
-    
-    for (const [key] of entries) {
-      this.cache.delete(key);
-    }
-    
-    console.log(`🗑️ [DEBUG] Removed ${count} oldest cache entries`);
+    this.lastCleanup = now;
+
+    logger.info('Cache cleanup completed', {
+      timestamp: new Date().toISOString(),
+      expiredCount,
+      remainingSize: this.cache.size
+    });
   }
 
   startCleanup() {
-    setInterval(() => {
-      this.clearExpired();
-      this.logCacheStats();
-    }, this.cleanupInterval);
+    // Run cleanup every 15 minutes
+    setInterval(() => this.cleanup(), this.CLEANUP_INTERVAL);
+
+    // Ensure cleanup runs on process exit
+    process.on('SIGTERM', () => {
+      this.cleanup();
+    });
   }
 
-  logCacheStats() {
+  getStats() {
+    const now = Date.now();
     const stats = {
-      size: this.cache.size,
-      maxSize: this.maxSize,
-      memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024
+      totalEntries: this.cache.size,
+      expiredEntries: 0,
+      validEntries: 0,
+      oldestEntry: null,
+      newestEntry: null
     };
-    console.log('📊 [DEBUG] Cache stats:', stats);
+
+    for (const [key, value] of this.cache.entries()) {
+      const age = now - value.timestamp;
+      if (age > this.CACHE_TTL) {
+        stats.expiredEntries++;
+      } else {
+        stats.validEntries++;
+        if (!stats.oldestEntry || value.timestamp < stats.oldestEntry.timestamp) {
+          stats.oldestEntry = { key, timestamp: value.timestamp };
+        }
+        if (!stats.newestEntry || value.timestamp > stats.newestEntry.timestamp) {
+          stats.newestEntry = { key, timestamp: value.timestamp };
+        }
+      }
+    }
+
+    return stats;
+  }
+
+  clear() {
+    this.cache.clear();
   }
 }
 
-export const responseCache = new ResponseCache(); 
+export const cache = new Cache(); 

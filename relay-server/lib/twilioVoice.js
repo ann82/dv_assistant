@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { ResponseGenerator } from './response.js';
 import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
+import logger from './logger.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -60,7 +61,7 @@ export class TwilioVoiceHandler {
         return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
       }
 
-      console.log(`📞 Incoming call from ${From} (CallSid: ${CallSid})`);
+      logger.info(`📞 Incoming call from ${From} (CallSid: ${CallSid})`);
 
       const ws = await this.createWebSocketConnection(CallSid, From);
       if (!ws) {
@@ -85,7 +86,7 @@ export class TwilioVoiceHandler {
       this.sendTwiMLResponse(res, twiml);
 
     } catch (error) {
-      console.error('Error handling incoming call:', error);
+      logger.error('Error handling incoming call:', error);
       this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
     }
   }
@@ -93,7 +94,7 @@ export class TwilioVoiceHandler {
   async handleCallStatus(req, res) {
     try {
       const { CallSid, CallStatus } = req.body;
-      console.log(`Call ${CallSid} status: ${CallStatus}`);
+      logger.info(`Call ${CallSid} status: ${CallStatus}`);
 
       if (CallStatus === CALL_STATUS.COMPLETED || CallStatus === CALL_STATUS.FAILED) {
         if (this.wsServer) {
@@ -104,7 +105,7 @@ export class TwilioVoiceHandler {
 
       this.sendSuccessResponse(res);
     } catch (error) {
-      console.error('Error handling call status:', error);
+      logger.error('Error handling call status:', error);
       this.sendErrorResponse(res, HTTP_STATUS.SERVER_ERROR, ERROR_MESSAGES.STATUS_ERROR);
     }
   }
@@ -116,7 +117,7 @@ export class TwilioVoiceHandler {
     
     if (!twilioSignature) return false;
     
-    console.log('[REAL] validateTwilioRequest calling validateRequest:', {authToken: this.authToken, twilioSignature, url, params});
+    logger.debug('[REAL] validateTwilioRequest calling validateRequest:', {authToken: this.authToken, twilioSignature, url, params});
     return this.validateRequest(
       this.authToken,
       twilioSignature,
@@ -137,7 +138,7 @@ export class TwilioVoiceHandler {
 
       return ws;
     } catch (error) {
-      console.error('Error creating WebSocket connection:', error);
+      logger.error('Error creating WebSocket connection:', error);
       return null;
     }
   }
@@ -147,7 +148,7 @@ export class TwilioVoiceHandler {
     let isResponding = false;
 
     ws.on('open', () => {
-      console.log(`WebSocket connected for call ${callSid}`);
+      logger.info(`WebSocket connected for call ${callSid}`);
     });
 
     ws.on('message', async (data) => {
@@ -164,7 +165,7 @@ export class TwilioVoiceHandler {
           // Set a timeout for the response
           responseTimeout = setTimeout(() => {
             if (isResponding) {
-              console.log(`Response timeout for call ${callSid}`);
+              logger.info(`Response timeout for call ${callSid}`);
               const twiml = this.generateTwiML("I'm sorry, but I'm having trouble processing your request. Please try again.", true);
               this.sendTwiMLResponse(res, twiml);
               isResponding = false;
@@ -184,7 +185,7 @@ export class TwilioVoiceHandler {
           isResponding = false;
         }
       } catch (error) {
-        console.error('Error handling WebSocket message:', error);
+        logger.error('Error handling WebSocket message:', error);
         // Send error response to Twilio
         const twiml = this.generateTwiML("I'm sorry, but I encountered an error. Please try again.", true);
         await this.sendTwiMLResponse(res, twiml);
@@ -192,7 +193,7 @@ export class TwilioVoiceHandler {
     });
 
     ws.on('close', () => {
-      console.log(`WebSocket closed for call ${callSid}`);
+      logger.info(`WebSocket closed for call ${callSid}`);
       if (responseTimeout) {
         clearTimeout(responseTimeout);
       }
@@ -200,7 +201,7 @@ export class TwilioVoiceHandler {
     });
 
     ws.on('error', (error) => {
-      console.error(`WebSocket error for call ${callSid}:`, error);
+      logger.error(`WebSocket error for call ${callSid}:`, error);
       if (responseTimeout) {
         clearTimeout(responseTimeout);
       }
@@ -214,7 +215,7 @@ export class TwilioVoiceHandler {
       try {
         call.ws.close();
       } catch (error) {
-        console.error(`Error closing WebSocket for call ${callSid}:`, error);
+        logger.error(`Error closing WebSocket for call ${callSid}:`, error);
       }
       this.activeCalls.delete(callSid);
     }
@@ -260,7 +261,7 @@ export class TwilioVoiceHandler {
         });
       });
     } catch (error) {
-      console.error('Error sending TwiML response:', error);
+      logger.error('Error sending TwiML response:', error);
       throw error;
     }
   }
@@ -282,7 +283,7 @@ export class TwilioVoiceHandler {
   }
 
   async handleCallStatusUpdate(callSid, status) {
-    console.log(`[Call ${callSid}] Status update received:`, {
+    logger.info(`[Call ${callSid}] Status update received:`, {
       status,
       timestamp: new Date().toISOString(),
       activeCalls: this.activeCalls.size,
@@ -294,29 +295,29 @@ export class TwilioVoiceHandler {
         // Validate call exists and has required data
         const call = this.activeCalls.get(callSid);
         if (!call) {
-          console.warn(`[Call ${callSid}] No active call data found`);
+          logger.warn(`[Call ${callSid}] No active call data found`);
           return;
         }
 
         // Enhanced validation
         if (!call.from) {
-          console.warn(`[Call ${callSid}] No phone number found for call`);
+          logger.warn(`[Call ${callSid}] No phone number found for call`);
           return;
         }
 
         if (!call.startTime) {
-          console.warn(`[Call ${callSid}] No start time recorded for call`);
+          logger.warn(`[Call ${callSid}] No start time recorded for call`);
           return;
         }
 
         // Validate phone number format
         const phoneRegex = /^\+?[1-9]\d{1,14}$/;
         if (!phoneRegex.test(call.from)) {
-          console.warn(`[Call ${callSid}] Invalid phone number format: ${call.from}`);
+          logger.warn(`[Call ${callSid}] Invalid phone number format: ${call.from}`);
           return;
         }
 
-        console.log(`[Call ${callSid}] Processing call end:`, {
+        logger.info(`[Call ${callSid}] Processing call end:`, {
           status,
           hasConsent: call.hasConsent,
           from: call.from,
@@ -333,7 +334,7 @@ export class TwilioVoiceHandler {
         // Clean up call data
         await this.cleanupCall(callSid);
       } catch (error) {
-        console.error(`[Call ${callSid}] Error in handleCallStatusUpdate:`, error);
+        logger.error(`[Call ${callSid}] Error in handleCallStatusUpdate:`, error);
       }
     }
   }
@@ -343,7 +344,7 @@ export class TwilioVoiceHandler {
     const RETRY_DELAY = 5000;
 
     try {
-      console.log(`[Call ${callSid}] Attempting to send SMS (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+      logger.info(`[Call ${callSid}] Attempting to send SMS (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
       
       const message = await this.twilioClient.messages.create({
         body: summary,
@@ -353,7 +354,7 @@ export class TwilioVoiceHandler {
 
       // Verify SMS was sent successfully
       if (message.sid) {
-        console.log(`[Call ${callSid}] SMS sent successfully:`, {
+        logger.info(`[Call ${callSid}] SMS sent successfully:`, {
           messageSid: message.sid,
           status: message.status,
           to: message.to,
@@ -373,7 +374,7 @@ export class TwilioVoiceHandler {
         throw new Error('SMS SID not received');
       }
     } catch (smsError) {
-      console.error(`[Call ${callSid}] Error sending SMS:`, {
+      logger.error(`[Call ${callSid}] Error sending SMS:`, {
         error: smsError.message,
         code: smsError.code,
         status: smsError.status,
@@ -392,11 +393,11 @@ export class TwilioVoiceHandler {
 
       // Retry logic
       if (retryCount < MAX_RETRIES) {
-        console.log(`[Call ${callSid}] Retrying SMS in ${RETRY_DELAY}ms...`);
+        logger.info(`[Call ${callSid}] Retrying SMS in ${RETRY_DELAY}ms...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         return this.sendSMSWithRetry(callSid, call, summary, retryCount + 1);
       } else {
-        console.error(`[Call ${callSid}] Max retry attempts reached for SMS`);
+        logger.error(`[Call ${callSid}] Max retry attempts reached for SMS`);
       }
     }
   }
@@ -409,7 +410,7 @@ export class TwilioVoiceHandler {
       }
       return `Call Summary:\n\n${summary}`;
     } catch (error) {
-      console.error(`[Call ${callSid}] Error generating call summary:`, error);
+      logger.error(`[Call ${callSid}] Error generating call summary:`, error);
       return 'Unable to generate call summary. Please contact support for assistance.';
     }
   }
