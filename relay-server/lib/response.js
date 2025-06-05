@@ -127,6 +127,11 @@ export class ResponseGenerator {
     // Check cache first
     const cachedAnalysis = this.getCachedAnalysis(input);
     if (cachedAnalysis) {
+      logger.info('Using cached analysis', { 
+        input,
+        confidence: cachedAnalysis.confidence,
+        isFactual: cachedAnalysis.isFactual
+      });
       return cachedAnalysis;
     }
 
@@ -145,6 +150,12 @@ export class ResponseGenerator {
           patternScore += weight;
           totalWeight += weight;
           matchedPatterns.push(`${category}:${pattern.toString()} (weight: ${weight})`);
+          logger.debug('Pattern match found', {
+            category,
+            pattern: pattern.toString(),
+            weight,
+            currentScore: patternScore
+          });
         }
       }
     }
@@ -155,6 +166,11 @@ export class ResponseGenerator {
         patternScore += weight;
         totalWeight += weight;
         matchedPatterns.push(`keyword:${word} (weight: ${weight})`);
+        logger.debug('Keyword match found', {
+          word,
+          weight,
+          currentScore: patternScore
+        });
       }
     }
 
@@ -163,6 +179,16 @@ export class ResponseGenerator {
 
     // Determine if query is factual
     const isFactual = confidence >= 0.3;
+
+    logger.info('Query analysis complete', {
+      input,
+      confidence,
+      isFactual,
+      patternScore,
+      totalWeight,
+      matchedPatterns,
+      timestamp: new Date().toISOString()
+    });
 
     const analysis = {
       isFactual,
@@ -304,7 +330,16 @@ export class ResponseGenerator {
   static async getResponse(input, context = {}) {
     // Analyze query and get confidence score
     const analysis = this.analyzeQuery(input);
-    const { confidence, isFactual } = analysis;
+    const { confidence, isFactual, matches } = analysis;
+
+    // Log confidence analysis
+    logger.info('Query Analysis', {
+      input,
+      confidence,
+      isFactual,
+      matches,
+      timestamp: new Date().toISOString()
+    });
 
     // Start timing the response
     const startTime = Date.now();
@@ -312,34 +347,36 @@ export class ResponseGenerator {
     let source;
     let success = false;
     let fallback = false;
-    logger.info('Inside the getResponse');
 
     try {
       if (confidence >= 0.7) {
         // High confidence - use Tavily exclusively
         source = 'tavily';
+        logger.info('Using Tavily (High Confidence)', { confidence });
         response = await this.queryTavily(input);
-        logger.info('Tavily Response:', response);
 
         if (!response || !response.results || response.results.length === 0) {
-          logger.info('Tavily response insufficient, falling back to GPT.');
+          logger.info('Tavily response insufficient, falling back to GPT', { confidence });
           fallback = true;
         } else {
-          logger.info('Tavily response sufficient, using Tavily results.');
+          logger.info('Using Tavily response', { confidence, resultCount: response.results.length });
           success = this.isSufficientResponse(response);
         }
       } else if (confidence >= 0.4) {
         // Medium confidence - try both in parallel
         source = 'hybrid';
+        logger.info('Using Hybrid Approach (Medium Confidence)', { confidence });
         const [tavilyResponse, gptResponse] = await Promise.all([
           this.queryTavily(input),
           this.generateGPTResponse(input, 'gpt-3.5-turbo', context)
         ]);
 
         if (this.isSufficientResponse(tavilyResponse)) {
+          logger.info('Using Tavily from Hybrid', { confidence, resultCount: tavilyResponse.results?.length });
           response = this.formatTavilyResponse(tavilyResponse);
           success = true;
         } else {
+          logger.info('Using GPT from Hybrid', { confidence });
           response = gptResponse;
           success = true;
           fallback = true;
@@ -347,6 +384,7 @@ export class ResponseGenerator {
       } else if (confidence >= 0.3) {
         // Low confidence - use GPT with Tavily context
         source = 'gpt';
+        logger.info('Using GPT with Context (Low Confidence)', { confidence });
         const tavilyResponse = await this.queryTavily(input);
         const context = {
           tavilyResults: tavilyResponse.results || [],
@@ -357,11 +395,17 @@ export class ResponseGenerator {
       } else {
         // Non-factual - use GPT exclusively
         source = 'gpt';
+        logger.info('Using GPT (Non-factual Query)', { confidence });
         response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
         success = true;
       }
     } catch (error) {
-      logger.error('Error generating response', { error: error.message });
+      logger.error('Error generating response', { 
+        error: error.message,
+        confidence,
+        source,
+        stack: error.stack
+      });
       // Fallback to GPT on error
       source = 'gpt';
       response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
@@ -371,6 +415,16 @@ export class ResponseGenerator {
 
     // Calculate response time
     const responseTime = Date.now() - startTime;
+
+    // Log final response details
+    logger.info('Response Generated', {
+      confidence,
+      source,
+      success,
+      fallback,
+      responseTime,
+      timestamp: new Date().toISOString()
+    });
 
     // Update routing stats
     this.updateRoutingStats(confidence, source, success, fallback, responseTime);
