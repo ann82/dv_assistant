@@ -11,6 +11,7 @@
     "express": "^5.1.0",
     "gpt-tokenizer": "^2.9.0",
     "openai": "^4.103.0",
+    "p-throttle": "^5.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "twilio": "^5.5.2",
