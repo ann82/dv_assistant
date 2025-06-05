@@ -1,117 +1,138 @@
-# DV Assistant
+# Domestic Violence Support Assistant
 
-A comprehensive domestic violence support system that provides real-time assistance through voice calls, SMS, and web interfaces.
+A voice-based AI assistant designed to provide immediate support and resources for individuals experiencing domestic violence. The system uses natural language processing to understand queries and provide relevant information about shelters, resources, and support services.
 
 ## Features
 
-### Core Functionality
-- **Multi-channel Support**: Voice calls, SMS, and web interface
-- **Real-time Processing**: Immediate response to user queries
-- **Contextual Understanding**: Advanced pattern matching for query analysis
-- **Resource Routing**: Intelligent routing to appropriate support services
+- **Voice Interface**: Easy-to-use voice-based interaction system
+- **Real-time Response**: Quick and accurate responses to user queries
+- **Resource Location**: Helps users find nearby shelters and support services
+- **Confidence-based Routing**: Intelligent routing of queries based on confidence scores
+- **Multi-source Information**: Combines information from multiple sources for comprehensive responses
+- **Conversation Summary**: Optional text message summary of the conversation and resources
+- **Enhanced Logging**: Detailed logging for better monitoring and debugging
+- **Robust Error Handling**: Improved error handling and recovery mechanisms
 
-### Cache System
-- **In-Memory Caching**: Fast access to frequently used data
-- **TTL-based Expiration**: Automatic cleanup of stale entries
-- **Background Cleanup**: Regular maintenance of cache entries
-- **Cache Statistics**: Monitoring of cache performance and usage
-- **Thread-Safe Operations**: Safe concurrent access
-- **Memory Management**: Automatic cleanup of expired entries
-- **Error Handling**: Graceful handling of cache misses and errors
+## Query Types and Confidence Scoring
 
-### Performance Monitoring
-- **Routing Statistics**: Track success rates by confidence level
-- **Response Times**: Monitor performance across different sources
-- **Error Tracking**: Comprehensive error logging and monitoring
-- **Cache Metrics**: Hit/miss rates and memory usage tracking
+The system uses a confidence-based scoring system to route queries to the most appropriate information source:
 
-### Security Features
-- **API Key Management**: Secure handling of external service keys
-- **Input Validation**: Robust validation of user inputs
-- **Error Handling**: Comprehensive error management
-- **Rate Limiting**: Protection against abuse
+### High Confidence Queries (Tavily API)
+These queries will be routed to the Tavily API for factual information:
+
+1. **Location-based Questions**:
+   - "Where is the nearest domestic violence shelter?"
+   - "Find a women's shelter near me"
+   - "Locate the closest safe house in my area"
+
+2. **Specific Shelter Queries**:
+   - "Where is the nearest women's shelter?"
+   - "Find a domestic violence shelter in [city]"
+   - "What is the address of the nearest safe house?"
+
+3. **Resource Location Questions**:
+   - "Where can I find domestic violence resources?"
+   - "Locate the nearest crisis center"
+   - "Find emergency housing services near me"
+
+### Medium Confidence Queries (Hybrid Approach)
+These queries will use both Tavily and GPT:
+- "What services do shelters offer?"
+- "How can I find help with domestic violence?"
+- "What resources are available for victims?"
+
+### Low Confidence Queries (GPT)
+These queries will use GPT for conversational responses:
+- "I need help"
+- "What should I do?"
+- "Can you tell me about shelters?"
 
 ## Technical Architecture
 
-### Cache Implementation
-```javascript
-class Cache {
-  constructor() {
-    this.cache = new Map();
-    this.CACHE_TTL = 1000 * 60 * 60; // 1 hour
-    this.CLEANUP_INTERVAL = 1000 * 60 * 15; // 15 minutes
-  }
+The system consists of several key components:
 
-  // Core operations
-  get(key) { /* ... */ }
-  set(key, value) { /* ... */ }
-  delete(key) { /* ... */ }
-  clear() { /* ... */ }
+1. **Voice Interface (Twilio)**
+   - Handles incoming calls
+   - Manages voice interactions
+   - Provides text-to-speech capabilities
+   - Sends follow-up SMS summaries
 
-  // Maintenance
-  cleanup() { /* ... */ }
-  startCleanup() { /* ... */ }
+2. **Response Generator**
+   - Analyzes user queries for confidence scoring
+   - Routes queries to appropriate information sources
+   - Combines information from multiple sources
+   - Generates natural, helpful responses
 
-  // Monitoring
-  getStats() { /* ... */ }
-}
-```
+3. **Information Sources**
+   - Tavily API for factual information
+   - GPT for conversational responses
+   - Hybrid approach for complex queries
 
-### Key Features
-1. **Automatic Cleanup**
-   - Regular background cleanup of expired entries
-   - Configurable cleanup intervals
-   - Process exit handling
+4. **WebSocket Server**
+   - Manages real-time communication
+   - Handles concurrent call sessions
+   - Provides robust error recovery
 
-2. **Performance Optimization**
-   - In-memory storage for fast access
-   - TTL-based expiration
-   - Thread-safe operations
+## Setup and Installation
 
-3. **Monitoring & Statistics**
-   - Cache size tracking
-   - Entry age monitoring
-   - Hit/miss rate tracking
-   - Memory usage monitoring
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ann82/dv_assistant.git
+   cd dv_assistant
+   ```
 
-## Installation
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-```bash
-npm install
-```
+3. Configure environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-## Configuration
+4. Start the server:
+   ```bash
+   npm start
+   ```
 
-Create a `.env` file with the following variables:
-```env
-OPENAI_API_KEY=your_openai_key
-TAVILY_API_KEY=your_tavily_key
-ELEVENLABS_API_KEY=your_elevenlabs_key
-```
+## Environment Variables
 
-## Usage
+Required environment variables:
+- `TWILIO_ACCOUNT_SID`: Your Twilio account SID
+- `TWILIO_AUTH_TOKEN`: Your Twilio auth token
+- `TWILIO_PHONE_NUMBER`: Your Twilio phone number
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `TAVILY_API_KEY`: Your Tavily API key
+- `WS_PORT`: WebSocket server port (default: 8080)
 
-```javascript
-import { ResponseGenerator } from './lib/response.js';
+## Recent Improvements
 
-// Get response for a query
-const response = await ResponseGenerator.getResponse('Where is the nearest shelter?');
-```
-
-## Testing
-
-```bash
-npm test
-```
+- Enhanced confidence scoring for better query routing
+- Improved pattern matching for shelter-related queries
+- Added detailed logging for better monitoring
+- Enhanced WebSocket error handling and recovery
+- Increased response timeouts for better reliability
+- Added connection timeouts to prevent hanging calls
+- Improved error messages and user feedback
+- Added comprehensive query examples and documentation
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Twilio for voice and SMS capabilities
+- OpenAI for GPT integration
+- Tavily for search capabilities
+- All contributors and supporters of the project

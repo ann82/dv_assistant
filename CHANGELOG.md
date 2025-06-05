@@ -236,70 +236,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Real-time speech recognition using Twilio's speech recognition
-- OpenAI TTS integration for high-quality voice responses
-- Multi-language support with proper language detection
-- Enhanced error handling and logging
-- Improved WebSocket connection management
-- Better audio stream handling and processing
-- Advanced mocking patterns for Twilio, WebSocket, and file system modules in all test suites
-- Dependency injection and handler patching for TwilioVoiceHandler and related classes in tests
-- Custom test stubs for WebSocket message handling and connection simulation
-- Documentation for extending and maintaining test mocks
-- Improved confidence scoring and pattern matching in ResponseGenerator.
-- Updated test expectations to match new confidence thresholds and pattern match format.
-- Minor adjustments to routing performance monitoring tests.
-- Enhanced cache system with improved performance and monitoring
-- Added cache statistics and metrics tracking
-- Implemented background cleanup for expired cache entries
-- Added cache invalidation functionality
-- Added comprehensive test coverage for cache operations
+- Enhanced confidence scoring system for better query routing
+- Improved pattern matching for shelter-related queries
+- Detailed logging for better monitoring and debugging
+- Connection timeouts to prevent hanging calls
+- Better error messages and user feedback
+- Comprehensive query examples and documentation
+- New section in README explaining query types and confidence scoring
 
 ### Changed
-- Switched from client-side Web Speech API to OpenAI TTS for better quality
-- Updated Twilio webhook handling for better reliability
-- Improved audio processing pipeline
-- Enhanced conversation flow with proper pauses and prompts
-- Better error messages and debugging information
-- Improved test reliability and isolation by ensuring all external dependencies are mocked
-- Updated test setup to register WebSocket connections in mock server state for accurate assertions
-- Enhanced test coverage for edge cases, error handling, and event-driven logic
-- Updated cache implementation to use a single shared instance
-- Improved cache error handling and resilience
-- Enhanced cache documentation and examples
-- Updated test suite to cover all cache operations
-- Improved cache performance monitoring
+- Increased response timeout from 10s to 15s for better reliability
+- Updated WebSocket error handling and recovery mechanisms
+- Improved logging format with more context and timestamps
+- Enhanced README with latest features and setup instructions
+- Updated pattern weights for better query routing
 
 ### Fixed
-- Fixed language parameter issue in Whisper transcription
-- Resolved WebSocket disconnection issues
-- Fixed audio stream handling and processing
-- Corrected TwiML response generation
-- Fixed speech result processing
-- Resolved issues with missing or incorrect mocks in Twilio and WebSocket tests
-- Fixed test failures related to handler registration and event simulation
-- All tests now pass, ensuring high confidence in code changes
-- Fixed cache invalidation test to use correct cache instance
-- Fixed cache statistics reporting
-- Fixed cache cleanup on process exit
-- Fixed concurrent cache operations handling
-- Fixed cache TTL implementation
+- WebSocket connection issues causing call disconnections
+- Missing confidence values in logs
+- Premature call terminations
+- Error handling in WebSocket message processing
+- Confidence calculation and pattern matching
 
-## [0.1.0] - 2024-03-23
+## [1.0.0] - 2024-03-20
 
 ### Added
-- Initial release
-- Basic voice call handling
-- GPT-4 integration for responses
-- Whisper integration for speech-to-text
-- WebSocket server for real-time communication
+- Initial release of the Domestic Violence Support Assistant
+- Voice interface using Twilio
+- Real-time response generation
+- Resource location capabilities
+- Confidence-based query routing
+- Multi-source information integration
+- Conversation summary via SMS
 - Basic error handling and logging
 
-### Known Issues
-- Occasional WebSocket disconnections
-- Language detection needs improvement
-- Audio quality could be better
-- Response times need optimization
+### Security
+- Secure API key management
+- Input validation
+- Rate limiting
+- Error handling
+
+## [0.1.0] - 2024-03-15
+
+### Added
+- Project initialization
+- Basic project structure
+- Development environment setup
+- Initial documentation
 
 ## [1.3.0] - 2024-03-20
 
@@ -364,16 +347,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - High API costs from audio streaming
 - Unnecessary GPT-4o usage for simple queries
 - Redundant audio processing
-
-## [1.0.0] - 2024-03-15
-
-### Added
-- Initial release
-- Real-time voice interaction
-- Shelter search and location services
-- Resource information and support
-- OpenAI Realtime API integration
-- WebSocket relay server
 
 ## [1.6.0] - 2024-03-25
 
