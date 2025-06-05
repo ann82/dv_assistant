@@ -328,6 +328,13 @@ export class ResponseGenerator {
   }
 
   static async getResponse(input, context = {}) {
+    // Log incoming request
+    logger.info('Incoming request', {
+      input,
+      context,
+      timestamp: new Date().toISOString()
+    });
+
     // Analyze query and get confidence score
     const analysis = this.analyzeQuery(input);
     const { confidence, isFactual, matches } = analysis;
@@ -352,31 +359,55 @@ export class ResponseGenerator {
       if (confidence >= 0.7) {
         // High confidence - use Tavily exclusively
         source = 'tavily';
-        logger.info('Using Tavily (High Confidence)', { confidence });
+        logger.info('Using Tavily (High Confidence)', { 
+          confidence,
+          input,
+          threshold: 0.7
+        });
         response = await this.queryTavily(input);
 
         if (!response || !response.results || response.results.length === 0) {
-          logger.info('Tavily response insufficient, falling back to GPT', { confidence });
+          logger.info('Tavily response insufficient, falling back to GPT', { 
+            confidence,
+            input,
+            response: response ? JSON.stringify(response) : 'null'
+          });
           fallback = true;
         } else {
-          logger.info('Using Tavily response', { confidence, resultCount: response.results.length });
+          logger.info('Using Tavily response', { 
+            confidence, 
+            resultCount: response.results.length,
+            input
+          });
           success = this.isSufficientResponse(response);
         }
       } else if (confidence >= 0.4) {
         // Medium confidence - try both in parallel
         source = 'hybrid';
-        logger.info('Using Hybrid Approach (Medium Confidence)', { confidence });
+        logger.info('Using Hybrid Approach (Medium Confidence)', { 
+          confidence,
+          input,
+          threshold: 0.4
+        });
         const [tavilyResponse, gptResponse] = await Promise.all([
           this.queryTavily(input),
           this.generateGPTResponse(input, 'gpt-3.5-turbo', context)
         ]);
 
         if (this.isSufficientResponse(tavilyResponse)) {
-          logger.info('Using Tavily from Hybrid', { confidence, resultCount: tavilyResponse.results?.length });
+          logger.info('Using Tavily from Hybrid', { 
+            confidence, 
+            resultCount: tavilyResponse.results?.length,
+            input
+          });
           response = this.formatTavilyResponse(tavilyResponse);
           success = true;
         } else {
-          logger.info('Using GPT from Hybrid', { confidence });
+          logger.info('Using GPT from Hybrid', { 
+            confidence,
+            input,
+            reason: 'Tavily response insufficient'
+          });
           response = gptResponse;
           success = true;
           fallback = true;
@@ -384,7 +415,11 @@ export class ResponseGenerator {
       } else if (confidence >= 0.3) {
         // Low confidence - use GPT with Tavily context
         source = 'gpt';
-        logger.info('Using GPT with Context (Low Confidence)', { confidence });
+        logger.info('Using GPT with Context (Low Confidence)', { 
+          confidence,
+          input,
+          threshold: 0.3
+        });
         const tavilyResponse = await this.queryTavily(input);
         const context = {
           tavilyResults: tavilyResponse.results || [],
@@ -395,7 +430,11 @@ export class ResponseGenerator {
       } else {
         // Non-factual - use GPT exclusively
         source = 'gpt';
-        logger.info('Using GPT (Non-factual Query)', { confidence });
+        logger.info('Using GPT (Non-factual Query)', { 
+          confidence,
+          input,
+          threshold: 0.3
+        });
         response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
         success = true;
       }
@@ -404,6 +443,7 @@ export class ResponseGenerator {
         error: error.message,
         confidence,
         source,
+        input,
         stack: error.stack
       });
       // Fallback to GPT on error
@@ -423,6 +463,8 @@ export class ResponseGenerator {
       success,
       fallback,
       responseTime,
+      input,
+      response: typeof response === 'string' ? response.substring(0, 100) + '...' : JSON.stringify(response).substring(0, 100) + '...',
       timestamp: new Date().toISOString()
     });
 

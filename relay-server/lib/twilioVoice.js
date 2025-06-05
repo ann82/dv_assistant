@@ -130,6 +130,24 @@ export class TwilioVoiceHandler {
     try {
       const ws = new this.WebSocketClass(`ws://localhost:${config.WS_PORT}?type=phone`);
       
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState !== RealWebSocket.OPEN) {
+          logger.error(`WebSocket connection timeout for call ${callSid}`);
+          ws.terminate();
+        }
+      }, 5000);
+
+      ws.on('open', () => {
+        logger.info(`WebSocket connected for call ${callSid}`);
+        clearTimeout(connectionTimeout);
+      });
+
+      ws.on('error', (error) => {
+        logger.error(`WebSocket error for call ${callSid}:`, error);
+        clearTimeout(connectionTimeout);
+      });
+
       this.activeCalls.set(callSid, {
         ws,
         from,
@@ -147,10 +165,6 @@ export class TwilioVoiceHandler {
     let responseTimeout;
     let isResponding = false;
 
-    ws.on('open', () => {
-      logger.info(`WebSocket connected for call ${callSid}`);
-    });
-
     ws.on('message', async (data) => {
       try {
         const event = JSON.parse(data);
@@ -165,12 +179,12 @@ export class TwilioVoiceHandler {
           // Set a timeout for the response
           responseTimeout = setTimeout(() => {
             if (isResponding) {
-              logger.info(`Response timeout for call ${callSid}`);
+              logger.error(`Response timeout for call ${callSid}`);
               const twiml = this.generateTwiML("I'm sorry, but I'm having trouble processing your request. Please try again.", true);
               this.sendTwiMLResponse(res, twiml);
               isResponding = false;
             }
-          }, 10000); // 10 second timeout
+          }, 15000); // 15 second timeout
 
           // Don't gather input if the response indicates the end of conversation
           const shouldGather = !event.text.toLowerCase().includes('goodbye') && 
