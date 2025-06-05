@@ -1,11 +1,10 @@
 import { config } from './config.js';
-import { responseCache } from './cache.js';
+import { cache } from './cache.js';
 import { OpenAI } from 'openai';
 import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { withRetryAndThrottle } from './apiUtils.js';
-import { cache } from './cache.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
