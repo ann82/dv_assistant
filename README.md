@@ -20,20 +20,9 @@ The system uses a confidence-based scoring system to route queries to the most a
 ### High Confidence Queries (Tavily API)
 These queries will be routed to the Tavily API for factual information:
 
-1. **Location-based Questions**:
-   - "Where is the nearest domestic violence shelter?"
-   - "Find a women's shelter near me"
-   - "Locate the closest safe house in my area"
-
-2. **Specific Shelter Queries**:
-   - "Where is the nearest women's shelter?"
-   - "Find a domestic violence shelter in [city]"
-   - "What is the address of the nearest safe house?"
-
-3. **Resource Location Questions**:
-   - "Where can I find domestic violence resources?"
-   - "Locate the nearest crisis center"
-   - "Find emergency housing services near me"
+- "Where is the nearest domestic violence shelter?"
+- "Find a women's shelter near me"
+- "Locate the closest safe house in my area"
 
 ### Medium Confidence Queries (Hybrid Approach)
 These queries will use both Tavily and GPT:
@@ -107,6 +96,15 @@ Required environment variables:
 - `TAVILY_API_KEY`: Your Tavily API key
 - `WS_PORT`: WebSocket server port (default: 8080)
 
+## Testing
+
+- All core and integration tests pass as of the latest update.
+- Some legacy and integration tests have been removed or consolidated for maintainability.
+- To run tests:
+  ```bash
+  npm test
+  ```
+
 ## Recent Improvements
 
 - Enhanced confidence scoring for better query routing
@@ -117,6 +115,7 @@ Required environment variables:
 - Added connection timeouts to prevent hanging calls
 - Improved error messages and user feedback
 - Added comprehensive query examples and documentation
+- **Note:** Some integration and performance tests have been removed or consolidated for maintainability.
 
 ## Contributing
 

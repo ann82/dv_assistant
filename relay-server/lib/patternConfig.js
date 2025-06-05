@@ -3,7 +3,7 @@
 // Pattern categories with weights and regex patterns
 export const patternCategories = {
   location: {
-    weight: 2.5,
+    weight: 3.0,
     patterns: [
       /where (?:is|are|can I find)/i,
       /find (?:a|an|the|some|any)/i,
@@ -37,7 +37,7 @@ export const patternCategories = {
     ]
   },
   shelter: {
-    weight: 3.0,
+    weight: 4.0,
     patterns: [
       /shelter(?:s)? (?:near|in|around|close to)/i,
       /domestic violence (?:shelter|resource|help|support)/i,
@@ -62,7 +62,7 @@ export const patternCategories = {
     ]
   },
   general: {
-    weight: 0.8,
+    weight: 0.5,
     patterns: [
       /find/i,
       /search/i,
@@ -77,16 +77,15 @@ export const patternCategories = {
 
 // Shelter keywords with weights
 export const shelterKeywords = [
-  { word: 'shelter', weight: 2.5 },
-  { word: 'domestic violence', weight: 3.0 },
-  { word: 'safe house', weight: 2.5 },
-  { word: 'emergency housing', weight: 2.0 },
-  { word: 'temporary housing', weight: 2.0 },
-  { word: 'refuge', weight: 2.0 },
-  { word: 'sanctuary', weight: 2.0 },
-  { word: 'haven', weight: 2.0 },
-  { word: 'crisis center', weight: 2.5 },
-  { word: 'women\'s shelter', weight: 2.5 },
-  { word: 'family shelter', weight: 2.5 },
-  { word: 'abuse shelter', weight: 2.5 }
+  { word: 'shelter', weight: 3.0 },
+  { word: 'domestic violence', weight: 4.0 },
+  { word: 'safe house', weight: 3.0 },
+  { word: 'emergency housing', weight: 3.0 },
+  { word: 'temporary housing', weight: 3.0 },
+  { word: 'refuge', weight: 3.0 },
+  { word: 'sanctuary', weight: 3.0 },
+  { word: 'crisis center', weight: 3.5 },
+  { word: 'women\'s shelter', weight: 3.5 },
+  { word: 'family shelter', weight: 3.5 },
+  { word: 'abuse shelter', weight: 3.5 }
 ]; 

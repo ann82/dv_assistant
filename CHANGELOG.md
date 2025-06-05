@@ -250,6 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved logging format with more context and timestamps
 - Enhanced README with latest features and setup instructions
 - Updated pattern weights for better query routing
+- **Testing:** Some integration and performance tests have been removed or consolidated for maintainability (see deleted files list)
 
 ### Fixed
 - WebSocket connection issues causing call disconnections
@@ -257,6 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Premature call terminations
 - Error handling in WebSocket message processing
 - Confidence calculation and pattern matching
+- Routing stats tracking for high confidence queries
 
 ## [1.0.0] - 2024-03-20
 

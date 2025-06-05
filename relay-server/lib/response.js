@@ -124,13 +124,20 @@ export class ResponseGenerator {
   }
 
   static analyzeQuery(input) {
+    // Log incoming query
+    logger.info('Analyzing query', {
+      input,
+      timestamp: new Date().toISOString()
+    });
+
     // Check cache first
     const cachedAnalysis = this.getCachedAnalysis(input);
     if (cachedAnalysis) {
       logger.info('Using cached analysis', { 
         input,
         confidence: cachedAnalysis.confidence,
-        isFactual: cachedAnalysis.isFactual
+        isFactual: cachedAnalysis.isFactual,
+        matches: cachedAnalysis.matches
       });
       return cachedAnalysis;
     }
@@ -143,33 +150,54 @@ export class ResponseGenerator {
     let matchedPatterns = [];
     let totalWeight = 0;
 
+    // Log pattern categories and weights
+    logger.debug('Pattern categories', {
+      categories: Object.keys(patternCategories),
+      timestamp: new Date().toISOString()
+    });
+
     // Check each category
     for (const [category, { weight, patterns }] of Object.entries(patternCategories)) {
+      logger.debug(`Checking category: ${category}`, {
+        weight,
+        patternCount: patterns.length,
+        timestamp: new Date().toISOString()
+      });
+
       for (const pattern of patterns) {
         if (pattern.test(normalizedInput)) {
           patternScore += weight;
           totalWeight += weight;
           matchedPatterns.push(`${category}:${pattern.toString()} (weight: ${weight})`);
-          logger.debug('Pattern match found', {
+          logger.info('Pattern match found', {
             category,
             pattern: pattern.toString(),
             weight,
-            currentScore: patternScore
+            currentScore: patternScore,
+            totalWeight,
+            timestamp: new Date().toISOString()
           });
         }
       }
     }
 
     // Check for shelter keywords
+    logger.debug('Checking shelter keywords', {
+      keywordCount: shelterKeywords.length,
+      timestamp: new Date().toISOString()
+    });
+
     for (const { word, weight } of shelterKeywords) {
       if (normalizedInput.includes(word)) {
         patternScore += weight;
         totalWeight += weight;
         matchedPatterns.push(`keyword:${word} (weight: ${weight})`);
-        logger.debug('Keyword match found', {
+        logger.info('Keyword match found', {
           word,
           weight,
-          currentScore: patternScore
+          currentScore: patternScore,
+          totalWeight,
+          timestamp: new Date().toISOString()
         });
       }
     }
@@ -180,6 +208,7 @@ export class ResponseGenerator {
     // Determine if query is factual
     const isFactual = confidence >= 0.3;
 
+    // Log final analysis
     logger.info('Query analysis complete', {
       input,
       confidence,
@@ -212,48 +241,59 @@ export class ResponseGenerator {
   }
 
   static updateRoutingStats(confidence, source, success, fallback = false, responseTime = 0) {
-    // Update total requests
     this.routingStats.totalRequests++;
 
-    // Update confidence level stats
-    let confidenceLevel;
+    // Update confidence-based stats
     if (confidence >= 0.7) {
-      confidenceLevel = 'high';
+      this.routingStats.byConfidence.high.count++;
+      if (success) {
+        this.routingStats.byConfidence.high.success++;
+        if (fallback) {
+          this.routingStats.byConfidence.high.fallback++;
+        }
+      }
     } else if (confidence >= 0.4) {
-      confidenceLevel = 'medium';
+      this.routingStats.byConfidence.medium.count++;
+      if (success) {
+        this.routingStats.byConfidence.medium.success++;
+        if (fallback) {
+          this.routingStats.byConfidence.medium.fallback++;
+        }
+      }
     } else if (confidence >= 0.3) {
-      confidenceLevel = 'low';
+      this.routingStats.byConfidence.low.count++;
+      if (success) {
+        this.routingStats.byConfidence.low.success++;
+        if (fallback) {
+          this.routingStats.byConfidence.low.fallback++;
+        }
+      }
     } else {
-      confidenceLevel = 'nonFactual';
+      this.routingStats.byConfidence.nonFactual.count++;
     }
 
-    this.routingStats.byConfidence[confidenceLevel].count++;
-    if (success) {
-      this.routingStats.byConfidence[confidenceLevel].success++;
-    }
-    if (fallback) {
-      this.routingStats.byConfidence[confidenceLevel].fallback++;
-    }
-
-    // Update source stats
-    this.routingStats.bySource[source].count++;
-    if (success) {
-      this.routingStats.bySource[source].success++;
+    // Update source-based stats
+    if (source) {
+      this.routingStats.bySource[source].count++;
+      if (success) {
+        this.routingStats.bySource[source].success++;
+      }
     }
 
     // Update response times
     if (responseTime > 0) {
       this.routingStats.responseTimes[source].push(responseTime);
+      
       // Keep only the last 100 response times
       if (this.routingStats.responseTimes[source].length > 100) {
         this.routingStats.responseTimes[source].shift();
       }
     }
 
-    // Log the update
-    logger.info('Updated routing stats', {
-      timestamp: new Date().toISOString()
-    });
+    // Log routing stats periodically
+    if (this.routingStats.totalRequests % 10 === 0) {
+      this.logRoutingPerformance();
+    }
   }
 
   static logRoutingPerformance() {
@@ -362,7 +402,8 @@ export class ResponseGenerator {
         logger.info('Using Tavily (High Confidence)', { 
           confidence,
           input,
-          threshold: 0.7
+          threshold: 0.7,
+          matches
         });
         response = await this.queryTavily(input);
 
@@ -370,14 +411,16 @@ export class ResponseGenerator {
           logger.info('Tavily response insufficient, falling back to GPT', { 
             confidence,
             input,
-            response: response ? JSON.stringify(response) : 'null'
+            response: response ? JSON.stringify(response) : 'null',
+            matches
           });
           fallback = true;
         } else {
           logger.info('Using Tavily response', { 
             confidence, 
             resultCount: response.results.length,
-            input
+            input,
+            matches
           });
           success = this.isSufficientResponse(response);
         }
@@ -387,7 +430,8 @@ export class ResponseGenerator {
         logger.info('Using Hybrid Approach (Medium Confidence)', { 
           confidence,
           input,
-          threshold: 0.4
+          threshold: 0.4,
+          matches
         });
         const [tavilyResponse, gptResponse] = await Promise.all([
           this.queryTavily(input),
@@ -398,7 +442,8 @@ export class ResponseGenerator {
           logger.info('Using Tavily from Hybrid', { 
             confidence, 
             resultCount: tavilyResponse.results?.length,
-            input
+            input,
+            matches
           });
           response = this.formatTavilyResponse(tavilyResponse);
           success = true;
@@ -406,7 +451,8 @@ export class ResponseGenerator {
           logger.info('Using GPT from Hybrid', { 
             confidence,
             input,
-            reason: 'Tavily response insufficient'
+            reason: 'Tavily response insufficient',
+            matches
           });
           response = gptResponse;
           success = true;
@@ -418,7 +464,8 @@ export class ResponseGenerator {
         logger.info('Using GPT with Context (Low Confidence)', { 
           confidence,
           input,
-          threshold: 0.3
+          threshold: 0.3,
+          matches
         });
         const tavilyResponse = await this.queryTavily(input);
         const context = {
@@ -433,7 +480,8 @@ export class ResponseGenerator {
         logger.info('Using GPT (Non-factual Query)', { 
           confidence,
           input,
-          threshold: 0.3
+          threshold: 0.3,
+          matches
         });
         response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
         success = true;
@@ -444,6 +492,7 @@ export class ResponseGenerator {
         confidence,
         source,
         input,
+        matches,
         stack: error.stack
       });
       // Fallback to GPT on error
@@ -464,6 +513,7 @@ export class ResponseGenerator {
       fallback,
       responseTime,
       input,
+      matches,
       response: typeof response === 'string' ? response.substring(0, 100) + '...' : JSON.stringify(response).substring(0, 100) + '...',
       timestamp: new Date().toISOString()
     });
@@ -508,13 +558,18 @@ export class ResponseGenerator {
   }
 
   static async queryTavily(query) {
-    try {
-      logger.info('Calling Tavily API', { 
-        query,
-        timestamp: new Date().toISOString()
-      });
+    logger.info('Querying Tavily API', {
+      query,
+      timestamp: new Date().toISOString()
+    });
 
-      const callTavilyWithRetry = withRetryAndThrottle(async function callTavily(query) {
+    if (!config.TAVILY_API_KEY) {
+      logger.error('Tavily API key not configured');
+      return null;
+    }
+
+    const callTavilyWithRetry = withRetryAndThrottle(async function callTavily(query) {
+      try {
         const response = await fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: {
@@ -524,38 +579,49 @@ export class ResponseGenerator {
           body: JSON.stringify({
             query,
             search_depth: 'advanced',
-            max_results: 5,
-            include_answer: true
+            include_answer: true,
+            include_domains: [],
+            exclude_domains: []
           })
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
           logger.error('Tavily API error', {
             status: response.status,
             statusText: response.statusText,
+            error: errorText,
             query
           });
-          throw new Error(`Tavily API error: ${response.statusText}`);
+          throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
-        logger.info('Tavily API response received', {
-          hasAnswer: !!data.answer,
-          resultCount: data.results?.length || 0,
-          answerLength: data.answer?.length || 0,
+        logger.info('Tavily API response', {
           query,
+          resultCount: data.results?.length || 0,
+          hasAnswer: !!data.answer,
           timestamp: new Date().toISOString()
         });
-        return data;
-      });
 
-      const data = await callTavilyWithRetry(query);
-      return data;
+        return data;
+      } catch (error) {
+        logger.error('Error calling Tavily API', {
+          error: error.message,
+          query,
+          stack: error.stack
+        });
+        throw error;
+      }
+    });
+
+    try {
+      return await callTavilyWithRetry(query);
     } catch (error) {
-      logger.error('Error querying Tavily', {
+      logger.error('Failed to get Tavily response', {
         error: error.message,
-        stack: error.stack,
-        query
+        query,
+        stack: error.stack
       });
       return null;
     }
