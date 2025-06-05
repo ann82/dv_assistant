@@ -246,6 +246,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependency injection and handler patching for TwilioVoiceHandler and related classes in tests
 - Custom test stubs for WebSocket message handling and connection simulation
 - Documentation for extending and maintaining test mocks
+- Improved confidence scoring and pattern matching in ResponseGenerator.
+- Updated test expectations to match new confidence thresholds and pattern match format.
+- Minor adjustments to routing performance monitoring tests.
+- Enhanced cache system with improved performance and monitoring
+- Added cache statistics and metrics tracking
+- Implemented background cleanup for expired cache entries
+- Added cache invalidation functionality
+- Added comprehensive test coverage for cache operations
 
 ### Changed
 - Switched from client-side Web Speech API to OpenAI TTS for better quality
@@ -256,6 +264,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved test reliability and isolation by ensuring all external dependencies are mocked
 - Updated test setup to register WebSocket connections in mock server state for accurate assertions
 - Enhanced test coverage for edge cases, error handling, and event-driven logic
+- Updated cache implementation to use a single shared instance
+- Improved cache error handling and resilience
+- Enhanced cache documentation and examples
+- Updated test suite to cover all cache operations
+- Improved cache performance monitoring
 
 ### Fixed
 - Fixed language parameter issue in Whisper transcription
@@ -266,6 +279,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolved issues with missing or incorrect mocks in Twilio and WebSocket tests
 - Fixed test failures related to handler registration and event simulation
 - All tests now pass, ensuring high confidence in code changes
+- Fixed cache invalidation test to use correct cache instance
+- Fixed cache statistics reporting
+- Fixed cache cleanup on process exit
+- Fixed concurrent cache operations handling
+- Fixed cache TTL implementation
 
 ## [0.1.0] - 2024-03-23
 
@@ -391,56 +409,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Resolved Twilio configuration access issues
-- Fixed `config.twilio` undefined error in deployment
-- Corrected environment variable loading in production
+- Fixed `config.twilio`
 
-## [1.9.1] - 2024-06-01
-
-### Added
-- Advanced and unified mocking for Twilio, OpenAI, WebSocket, and file system modules in all test suites.
-- Mocked `twilio.twiml.VoiceResponse` with all required methods for TwiML response generation.
-- Mocked config to include a `twilio` object with `accountSid`, `authToken`, and `phoneNumber` for all tests.
-- Test script in `package.json` now sets `OPENAI_API_KEY` automatically for all test runs.
+## [Unreleased]
 
 ### Changed
-- Improved test reliability and isolation by ensuring all external dependencies are mocked before imports.
-- Updated test documentation and troubleshooting steps in README.
+- Replaced Redis-based caching with efficient local in-memory cache
+- Improved cache cleanup mechanism with automatic background cleanup
+- Optimized cache performance by removing external dependencies
+- Updated cache TTL to 1 hour (configurable via CACHE_EXPIRY)
 
-### Fixed
-- Resolved test failures due to missing or incomplete mocks for Twilio and config.
-- Fixed issues with environment variable timing for OpenAI API key in tests.
-
-## [1.10.0] - 2024-04-01
-
-### Added
-- Enhanced cache system with size limits and monitoring
-- Improved Twilio voice conversation flow
-- Added detailed debug logging for Tavily API calls
-
-### Changed
-- Updated cache cleanup interval from 24 hours to 5 minutes
-- Modified Twilio voice prompts to be context-aware
-- Improved conversation ending detection
-
-### Fixed
-- Fixed repeated "How may I help" prompts in Twilio calls
-- Resolved cache memory growth issues
-- Improved error handling in Tavily API integration
-
-## [1.11.0] - 2024-04-01
+### Removed
+- Removed Redis dependency and configuration
+- Removed async/await complexity from cache operations
 
 ### Added
-- Enhanced logging system with structured JSON output
-- Log level configuration support
-- Detailed API call tracking
-- Performance monitoring logs
-
-### Changed
-- Improved Tavily API error handling
-- Updated logging format for better Railway integration
-- Enhanced debug information for API calls
-
-### Fixed
-- Fixed 499 status code issues in Twilio calls
-- Improved error tracking in API calls
-- Better handling of API timeouts 
+- Added cache statistics and monitoring
+- Added automatic cleanup every 15 minutes
+- Added cache size and expiration tracking
+- Added graceful cleanup on process exit
