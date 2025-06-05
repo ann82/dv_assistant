@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
+    "async-retry": "^1.3.3",
     "body-parser": "^2.2.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
