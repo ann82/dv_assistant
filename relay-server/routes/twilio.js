@@ -8,12 +8,25 @@ import fsSync from 'fs';
 import { fileURLToPath } from 'url';
 import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 import logger from '../lib/logger.js';
+import { callTavilyAPI, callGPT } from '../lib/apis.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-const twilioClient = twilio(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
+
+// Initialize Twilio client with environment variables
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+if (!accountSid || !authToken) {
+  logger.error('Twilio credentials not found in environment variables');
+  throw new Error('Twilio credentials not found in environment variables');
+}
+
+const twilioClient = twilio(accountSid, authToken);
+logger.info('Twilio client initialized successfully');
+
 const twilioVoiceHandler = new TwilioVoiceHandler(
   config.TWILIO_ACCOUNT_SID,
   config.TWILIO_AUTH_TOKEN,
@@ -105,28 +118,32 @@ async function cleanupAudioFile(audioPath) {
 // Apply validation to all Twilio routes
 router.use(validateTwilioRequest);
 
-router.post('/voice', (req, res) => {
+// Log when the router is initialized
+logger.info('Initializing Twilio routes');
+
+// Test route to verify logging
+router.get('/test', (req, res) => {
+  logger.info('Test route hit');
+  res.json({ message: 'Test route working' });
+});
+
+// Log all incoming requests
+router.use((req, res, next) => {
+  logger.info('Incoming Twilio request:', {
+    method: req.method,
+    path: req.path,
+    headers: req.headers
+  });
+  next();
+});
+
+router.post('/voice', async (req, res) => {
   try {
-    logger.info('Voice Route - Request Body:', req.body);
-    logger.info('Voice Route - CallSid:', req.body.CallSid);
+    logger.info('Processing voice request:', req.body);
     
-    // Log Twilio call details when call starts
-    logTwilioCallDetails(req.body.CallSid);
-    
-    const domain = req.get('host');
     const twiml = new twilio.twiml.VoiceResponse();
-
-    // Add welcome message
-    twiml.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'Welcome to the Domestic Violence Support Assistant. I\'m here to help you.');
-
-    // Add a pause to let the user respond
-    twiml.pause({ length: 1 });
-
-    // Configure speech recognition
-    const gather = twiml.gather({
+    twiml.say('Welcome to the Domestic Violence Support Assistant. How can I help you today?');
+    twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
@@ -136,33 +153,93 @@ router.post('/voice', (req, res) => {
       language: 'en-US'
     });
 
-    // Add a prompt for the user
-    gather.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'How can I help you today?');
-
-    // Register the call with WebSocket server
-    const wss = getWebSocketServer();
-    wss.registerCall(req.body.CallSid);
-
-    // Start media stream
-    const connect = twiml.connect();
-    connect.stream({
-      url: `wss://${domain}/twilio-stream`,
-      track: 'inbound_track'
-    });
-
-    const twimlString = twiml.toString();
-    logger.info('Generated TwiML:', twimlString);
-    
+    logger.info('Sending TwiML response:', twiml.toString());
     res.type('text/xml');
-    res.send(twimlString);
+    res.send(twiml.toString());
   } catch (error) {
-    logger.error('Error in Twilio voice route:', error);
-    res.status(500).send('Error processing voice request');
+    logger.error('Error processing voice request:', error);
+    res.status(500).send('Error processing request');
   }
 });
+
+router.post('/voice/process', async (req, res) => {
+  try {
+    const { CallSid, SpeechResult, Confidence } = req.body;
+    logger.info('Processing speech result:', { callSid: CallSid, speechResult: SpeechResult, confidence: Confidence });
+
+    // Process the speech result and generate response
+    const response = await processSpeechResult(SpeechResult);
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // First say the response
+    twiml.say(response);
+    
+    // Add a pause to let the user process the information
+    twiml.pause({ length: 1 });
+    
+    // Then gather the next input
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: 'auto',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US'
+    });
+
+    logger.info('Sending TwiML response:', twiml.toString());
+    res.type('text/xml');
+    res.send(twiml.toString());
+  } catch (error) {
+    logger.error('Error processing speech:', error);
+    res.status(500).send('Error processing speech');
+  }
+});
+
+async function processSpeechResult(speechResult) {
+  try {
+    logger.info('Starting speech processing for:', speechResult);
+    
+    // Check if we need to search for resources
+    const needsResourceSearch = speechResult.toLowerCase().includes('find') || 
+                              speechResult.toLowerCase().includes('search') ||
+                              speechResult.toLowerCase().includes('near') ||
+                              speechResult.toLowerCase().includes('location');
+    
+    let response;
+    if (needsResourceSearch) {
+      logger.info('Resource search needed, calling Tavily API');
+      const tavilyResponse = await callTavilyAPI(speechResult);
+      logger.info('Tavily API response:', tavilyResponse);
+      
+      // Format Tavily response
+      response = formatTavilyResponse(tavilyResponse);
+    } else {
+      logger.info('No resource search needed, using GPT for general response');
+      const gptResponse = await callGPT(speechResult);
+      logger.info('GPT response:', gptResponse);
+      
+      response = gptResponse.text;
+    }
+
+    return response;
+  } catch (error) {
+    logger.error('Error in processSpeechResult:', error);
+    return 'I apologize, but I encountered an error processing your request. Please try again.';
+  }
+}
+
+function formatTavilyResponse(tavilyResponse) {
+  // TODO: Implement proper formatting of Tavily response
+  return `I found some resources that might help:
+1. Safe House of Santa Clara County - 24/7 hotline: 408-279-2962
+2. Next Door Solutions - Domestic violence services: 408-279-2962
+3. Community Solutions - Emergency shelter: 408-278-2160
+
+Would you like more information about any of these resources?`;
+}
 
 // Handle call status updates
 router.post('/status', async (req, res) => {
@@ -198,199 +275,6 @@ router.post('/recording', (req, res) => {
     res.status(500).send('Error processing recording');
   }
 });
-
-// Refactored handler for /voice/process
-export async function handleTwilioWebhook(req, res) {
-  try {
-    logger.info('Processing speech result:', {
-      callSid: req.body.CallSid,
-      speechResult: req.body.SpeechResult,
-      confidence: req.body.Confidence
-    });
-
-    const wss = getWebSocketServer();
-    if (!wss || !wss.audioService) {
-      throw new Error('WebSocket server or audio service not initialized');
-    }
-
-    const twiml = new twilio.twiml.VoiceResponse();
-    // Get GPT response for the speech result
-    logger.info('Getting GPT response...');
-    const gptResponse = await wss.audioService.getGptReply(req.body.SpeechResult);
-    logger.info('GPT Response:', gptResponse);
-
-    if (!gptResponse || !gptResponse.text) {
-      throw new Error('Invalid GPT response');
-    }
-
-    // Truncate response if it's too long (Twilio has a limit)
-    const maxResponseLength = 1000; // Adjust this value based on testing
-    let truncatedText = gptResponse.text;
-    if (truncatedText.length > maxResponseLength) {
-      // First, try to find the last complete resource entry
-      const resourceMatches = truncatedText.match(/\d+\.\s+\*\*[^*]+\*\*:.*?(?=\n\n|\d+\.\s+\*\*|$)/gs);
-      if (resourceMatches) {
-        // Find the last complete resource that fits within the limit
-        let totalLength = 0;
-        let lastCompleteResource = '';
-        for (const resource of resourceMatches) {
-          if (totalLength + resource.length <= maxResponseLength) {
-            totalLength += resource.length;
-            lastCompleteResource = resource;
-          } else {
-            break;
-          }
-        }
-        // If we found a complete resource, use it
-        if (lastCompleteResource) {
-          const lastResourceIndex = truncatedText.lastIndexOf(lastCompleteResource) + lastCompleteResource.length;
-          truncatedText = truncatedText.substring(0, lastResourceIndex);
-        } else {
-          // If no complete resource fits, find the last complete sentence
-          const lastPeriod = truncatedText.substring(0, maxResponseLength).lastIndexOf('.');
-          if (lastPeriod > 0) {
-            truncatedText = truncatedText.substring(0, lastPeriod + 1);
-          } else {
-            // If no period found, find the last space
-            const lastSpace = truncatedText.substring(0, maxResponseLength).lastIndexOf(' ');
-            if (lastSpace > 0) {
-              truncatedText = truncatedText.substring(0, lastSpace) + '...';
-            } else {
-              truncatedText = truncatedText.substring(0, maxResponseLength) + '...';
-            }
-          }
-        }
-      } else {
-        // If no resource pattern found, fall back to sentence-based truncation
-        const lastPeriod = truncatedText.substring(0, maxResponseLength).lastIndexOf('.');
-        if (lastPeriod > 0) {
-          truncatedText = truncatedText.substring(0, lastPeriod + 1);
-        } else {
-          const lastSpace = truncatedText.substring(0, maxResponseLength).lastIndexOf(' ');
-          if (lastSpace > 0) {
-            truncatedText = truncatedText.substring(0, lastSpace) + '...';
-          } else {
-            truncatedText = truncatedText.substring(0, maxResponseLength) + '...';
-          }
-        }
-      }
-    }
-
-    // Generate TTS for the response
-    logger.info('Generating TTS...');
-    const ttsResponse = await wss.audioService.generateTTS(truncatedText);
-    logger.info('TTS Response:', ttsResponse);
-
-    if (!ttsResponse || !ttsResponse.audioPath) {
-      throw new Error('Invalid TTS response');
-    }
-
-    // Get the full URL for the audio file
-    const domain = req.get('host');
-    const audioUrl = `https://${domain}${ttsResponse.audioPath}`;
-    logger.info('Audio URL:', audioUrl);
-
-    // Verify the audio file exists and is completely written
-    logger.info('Verifying audio file...');
-    let retryCount = 0;
-    const maxRetries = 5;
-    const retryDelay = 1000; // 1 second
-
-    while (retryCount < maxRetries) {
-      try {
-        // Check if file exists
-        if (!fsSync.existsSync(ttsResponse.fullPath)) {
-          throw new Error('Audio file not found: ' + ttsResponse.fullPath);
-        }
-        // Get file stats
-        const stats = await fs.stat(ttsResponse.fullPath);
-        // Verify file size is greater than 0
-        if (stats.size === 0) {
-          throw new Error('Audio file is empty');
-        }
-        // Verify file is not being written to
-        const initialSize = stats.size;
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
-        const finalSize = (await fs.stat(ttsResponse.fullPath)).size;
-        if (initialSize !== finalSize) {
-          throw new Error('Audio file is still being written');
-        }
-        logger.info('Audio file verified:', {
-          path: ttsResponse.fullPath,
-          size: stats.size,
-          created: stats.birthtime,
-          modified: stats.mtime
-        });
-        // File is ready, break the retry loop
-        break;
-      } catch (error) {
-        retryCount++;
-        if (retryCount === maxRetries) {
-          logger.error('Failed to verify audio file after retries:', error);
-          throw error;
-        }
-        logger.info(`Retry ${retryCount}/${maxRetries} - Waiting for audio file to be ready...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
-    }
-
-    // First play the response
-    twiml.play(audioUrl);
-    // Add a pause to let the user respond
-    twiml.pause({ length: 2 });
-    // Then set up the next gather
-    const gather = twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: 'auto',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: 10
-    });
-    gather.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'How else can I help you?');
-    const twimlString = twiml.toString();
-    logger.info('Generated TwiML:', twimlString);
-    res.type('text/xml');
-    res.send(twimlString);
-  } catch (error) {
-    logger.error('Error processing speech result:', error);
-    logger.error('Error stack:', error.stack);
-    // Generate error TwiML
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'I apologize, but I encountered an error. Please try again.');
-    // Add a pause
-    twiml.pause({ length: 1 });
-    // Set up the next gather
-    const gather = twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: 'auto',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US'
-    });
-    gather.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'How can I help you?');
-    const twimlString = twiml.toString();
-    logger.info('Error TwiML:', twimlString);
-    res.type('text/xml');
-    res.send(twimlString);
-  }
-}
-
-// Attach the named handler to the router
-router.post('/voice/process', handleTwilioWebhook);
 
 // Handle incoming SMS messages
 router.post('/sms', async (req, res) => {

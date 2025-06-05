@@ -1,23 +1,18 @@
 import winston from 'winston';
-import { config } from './config.js';
 
-// Custom format for better readability
+// Create a custom format for better readability
 const customFormat = winston.format.printf(({ level, message, timestamp, ...metadata }) => {
   let msg = `${timestamp} [${level.toUpperCase()}] ${message}`;
-  
-  // Add metadata if present
   if (Object.keys(metadata).length > 0) {
     msg += ` ${JSON.stringify(metadata, null, 2)}`;
   }
-  
   return msg;
 });
 
 const logger = winston.createLogger({
-  level: config.LOG_LEVEL || 'debug', // Changed default to debug
+  level: process.env.LOG_LEVEL || 'debug',
   format: winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
     winston.format.colorize(),
     customFormat
   ),
@@ -30,6 +25,9 @@ const logger = winston.createLogger({
     })
   ]
 });
+
+// Add a test log to verify logging is working
+logger.info('Logger initialized');
 
 // Add a stream for Morgan
 logger.stream = {

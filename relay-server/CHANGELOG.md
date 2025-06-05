@@ -1,8 +1,43 @@
 # Changelog
 
-## [Unreleased]
+All notable changes to this project will be documented in this file.
+
+## [1.0.0] - 2024-03-19
 
 ### Added
+- Initial release of DV Assistant Relay Server
+- Twilio voice call handling
+- WebSocket server for real-time communication
+- Tavily API integration for resource searches
+- OpenAI GPT integration for general responses
+- Environment variable validation
+- Health check endpoint
+- Comprehensive error handling
+- Railway deployment support
+
+### Changed
+- Updated server configuration for Railway deployment
+- Improved error handling and logging
+- Updated package.json with correct dependencies
+- Added Node.js version requirement (>= 18.0.0)
+
+### Fixed
+- Fixed environment variable loading
+- Fixed WebSocket server initialization
+- Fixed API key validation
+- Fixed server port configuration
+
+## [0.1.0] - 2024-03-18
+
+### Added
+- Basic server setup
+- Twilio integration
+- WebSocket server
+- Environment configuration
+- Basic error handling
+- Logging system
+
+### Changed
 - Confidence-based routing system for intelligent query handling
   - High confidence (≥ 0.7): Uses Tavily exclusively
   - Medium confidence (0.4-0.7): Tries both Tavily and GPT in parallel
@@ -21,11 +56,6 @@
   - Cache functionality tests
   - Routing performance tests
   - Cache statistics tests
-
-### Changed
-- Improved query analysis with weighted pattern matching
-- Enhanced logging with detailed performance metrics
-- Optimized response generation with parallel processing for medium confidence queries
 
 ### Fixed
 - Memory leak in confidence analysis caching
