@@ -39,6 +39,7 @@ export class TwilioVoiceHandler {
     this.validateRequest = validateRequest;
     this.WebSocketClass = WebSocketClass;
     this.twilioClient = twilio(accountSid, authToken);
+    this.processingRequests = new Map(); // Track processing requests
     if (server) {
       this.wsServer = new TwilioWebSocketServer(server);
     } else {
@@ -61,10 +62,20 @@ export class TwilioVoiceHandler {
         return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
       }
 
+      // Check if we're already processing this call
+      if (this.processingRequests.has(CallSid)) {
+        logger.info(`Duplicate request for call ${CallSid}, ignoring`);
+        return this.sendSuccessResponse(res);
+      }
+
       logger.info(`📞 Incoming call from ${From} (CallSid: ${CallSid})`);
+
+      // Mark call as being processed
+      this.processingRequests.set(CallSid, true);
 
       const ws = await this.createWebSocketConnection(CallSid, From);
       if (!ws) {
+        this.processingRequests.delete(CallSid);
         return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
       }
 
@@ -83,7 +94,7 @@ export class TwilioVoiceHandler {
           language="en-US"/>
 </Response>`;
 
-      this.sendTwiMLResponse(res, twiml);
+      this.sendTwiMLResponse(res);
 
     } catch (error) {
       logger.error('Error handling incoming call:', error);
@@ -101,6 +112,7 @@ export class TwilioVoiceHandler {
           await this.wsServer.handleCallEnd(CallSid);
         }
         await this.cleanupCall(CallSid);
+        this.processingRequests.delete(CallSid);
       }
 
       this.sendSuccessResponse(res);
@@ -164,11 +176,19 @@ export class TwilioVoiceHandler {
   setupWebSocketHandlers(ws, callSid, res) {
     let responseTimeout;
     let isResponding = false;
+    let lastRequestId = null;
 
     ws.on('message', async (data) => {
       try {
         const event = JSON.parse(data);
         if (event.type === 'response.text') {
+          // Check for duplicate requests
+          if (event.requestId === lastRequestId) {
+            logger.info(`Duplicate response request for call ${callSid}, ignoring`);
+            return;
+          }
+          lastRequestId = event.requestId;
+
           isResponding = true;
           
           // Clear any existing timeout
@@ -212,6 +232,7 @@ export class TwilioVoiceHandler {
         clearTimeout(responseTimeout);
       }
       this.activeCalls.delete(callSid);
+      this.processingRequests.delete(callSid);
     });
 
     ws.on('error', (error) => {
@@ -220,6 +241,7 @@ export class TwilioVoiceHandler {
         clearTimeout(responseTimeout);
       }
       this.activeCalls.delete(callSid);
+      this.processingRequests.delete(callSid);
     });
   }
 
