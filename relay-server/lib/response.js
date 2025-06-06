@@ -651,52 +651,40 @@ export class ResponseGenerator {
 
     if (shelters.length === 0) {
       return {
-        summary: "I couldn't find specific shelter information in Atlanta. Would you like me to search for domestic violence resources in your area instead?",
+        summary: "I couldn't find specific shelter information. Would you like me to search for domestic violence resources in your area instead?",
         fullDetails: "No specific shelters found. Please try a different search query.",
         shelters: []
       };
     }
 
+    // Cache the full shelter details
+    const cacheKey = `shelter_search_${Date.now()}`;
+    cache.set(cacheKey, {
+      shelters,
+      timestamp: Date.now()
+    });
+
     // Format based on request type
     if (requestType === 'phone') {
-      const summary = `I found ${shelters.length} shelters in Atlanta. Here are the first 3:\n\n` + 
-        shelters.slice(0, 3).map((s, i) => 
-          `${i + 1}. ${s.name}\n` +
-          `   Phone: ${s.phone}\n`
-        ).join('\n') +
-        '\n\nWould you like to hear more details about any of these shelters?';
-
-      const fullDetails = shelters.map((s, i) => 
-        `${i + 1}. ${s.name}\n` +
-        `   Phone: ${s.phone}\n` +
-        `   Services: ${s.services}\n`
-      ).join('\n');
+      const summary = `I found ${shelters.length} shelters. Here are their names:\n\n` + 
+        shelters.map((s, i) => 
+          `${i + 1}. ${s.name}`
+        ).join('\n');
 
       return {
         summary,
-        fullDetails,
+        cacheKey,
         shelters
       };
     } else {
-      const summary = `I found ${shelters.length} shelters in Atlanta:\n\n` + 
+      const summary = `I found ${shelters.length} shelters:\n\n` + 
         shelters.map((s, i) => 
-          `${i + 1}. ${s.name}\n` +
-          `   Services: ${s.services}\n` +
-          `   Phone: ${s.phone}\n`
-        ).join('\n') +
-        '\n\nWould you like more details about any of these shelters?';
-
-      const fullDetails = shelters.map((s, i) => 
-        `${i + 1}. ${s.name}\n` +
-        `   Address: ${s.address}\n` +
-        `   Phone: ${s.phone}\n` +
-        `   Services: ${s.services}\n` +
-        `   Description: ${s.description}\n`
-      ).join('\n');
+          `${i + 1}. ${s.name}`
+        ).join('\n');
 
       return {
         summary,
-        fullDetails,
+        cacheKey,
         shelters
       };
     }
@@ -752,45 +740,47 @@ export class ResponseGenerator {
   }
 
   static async getDetailedResponse(input, context) {
-    const lastSearch = context.lastShelterSearch;
-    if (lastSearch) {
-      const shelterNumber = input.match(/shelter (\d+)/i)?.[1];
-      if (shelterNumber) {
-        const index = parseInt(shelterNumber) - 1;
-        if (index >= 0 && index < lastSearch.shelters.length) {
-          const shelter = lastSearch.shelters[index];
-          
-          // Format based on request type
-          if (context.requestType === 'phone') {
-            return {
-              text: `Here's what I found for ${shelter.name}:\n\n` +
-                    `Phone: ${shelter.phone}\n` +
-                    `Services: ${shelter.services}\n\n` +
-                    `Would you like to know about another shelter?`,
-              source: 'tavily',
-              model: 'tavily',
-              inputTokens: 0,
-              outputTokens: 0,
-              whisperUsed: false
-            };
-          } else {
-            return {
-              text: `Here are the details for ${shelter.name}:\n\n` +
-                    `Address: ${shelter.address}\n` +
-                    `Phone: ${shelter.phone}\n` +
-                    `Services: ${shelter.services}\n` +
-                    `Description: ${shelter.description}\n\n` +
-                    `Would you like to know more about any other shelters?`,
-              source: 'tavily',
-              model: 'tavily',
-              inputTokens: 0,
-              outputTokens: 0,
-              whisperUsed: false
-            };
+    const cacheKey = context.lastShelterSearch?.cacheKey;
+    if (cacheKey) {
+      const cachedResults = cache.get(cacheKey);
+      if (cachedResults) {
+        const shelterNumber = input.match(/shelter (\d+)/i)?.[1];
+        if (shelterNumber) {
+          const index = parseInt(shelterNumber) - 1;
+          if (index >= 0 && index < cachedResults.shelters.length) {
+            const shelter = cachedResults.shelters[index];
+            
+            // Format based on request type
+            if (context.requestType === 'phone') {
+              return {
+                text: `Here's what I found for ${shelter.name}:\n\n` +
+                      `Phone: ${shelter.phone}\n` +
+                      `Services: ${shelter.services}`,
+                source: 'tavily',
+                model: 'tavily',
+                inputTokens: 0,
+                outputTokens: 0,
+                whisperUsed: false,
+                shelter
+              };
+            } else {
+              return {
+                text: `Here are the details for ${shelter.name}:\n\n` +
+                      `Address: ${shelter.address}\n` +
+                      `Phone: ${shelter.phone}\n` +
+                      `Services: ${shelter.services}\n` +
+                      `Description: ${shelter.description}`,
+                source: 'tavily',
+                model: 'tavily',
+                inputTokens: 0,
+                outputTokens: 0,
+                whisperUsed: false,
+                shelter
+              };
+            }
           }
         }
       }
-      return null;
     }
     return null;
   }
@@ -905,6 +895,121 @@ export class ResponseGenerator {
     return patterns
       .filter(p => p.matched)
       .map(p => `${p.category}:${p.pattern} (weight: ${p.weight})`);
+  }
+
+  static async searchWithTavily(query) {
+    try {
+      // Enhance the query to focus on domestic violence shelters
+      const enhancedQuery = `domestic violence shelter ${query}`;
+      
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': config.TAVILY_API_KEY
+        },
+        body: JSON.stringify({
+          query: enhancedQuery,
+          search_depth: 'advanced',
+          include_domains: [],
+          exclude_domains: [],
+          max_results: 5
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Tavily API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Filter and validate results
+      const validResults = data.results.filter(result => {
+        const content = (result.content || '').toLowerCase();
+        const title = (result.title || '').toLowerCase();
+        
+        // Check for relevant keywords
+        const relevantKeywords = [
+          'domestic violence',
+          'shelter',
+          'safe house',
+          'women\'s shelter',
+          'family shelter',
+          'emergency shelter',
+          'crisis center',
+          'support services',
+          'victim services',
+          'abuse shelter'
+        ];
+        
+        // Check for irrelevant keywords
+        const irrelevantKeywords = [
+          'animal shelter',
+          'pet shelter',
+          'dog shelter',
+          'cat shelter',
+          'wildlife',
+          'veterinary',
+          'animal control'
+        ];
+        
+        // Must contain at least one relevant keyword
+        const hasRelevantKeyword = relevantKeywords.some(keyword => 
+          content.includes(keyword) || title.includes(keyword)
+        );
+        
+        // Must not contain any irrelevant keywords
+        const hasIrrelevantKeyword = irrelevantKeywords.some(keyword => 
+          content.includes(keyword) || title.includes(keyword)
+        );
+        
+        return hasRelevantKeyword && !hasIrrelevantKeyword;
+      });
+
+      if (validResults.length === 0) {
+        logger.warn('No valid shelter results found for query:', query);
+        return {
+          text: "I apologize, but I couldn't find specific information about domestic violence shelters in that area. Would you like me to help you find general domestic violence resources instead?",
+          confidence: 'low'
+        };
+      }
+
+      // Sort results by relevance score
+      validResults.sort((a, b) => b.score - a.score);
+
+      // Format the response
+      const formattedResponse = this.formatShelterResponse(validResults);
+      
+      return {
+        text: formattedResponse,
+        confidence: 'high'
+      };
+    } catch (error) {
+      logger.error('Error in Tavily search:', error);
+      throw error;
+    }
+  }
+
+  static formatShelterResponse(results) {
+    try {
+      const topResults = results.slice(0, 3);
+      let response = "I found some domestic violence shelters and resources that might help:\n\n";
+      
+      topResults.forEach((result, index) => {
+        const title = result.title.replace(/[^\w\s-]/g, '');
+        const content = result.content.split('.')[0]; // Get first sentence
+        
+        response += `${index + 1}. ${title}\n`;
+        response += `${content}\n\n`;
+      });
+      
+      response += "Would you like more specific information about any of these resources?";
+      
+      return response;
+    } catch (error) {
+      logger.error('Error formatting shelter response:', error);
+      return "I found some resources, but I'm having trouble formatting them. Would you like me to try searching again?";
+    }
   }
 }
 
