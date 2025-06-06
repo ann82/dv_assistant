@@ -23,7 +23,7 @@ export async function callTavilyAPI(query) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': apiKey  // Changed from 'api-key' to 'X-API-Key'
+        'Authorization': `Bearer ${apiKey}`  // Changed from 'api-key' to 'Authorization: Bearer'
       },
       body: JSON.stringify({
         query: query,
