@@ -297,47 +297,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Enhanced confidence scoring system for better query routing
-- Improved pattern matching for shelter-related queries
-- Detailed logging for better monitoring and debugging
-- Connection timeouts to prevent hanging calls
-- Better error messages and user feedback
-- Comprehensive query examples and documentation
-- New section in README explaining query types and confidence scoring
+- New logging system with improved error tracking and debugging capabilities
+- Enhanced error handling in Twilio routes
+- Improved WebSocket server initialization and error handling
+- New health check endpoint for monitoring
+- Comprehensive test suite for all components
+- New caching mechanism for improved performance
+- Cost logging system for API usage tracking
 
 ### Changed
-- Increased response timeout from 10s to 15s for better reliability
-- Updated WebSocket error handling and recovery mechanisms
-- Improved logging format with more context and timestamps
-- Enhanced README with latest features and setup instructions
-- Updated pattern weights for better query routing
-- **Testing:** Some integration and performance tests have been removed or consolidated for maintainability (see deleted files list)
+- Refactored caching mechanism to use a more efficient approach
+- Updated deployment configuration to ensure all files are included
+- Improved file structure and organization
+- Enhanced error handling and logging throughout the application
+- Updated Twilio integration with better error handling
+- Improved WebSocket server initialization
+- Enhanced test coverage and reliability
+- Updated documentation with new features and changes
+
+### Removed
+- Obsolete tests and unused files
+- Old caching system
+- Unused dependencies and configurations
+- Redundant code and comments
 
 ### Fixed
-- WebSocket connection issues causing call disconnections
-- Missing confidence values in logs
-- Premature call terminations
-- Error handling in WebSocket message processing
-- Confidence calculation and pattern matching
-- Routing stats tracking for high confidence queries
+- Module import issues in deployment environment
+- Twilio routes error handling
+- WebSocket server initialization
+- Test reliability issues
+- Deployment configuration to ensure all files are included
+- File structure issues in deployment
 
-## [1.0.0] - 2024-03-20
+## [1.0.0] - 2024-03-19
 
 ### Added
 - Initial release of the Domestic Violence Support Assistant
-- Voice interface using Twilio
-- Real-time response generation
-- Resource location capabilities
-- Confidence-based query routing
-- Multi-source information integration
-- Conversation summary via SMS
-- Basic error handling and logging
-
-### Security
-- Secure API key management
-- Input validation
-- Rate limiting
-- Error handling
+- Real-time voice communication using Twilio
+- Intelligent query handling with OpenAI
+- WebSocket server for real-time updates
+- Comprehensive logging system
+- Error handling and monitoring
+- Test suite for all components
 
 ## [0.1.0] - 2024-03-15
 
@@ -446,21 +447,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Resolved Twilio configuration access issues
 - Fixed `config.twilio`
-
-## [Unreleased]
-
-### Changed
-- Replaced Redis-based caching with efficient local in-memory cache
-- Improved cache cleanup mechanism with automatic background cleanup
-- Optimized cache performance by removing external dependencies
-- Updated cache TTL to 1 hour (configurable via CACHE_EXPIRY)
-
-### Removed
-- Removed Redis dependency and configuration
-- Removed async/await complexity from cache operations
-
-### Added
-- Added cache statistics and monitoring
-- Added automatic cleanup every 15 minutes
-- Added cache size and expiration tracking
-- Added graceful cleanup on process exit

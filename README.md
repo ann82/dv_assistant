@@ -1,144 +1,119 @@
 # Domestic Violence Support Assistant
 
-A voice-based AI assistant designed to provide immediate support and resources for individuals experiencing domestic violence. The system uses natural language processing to understand queries and provide relevant information about shelters, resources, and support services.
+A real-time voice-based assistant designed to provide immediate support and information to individuals affected by domestic violence. The system uses Twilio for voice communication and OpenAI for intelligent query handling.
 
 ## Features
 
-- **Voice Interface**: Easy-to-use voice-based interaction system
-- **Real-time Response**: Quick and accurate responses to user queries
-- **Resource Location**: Helps users find nearby shelters and support services
-- **Confidence-based Routing**: Intelligent routing of queries based on confidence scores
-- **Multi-source Information**: Combines information from multiple sources for comprehensive responses
-- **Conversation Summary**: Optional text message summary of the conversation and resources
-- **Enhanced Logging**: Detailed logging for better monitoring and debugging
-- **Robust Error Handling**: Improved error handling and recovery mechanisms
+- Real-time voice communication using Twilio
+- Intelligent query handling with OpenAI
+- WebSocket server for real-time updates
+- Comprehensive logging system
+- Error handling and monitoring
+- Test suite for all components
+- Cost logging for API usage tracking
+- Health check endpoint for monitoring
 
-## Query Types and Confidence Scoring
+## Recent Changes
 
-The system uses a confidence-based scoring system to route queries to the most appropriate information source:
+- Enhanced error handling in Twilio routes
+- Improved WebSocket server initialization
+- Updated deployment configuration
+- Improved file structure and organization
+- Enhanced test coverage and reliability
+- Added comprehensive logging system
+- Implemented cost logging for API usage
+- Added health check endpoint
 
-### High Confidence Queries (Tavily API)
-These queries will be routed to the Tavily API for factual information:
-
-- "Where is the nearest domestic violence shelter?"
-- "Find a women's shelter near me"
-- "Locate the closest safe house in my area"
-
-### Medium Confidence Queries (Hybrid Approach)
-These queries will use both Tavily and GPT:
-- "What services do shelters offer?"
-- "How can I find help with domestic violence?"
-- "What resources are available for victims?"
-
-### Low Confidence Queries (GPT)
-These queries will use GPT for conversational responses:
-- "I need help"
-- "What should I do?"
-- "Can you tell me about shelters?"
-
-## Technical Architecture
-
-The system consists of several key components:
-
-1. **Voice Interface (Twilio)**
-   - Handles incoming calls
-   - Manages voice interactions
-   - Provides text-to-speech capabilities
-   - Sends follow-up SMS summaries
-
-2. **Response Generator**
-   - Analyzes user queries for confidence scoring
-   - Routes queries to appropriate information sources
-   - Combines information from multiple sources
-   - Generates natural, helpful responses
-
-3. **Information Sources**
-   - Tavily API for factual information
-   - GPT for conversational responses
-   - Hybrid approach for complex queries
-
-4. **WebSocket Server**
-   - Manages real-time communication
-   - Handles concurrent call sessions
-   - Provides robust error recovery
-
-## Setup and Installation
+## Installation
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/ann82/dv_assistant.git
-   cd dv_assistant
-   ```
+```bash
+git clone https://github.com/ann82/dv_assistant.git
+cd dv_assistant
+```
 
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+cd relay-server
+npm install
+```
 
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+3. Set up environment variables:
+```bash
+cp .env.example .env
+```
+Edit `.env` with your configuration:
+```
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone_number
+TAVILY_API_KEY=your_tavily_api_key
+OPENAI_API_KEY=your_openai_api_key
+```
 
-4. Start the server:
-   ```bash
-   npm start
-   ```
+## Configuration
 
-## Environment Variables
+The application requires the following environment variables:
 
-Required environment variables:
 - `TWILIO_ACCOUNT_SID`: Your Twilio account SID
 - `TWILIO_AUTH_TOKEN`: Your Twilio auth token
 - `TWILIO_PHONE_NUMBER`: Your Twilio phone number
-- `OPENAI_API_KEY`: Your OpenAI API key
 - `TAVILY_API_KEY`: Your Tavily API key
-- `WS_PORT`: WebSocket server port (default: 8080)
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `PORT`: Server port (default: 3000)
+- `WS_PORT`: WebSocket server port (default: 3001)
+- `LOG_LEVEL`: Logging level (default: info)
+
+## Usage
+
+1. Start the server:
+```bash
+npm start
+```
+
+2. The server will be available at `http://localhost:3000`
+
+3. WebSocket server will be available at `ws://localhost:3001`
+
+4. Health check endpoint: `http://localhost:3000/health`
 
 ## Testing
 
-- All core and integration tests pass as of the latest update.
-- Some legacy and integration tests have been removed or consolidated for maintainability.
-- To run tests:
-  ```bash
-  npm test
-  ```
+Run the test suite:
+```bash
+npm test
+```
 
-## Recent Improvements
+## Deployment
 
-- Enhanced confidence scoring for better query routing
-- Improved pattern matching for shelter-related queries
-- Added detailed logging for better monitoring
-- Enhanced WebSocket error handling and recovery
-- Optimized timeout configuration for better call handling:
-  - 45-second response timeout for complex queries
-  - 10-second speech input timeout for user responses
-  - 30-second WebSocket connection timeout
-- Improved retry mechanism with max 3 attempts
-- Added 1-second pause between responses for better user experience
-- Enhanced error messages and user feedback
-- Added comprehensive query examples and documentation
-- Fixed async/await handling in WebSocket connections
-- Improved SMS error handling and logging
-- Enhanced test reliability for error scenarios
-- **Note:** Some integration and performance tests have been removed or consolidated for maintainability.
+The application is configured for deployment on Railway. The deployment process:
+
+1. Uses nixpacks as the builder
+2. Installs dependencies in the relay-server directory
+3. Starts the server using server.js as the entry point
+4. Includes all necessary files and directories
+5. Maintains proper file structure in the deployment environment
+
+## Architecture
+
+The application consists of several key components:
+
+- **Server**: Express.js server handling HTTP requests
+- **WebSocket Server**: Real-time communication
+- **Twilio Integration**: Voice communication
+- **OpenAI Integration**: Intelligent query handling
+- **Logging System**: Comprehensive error tracking
+- **Cost Logging**: API usage tracking
+- **Health Monitoring**: System status checks
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Twilio for voice and SMS capabilities
-- OpenAI for GPT integration
-- Tavily for search capabilities
-- All contributors and supporters of the project
