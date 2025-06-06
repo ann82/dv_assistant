@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd relay-server && npm install"
+buildCommand = "cd relay-server && npm install && mkdir -p /app/relay-server/lib && cp -r lib/* /app/relay-server/lib/ && cp -r routes /app/relay-server/ && cp server.js websocketServer.js /app/relay-server/"
 
 [deploy]
 startCommand = "cd relay-server && node --experimental-modules server.js"

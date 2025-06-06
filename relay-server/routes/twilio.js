@@ -1,12 +1,18 @@
 import express from 'express';
-import { config, validateTwilioRequest, TwilioVoiceHandler, logger, callTavilyAPI, callGPT, getIntent, intentHandlers, rewriteQuery, generateSpeechHash } from '../lib/index.js';
+import { config } from '../lib/config.js';
 import twilio from 'twilio';
+import { validateTwilioRequest } from '../lib/twilio.js';
 import path from 'path';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import { fileURLToPath } from 'url';
+import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
+import logger from '../lib/logger.js';
+import { callTavilyAPI, callGPT } from '../lib/apis.js';
 import { createHash } from 'crypto';
 import { VoiceResponse } from 'twilio/lib/twiml/VoiceResponse.js';
+import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
+import { generateSpeechHash } from '../lib/utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
