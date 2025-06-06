@@ -5,7 +5,6 @@ import { callTavilyAPI, callGPT } from '../lib/apis.js';
 
 // Mock the API calls
 vi.mock('../lib/apis.js', () => ({
-  default: {},
   callTavilyAPI: vi.fn(),
   callGPT: vi.fn()
 }));
