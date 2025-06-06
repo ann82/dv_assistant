@@ -60,13 +60,6 @@ const getWebSocketServer = () => {
 const processedSpeechResults = new Map();
 const callContexts = new Map();
 
-// Add this function before processSpeechResult
-export function generateSpeechHash(callSid, speechResult) {
-  return createHash('md5')
-    .update(`${callSid}:${speechResult}`)
-    .digest('hex');
-}
-
 // Function to fetch and log Twilio call details
 async function fetchCallDetails(callSid) {
   try {
