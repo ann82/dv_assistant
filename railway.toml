@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd relay-server && npm install && npm run build"
+buildCommand = "cd relay-server && npm install"
 
 [deploy]
 startCommand = "cd relay-server && node --experimental-modules server.js"

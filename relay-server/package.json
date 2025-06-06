@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node server.js",
+    "build": "echo 'No build step required'",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
