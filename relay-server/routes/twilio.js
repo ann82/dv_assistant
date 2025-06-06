@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 import logger from '../lib/logger.js';
 import { callTavilyAPI, callGPT } from '../lib/apis.js';
+import { createHash } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,54 +53,34 @@ const getWebSocketServer = () => {
   return global.wss;
 };
 
+// Add after other global variables
+const processedSpeechResults = new Map();
+
+// Add this function before processSpeechResult
+export function generateSpeechHash(callSid, speechResult) {
+  return createHash('md5')
+    .update(`${callSid}:${speechResult}`)
+    .digest('hex');
+}
+
 // Function to fetch and log Twilio call details
-async function logTwilioCallDetails(callSid) {
+async function fetchCallDetails(callSid) {
   try {
-    // Fetch call details
-    const call = await twilioClient.calls(callSid).fetch();
-    logger.info('Twilio Call Details:', {
-      sid: call.sid,
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    const call = await client.calls(callSid).fetch();
+    logger.info('Call details:', {
+      callSid: call.sid,
       status: call.status,
-      direction: call.direction,
+      from: call.from,
+      to: call.to,
       duration: call.duration,
       startTime: call.startTime,
-      endTime: call.endTime,
-      price: call.price,
-      priceUnit: call.priceUnit
+      endTime: call.endTime
     });
-
-    // Fetch call recordings
-    const recordings = await twilioClient.recordings.list({ callSid });
-    if (recordings.length > 0) {
-      logger.info('Call Recordings:', recordings.map(r => ({
-        sid: r.sid,
-        duration: r.duration,
-        status: r.status,
-        uri: r.uri
-      })));
-    }
-
-    // Fetch call logs using the correct API
-    const logs = await twilioClient.calls(callSid).fetch();
-    logger.info('Call Logs:', {
-      timestamp: new Date().toISOString(),
-      status: logs.status,
-      duration: logs.duration,
-      errorCode: logs.errorCode,
-      errorMessage: logs.errorMessage,
-      answeredBy: logs.answeredBy,
-      parentCallSid: logs.parentCallSid
-    });
-
+    return call;
   } catch (error) {
-    logger.error('Error fetching Twilio call details:', error);
-    // Log additional error details for debugging
-    if (error.code) {
-      logger.error('Twilio Error Code:', error.code);
-    }
-    if (error.moreInfo) {
-      logger.error('Twilio Error Info:', error.moreInfo);
-    }
+    logger.error('Error fetching call details:', error);
+    return null;
   }
 }
 
@@ -163,23 +144,37 @@ router.post('/voice', async (req, res) => {
 });
 
 router.post('/voice/process', async (req, res) => {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+
   try {
-    const { CallSid, SpeechResult, Confidence } = req.body;
-    logger.info('Processing speech result:', { callSid: CallSid, speechResult: SpeechResult, confidence: Confidence });
+    const { CallSid, From, SpeechResult, Confidence } = req.body;
+
+    logger.info('Incoming Twilio request:', {
+      requestId,
+      method: req.method,
+      path: req.path,
+      headers: req.headers
+    });
+
+    logger.info('Processing speech result:', {
+      requestId,
+      callSid: CallSid,
+      speechResult: SpeechResult,
+      confidence: Confidence
+    });
 
     // Process the speech result and generate response
-    const response = await processSpeechResult(SpeechResult);
-    
+    const response = await processSpeechResult(CallSid, SpeechResult, Confidence);
+
     const twiml = new twilio.twiml.VoiceResponse();
-    
-    // First say the response
     twiml.say(response);
-    
-    // Add a pause to let the user process the information
+
+    // Add a pause
     twiml.pause({ length: 1 });
-    
-    // Then gather the next input
-    twiml.gather({
+
+    // Set up the next gather
+    const gather = twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
@@ -189,45 +184,69 @@ router.post('/voice/process', async (req, res) => {
       language: 'en-US'
     });
 
-    logger.info('Sending TwiML response:', twiml.toString());
     res.type('text/xml');
     res.send(twiml.toString());
   } catch (error) {
-    logger.error('Error processing speech:', error);
-    res.status(500).send('Error processing speech');
+    logger.error('Error processing request:', {
+      requestId,
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).send('Error processing request');
   }
 });
 
-async function processSpeechResult(speechResult) {
+// Function to process speech results
+export async function processSpeechResult(callSid, speechResult, confidence) {
   try {
-    logger.info('Starting speech processing for:', speechResult);
-    
-    // Check if we need to search for resources
-    const needsResourceSearch = speechResult.toLowerCase().includes('find') || 
-                              speechResult.toLowerCase().includes('search') ||
-                              speechResult.toLowerCase().includes('near') ||
-                              speechResult.toLowerCase().includes('location');
-    
-    let response;
-    if (needsResourceSearch) {
-      logger.info('Resource search needed, calling Tavily API');
-      const tavilyResponse = await callTavilyAPI(speechResult);
-      logger.info('Tavily API response:', tavilyResponse);
-      
-      // Format Tavily response
-      response = formatTavilyResponse(tavilyResponse);
-    } else {
-      logger.info('No resource search needed, using GPT for general response');
-      const gptResponse = await callGPT(speechResult);
-      logger.info('GPT response:', gptResponse);
-      
-      response = gptResponse.text;
+    logger.info('Processing speech result:', {
+      callSid,
+      speechResult,
+      confidence
+    });
+
+    // Generate hash for this speech result
+    const speechHash = generateSpeechHash(callSid, speechResult);
+
+    // Check if we've already processed this exact speech result
+    if (processedSpeechResults.has(speechHash)) {
+      logger.info('Skipping duplicate speech result:', {
+        callSid,
+        speechResult,
+        hash: speechHash
+      });
+      return;
     }
 
-    return response;
+    // Store the hash to prevent duplicate processing
+    processedSpeechResults.set(speechHash, Date.now());
+
+    // Clean up old entries (older than 5 minutes)
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    for (const [hash, timestamp] of processedSpeechResults.entries()) {
+      if (timestamp < fiveMinutesAgo) {
+        processedSpeechResults.delete(hash);
+      }
+    }
+
+    // Check if we need to search for resources
+    const resourceKeywords = ['shelter', 'help', 'resource', 'service', 'support', 'assistance'];
+    const needsResourceSearch = resourceKeywords.some(keyword => 
+      speechResult.toLowerCase().includes(keyword)
+    );
+
+    if (needsResourceSearch) {
+      logger.info('Resource search needed, calling Tavily API');
+      const searchResult = await callTavilyAPI(speechResult);
+      return searchResult;
+    } else {
+      logger.info('General response needed, calling GPT');
+      const gptResponse = await callGPT(speechResult);
+      return gptResponse.text;
+    }
   } catch (error) {
     logger.error('Error in processSpeechResult:', error);
-    return 'I apologize, but I encountered an error processing your request. Please try again.';
+    throw error;
   }
 }
 
@@ -334,178 +353,7 @@ router.post('/consent', async (req, res) => {
     
     // Enhanced validation
     if (!CallSid || !From || !SpeechResult) {
-      logger.warn(`[Request ${requestId}] Missing required parameters:`, {
-        callSid: CallSid,
-        from: From,
-        hasSpeechResult: !!SpeechResult,
-        timestamp: new Date().toISOString()
-      });
-      return res.status(400).send('Missing required parameters');
-    }
-
-    // Validate phone number format
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(From)) {
-      logger.warn(`[Request ${requestId}] Invalid phone number format:`, {
-        phoneNumber: From,
-        timestamp: new Date().toISOString()
-      });
-      return res.status(400).send('Invalid phone number format');
-    }
-
-    // Validate speech result
-    if (SpeechResult.length < 1 || SpeechResult.length > 1000) {
-      logger.warn(`[Request ${requestId}] Invalid speech result length:`, {
-        length: SpeechResult.length,
-        timestamp: new Date().toISOString()
-      });
-      return res.status(400).send('Invalid speech result');
-    }
-
-    logger.info(`[Request ${requestId}] Processing consent response:`, {
-      callSid: CallSid,
-      from: From,
-      speechResult: SpeechResult,
-      timestamp: new Date().toISOString(),
-      processingTime: Date.now() - startTime
-    });
-
-    const twiml = new twilio.twiml.VoiceResponse();
-    
-    // Enhanced keyword matching with confidence scores
-    const consentKeywords = [
-      { word: 'yes', score: 1.0 },
-      { word: 'yeah', score: 0.9 },
-      { word: 'sure', score: 0.8 },
-      { word: 'okay', score: 0.8 },
-      { word: 'ok', score: 0.7 },
-      { word: 'agree', score: 0.9 },
-      { word: 'please', score: 0.6 },
-      { word: 'go ahead', score: 0.8 }
-    ];
-    
-    const optOutKeywords = [
-      { word: 'no', score: 1.0 },
-      { word: 'nope', score: 0.9 },
-      { word: 'don\'t', score: 0.8 },
-      { word: 'stop', score: 0.9 },
-      { word: 'cancel', score: 0.8 },
-      { word: 'opt out', score: 1.0 }
-    ];
-    
-    // Calculate consent score
-    const consentScore = consentKeywords.reduce((max, { word, score }) => {
-      const match = SpeechResult.toLowerCase().includes(word);
-      return match ? Math.max(max, score) : max;
-    }, 0);
-
-    const optOutScore = optOutKeywords.reduce((max, { word, score }) => {
-      const match = SpeechResult.toLowerCase().includes(word);
-      return match ? Math.max(max, score) : max;
-    }, 0);
-
-    const isConsent = consentScore > optOutScore && consentScore >= 0.7;
-    const isOptOut = optOutScore > consentScore && optOutScore >= 0.7;
-
-    logger.info(`[Request ${requestId}] Consent analysis:`, {
-      consentScore,
-      optOutScore,
-      isConsent,
-      isOptOut,
-      timestamp: new Date().toISOString()
-    });
-
-    // Store consent status with enhanced logging
-    const wss = getWebSocketServer();
-    if (wss) {
-      const call = wss.activeCalls.get(CallSid);
-      if (call) {
-        const previousConsent = call.hasConsent;
-        call.hasConsent = isConsent;
-        call.consentTimestamp = new Date().toISOString();
-        call.consentResponse = SpeechResult;
-        call.consentScores = {
-          consent: consentScore,
-          optOut: optOutScore
-        };
-        wss.activeCalls.set(CallSid, call);
-
-        logger.info(`[Request ${requestId}] Consent status updated:`, {
-          callSid: CallSid,
-          from: From,
-          previousConsent,
-          newConsent: isConsent,
-          timestamp: call.consentTimestamp,
-          response: SpeechResult,
-          scores: call.consentScores,
-          processingTime: Date.now() - startTime
-        });
-      } else {
-        logger.warn(`[Request ${requestId}] No active call found for consent response:`, {
-          callSid: CallSid,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-
-    // Acknowledge consent decision with appropriate message
-    if (isConsent) {
-      twiml.say({
-        voice: 'Polly.Amy',
-        language: 'en-US'
-      }, 'Thank you. You will receive a summary and resources after the call.');
-    } else if (isOptOut) {
-      twiml.say({
-        voice: 'Polly.Amy',
-        language: 'en-US'
-      }, 'Understood. You will not receive any follow-up messages.');
-    } else {
-      // Handle unclear response
-      twiml.say({
-        voice: 'Polly.Amy',
-        language: 'en-US'
-      }, 'I didn\'t quite understand. For your privacy, I\'ll assume you don\'t want follow-up messages. You can always call back if you change your mind.');
-    }
-
-    // Add a pause
-    twiml.pause({ length: 1 });
-
-    // Continue with the main conversation
-    twiml.say({
-      voice: 'Polly.Amy',
-      language: 'en-US'
-    }, 'How can I help you today?');
-
-    // Set up the next gather for the main conversation
-    const gather = twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: 'auto',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US'
-    });
-
-    const twimlString = twiml.toString();
-    logger.info(`[Request ${requestId}] Sending TwiML response:`, {
-      length: twimlString.length,
-      processingTime: Date.now() - startTime,
-      timestamp: new Date().toISOString()
-    });
-
-    res.type('text/xml');
-    res.send(twimlString);
-  } catch (error) {
-    logger.error(`[Request ${requestId}] Error handling consent:`, {
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-      processingTime: Date.now() - startTime,
-      memoryUsage: process.memoryUsage()
-    });
-    res.status(500).send('Error processing consent');
-  }
-});
-
-export default router; 
+      logger.warn(`
+```
+export { processSpeechResult };
+export default router;
