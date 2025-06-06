@@ -23,6 +23,9 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Added comprehensive logging system
 - Implemented cost logging for API usage
 - Added health check endpoint
+- Simplified module imports using index.js
+- Updated package.json with proper module exports
+- Removed unnecessary build step from deployment
 
 ## Installation
 
@@ -93,6 +96,7 @@ The application is configured for deployment on Railway. The deployment process:
 3. Starts the server using server.js as the entry point
 4. Includes all necessary files and directories
 5. Maintains proper file structure in the deployment environment
+6. Uses ES modules with proper module resolution
 
 ## Architecture
 
@@ -105,6 +109,7 @@ The application consists of several key components:
 - **Logging System**: Comprehensive error tracking
 - **Cost Logging**: API usage tracking
 - **Health Monitoring**: System status checks
+- **Module System**: Centralized module exports through index.js
 
 ## Contributing
 

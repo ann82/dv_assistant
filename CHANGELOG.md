@@ -304,6 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite for all components
 - New caching mechanism for improved performance
 - Cost logging system for API usage tracking
+- Central module exports through lib/index.js
 
 ### Changed
 - Refactored caching mechanism to use a more efficient approach
@@ -314,12 +315,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved WebSocket server initialization
 - Enhanced test coverage and reliability
 - Updated documentation with new features and changes
+- Simplified module imports using index.js
+- Updated package.json with proper module exports
+- Removed unnecessary build step from deployment
 
 ### Removed
 - Obsolete tests and unused files
 - Old caching system
 - Unused dependencies and configurations
 - Redundant code and comments
+- Unnecessary build step from deployment process
 
 ### Fixed
 - Module import issues in deployment environment
@@ -328,6 +333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test reliability issues
 - Deployment configuration to ensure all files are included
 - File structure issues in deployment
+- Module resolution in production environment
 
 ## [1.0.0] - 2024-03-19
 
