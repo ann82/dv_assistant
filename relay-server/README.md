@@ -20,7 +20,7 @@ A Node.js server that handles Twilio voice calls and integrates with Tavily API 
   - Account SID
   - Auth Token
   - Phone number
-- Tavily API key
+- Tavily API key (starts with 'tvly-')
 - OpenAI API key
 
 ## Environment Variables
@@ -39,7 +39,7 @@ TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_PHONE_NUMBER=your_twilio_phone_number
 
 # API Keys
-TAVILY_API_KEY=your_tavily_api_key
+TAVILY_API_KEY=tvly-your-tavily-api-key  # Must start with 'tvly-'
 OPENAI_API_KEY=your_openai_api_key
 ```
 
@@ -74,7 +74,7 @@ npm start
    - `TWILIO_ACCOUNT_SID`
    - `TWILIO_AUTH_TOKEN`
    - `TWILIO_PHONE_NUMBER`
-   - `TAVILY_API_KEY`
+   - `TAVILY_API_KEY` (must start with 'tvly-')
    - `OPENAI_API_KEY`
    - `NODE_ENV=production`
 5. Deploy the application
