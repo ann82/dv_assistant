@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2024-04-02
+
+### Added
+- Enhanced timeout configuration for better call handling
+  - 45-second response timeout for complex queries
+  - 10-second speech input timeout for user responses
+  - 30-second WebSocket connection timeout
+- Improved retry mechanism for response timeouts
+  - Maximum of 3 retries for failed responses
+  - Better error messages during retry attempts
+  - Proper cleanup after max retries reached
+- Enhanced search result filtering
+  - Added comprehensive keyword filtering for relevant results
+  - Improved query enhancement for better search results
+  - Better response formatting for shelter information
+  - Added fallback responses for no results found
+  - Added support for pet-friendly domestic violence shelters
+  - Added support for child-friendly and family shelters
+  - Improved sentence selection for more relevant responses
+
+### Changed
+- Updated TwiML response structure for better reliability
+  - Added 1-second pause between responses
+  - Using Polly.Amy voice for consistent speech synthesis
+  - Improved error message formatting
+- Enhanced WebSocket connection handling
+  - Better timeout management
+  - Improved resource cleanup
+  - More detailed error logging
+- Improved search result processing
+  - Better filtering of irrelevant results
+  - Enhanced result validation
+  - More structured response format
+  - Smarter sentence selection for responses
+  - Better handling of pet-friendly shelter information
+  - Enhanced support for family and child-friendly shelters
+  - Improved filtering of educational and childcare facilities
+
+### Fixed
+- Resolved issues with call cutoffs during long responses
+- Fixed resource cleanup on connection errors
+- Improved error recovery during WebSocket disconnections
+- Enhanced logging for timeout and retry scenarios
+- Fixed irrelevant search results causing call disconnections
+- Improved handling of search queries for better accuracy
+- Fixed filtering of pet-friendly domestic violence shelters
+- Fixed filtering of child-friendly and family shelters
+- Improved handling of educational and childcare facility results
+
+## [1.9.0] - 2024-04-01
+
+### Fixed
+- Fixed Twilio test case for SMS error handling
+- Corrected async/await handling in WebSocket close event
+- Improved error logging in SMS summary sending
+- Enhanced test reliability for error scenarios
+
+### Changed
+- Updated WebSocket connection handling to properly handle async operations
+- Improved error message consistency in SMS failure cases
+
 ## [1.8.0] - 2024-03-31
 
 ### Added

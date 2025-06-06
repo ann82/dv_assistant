@@ -1,7 +1,14 @@
 // Set environment variables before any imports
 process.env.OPENAI_API_KEY = 'test-api-key';
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { handleIncomingCall, handleGather, handleSpeechResult } from '../relay-server/routes/twilio.js';
+import { generateSpeechHash } from '../relay-server/routes/twilio.js';
+
+// Mock environment variables
+process.env.TWILIO_ACCOUNT_SID = 'test_account_sid';
+process.env.TWILIO_AUTH_TOKEN = 'test_auth_token';
+process.env.TWILIO_PHONE_NUMBER = '+1234567890';
 
 // Mock OpenAI before any imports that might use it
 vi.mock('openai', () => {

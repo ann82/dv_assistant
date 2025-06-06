@@ -11,6 +11,8 @@ export class RealtimeRelay {
     this.apiKey = apiKey;
     this.sockets = new WeakMap();
     this.wss = null;
+    this.clients = new Map();
+    this.lastRequestedShelter = new Map(); // Store last requested shelter per client
   }
 
   listen(port) {
@@ -20,6 +22,10 @@ export class RealtimeRelay {
   }
 
   async connectionHandler(ws, req) {
+    const clientId = req.headers['sec-websocket-key'];
+    this.clients.set(clientId, ws);
+    this.lastRequestedShelter.set(clientId, null);
+
     if (!req.url) {
       this.log('No URL provided, closing connection.');
       ws.close();
@@ -39,17 +45,67 @@ export class RealtimeRelay {
     const requestType = url.searchParams.get('type') || 'web';
     this.log(`Request type: ${requestType}`);
 
-    // Instantiate new client
-    this.log(`Connecting with key "${this.apiKey.slice(0, 3)}..."`);
-    const client = new RealtimeClient({ apiKey: this.apiKey });
-
-    // Track conversation context
+    // Create context for this connection
     const context = {
-      isFollowUp: false,
       lastInput: null,
-      lastShelterSearch: null,
-      requestType // Add request type to context
+      isFollowUp: false,
+      requestType,
+      lastShelterSearch: null
     };
+
+    // Create OpenAI client
+    const client = new RealtimeClient({
+      apiKey: config.OPENAI_API_KEY,
+      model: config.GPT35_MODEL
+    });
+
+    // Handle disconnection
+    ws.on('close', async () => {
+      this.clients.delete(clientId);
+      const lastShelter = this.lastRequestedShelter.get(clientId);
+      if (lastShelter) {
+        // Create summary message
+        const summary = `Here's a summary of the shelter information you requested:\n\n` +
+          `Name: ${lastShelter.name}\n` +
+          `Phone: ${lastShelter.phone}\n` +
+          `Services: ${lastShelter.services}\n` +
+          (lastShelter.address ? `Address: ${lastShelter.address}\n` : '') +
+          (lastShelter.description ? `Description: ${lastShelter.description}\n` : '');
+
+        // Handle based on request type
+        if (context.requestType === 'phone') {
+          try {
+            // Send summary via Twilio
+            const twilioClient = require('twilio')(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN);
+            await twilioClient.messages.create({
+              body: summary,
+              to: context.phoneNumber, // This should be stored in context when call starts
+              from: config.TWILIO_PHONE_NUMBER
+            });
+            logger.info('Sent disconnection summary via Twilio SMS', {
+              phoneNumber: context.phoneNumber,
+              shelterName: lastShelter.name
+            });
+          } catch (error) {
+            logger.error('Failed to send disconnection summary via Twilio:', error);
+          }
+        } else {
+          // For web clients, try to send via websocket if still open
+          try {
+            ws.send(JSON.stringify({
+              type: 'response.text',
+              text: summary,
+              source: 'tavily',
+              tokens: 0,
+              requestType: 'web'
+            }));
+          } catch (error) {
+            logger.error('Failed to send disconnection summary via websocket:', error);
+          }
+        }
+      }
+      this.lastRequestedShelter.delete(clientId);
+    });
 
     // Relay: OpenAI Realtime API Event -> Browser Event
     client.realtime.on('server.*', async (event) => {
@@ -65,8 +121,13 @@ export class RealtimeRelay {
           if (response.source === 'tavily' && response.shelters) {
             context.lastShelterSearch = {
               shelters: response.shelters,
-              fullDetails: response.text
+              cacheKey: response.cacheKey
             };
+          }
+
+          // If this is a detailed shelter response, store it
+          if (response.source === 'tavily' && response.shelter) {
+            this.lastRequestedShelter.set(clientId, response.shelter);
           }
 
           // Log cost for this interaction
@@ -77,8 +138,8 @@ export class RealtimeRelay {
             whisperUsed: response.whisperUsed || false,
             transcriptLength: response.transcriptLength || 0,
             responseLength: response.text.length,
-            ttsCharacters: response.text.length, // Since we're using client-side TTS
-            requestType // Add request type to cost logging
+            ttsCharacters: response.text.length,
+            requestType
           });
 
           // Only send response if it's not an error
@@ -89,7 +150,7 @@ export class RealtimeRelay {
               text: response.text,
               source: response.source,
               tokens: response.tokens,
-              requestType // Include request type in response
+              requestType
             }));
 
             // Update context

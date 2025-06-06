@@ -10,6 +10,7 @@ import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 import logger from '../lib/logger.js';
 import { callTavilyAPI, callGPT } from '../lib/apis.js';
 import { createHash } from 'crypto';
+import { VoiceResponse } from 'twilio/lib/twiml/VoiceResponse';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,7 @@ const getWebSocketServer = () => {
 
 // Add after other global variables
 const processedSpeechResults = new Map();
+const callContexts = new Map();
 
 // Add this function before processSpeechResult
 export function generateSpeechHash(callSid, speechResult) {
@@ -380,5 +382,48 @@ router.post('/consent', async (req, res) => {
     res.status(500).send('Error processing consent');
   }
 });
+
+export async function handleIncomingCall(req, res) {
+  try {
+    const callSid = req.body.CallSid;
+    const from = req.body.From;
+    
+    // Store phone number in context for this call
+    const context = {
+      phoneNumber: from,
+      requestType: 'phone',
+      lastShelterSearch: null
+    };
+
+    // Create TwiML response
+    const twiml = new VoiceResponse();
+    
+    // Add gather verb to collect user input
+    const gather = twiml.gather({
+      input: 'speech',
+      action: `/twilio/speech/${callSid}`,
+      method: 'POST',
+      speechTimeout: 'auto',
+      enhanced: true,
+      speechModel: 'phone_call'
+    });
+
+    gather.say('Hello, I can help you find domestic violence shelters and resources. What would you like to know?');
+
+    // If no input is received, repeat the prompt
+    twiml.redirect(`/twilio/speech/${callSid}`);
+
+    // Send response
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+    // Store context for this call
+    callContexts.set(callSid, context);
+
+  } catch (error) {
+    logger.error('Error handling incoming call:', error);
+    res.status(500).send('Error processing call');
+  }
+}
 
 export default router;

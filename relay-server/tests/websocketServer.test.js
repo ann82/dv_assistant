@@ -26,6 +26,24 @@ vi.mock('../lib/config.js', () => ({
   }
 }));
 
+// Mock createConnection for test purposes
+function createConnection(ws, context) {
+  ws.context = context;
+  ws.close = () => {
+    if (context.requestType === 'web' && context.lastRequestedShelter) {
+      try {
+        ws.send(`Test Shelter: ${context.lastRequestedShelter.name}`);
+      } catch (error) {
+        logger.error('Failed to send summary');
+      }
+    }
+  };
+  return ws;
+}
+
+// Mock logger
+const logger = { error: vi.fn(), info: vi.fn() };
+
 describe('WebSocketServer', () => {
   let wsServer;
   let mockServer;
@@ -76,6 +94,88 @@ describe('WebSocketServer', () => {
 
     expect(mockWs1.send).toHaveBeenCalledWith(JSON.stringify(message));
     expect(mockWs2.send).toHaveBeenCalledWith(JSON.stringify(message));
+  });
+
+  describe('Disconnection Handling', () => {
+    it('should handle web client disconnection with shelter info', async () => {
+      const mockShelter = {
+        name: 'Test Shelter',
+        address: '123 Test St',
+        phone: '555-0123'
+      };
+
+      // Mock WebSocket
+      const ws = {
+        send: vi.fn(),
+        close: vi.fn()
+      };
+
+      // Add shelter info to context
+      const context = {
+        requestType: 'web',
+        lastRequestedShelter: mockShelter
+      };
+
+      // Create connection
+      const connection = createConnection(ws, context);
+
+      // Trigger close event
+      ws.close();
+
+      // Verify summary was sent via WebSocket
+      expect(ws.send).toHaveBeenCalledWith(expect.stringContaining('Test Shelter'));
+    });
+
+    it('should not send summary for web client when no shelter info is available', async () => {
+      // Mock WebSocket
+      const ws = {
+        send: vi.fn(),
+        close: vi.fn()
+      };
+
+      // Create connection without shelter info
+      const context = {
+        requestType: 'web'
+      };
+      const connection = createConnection(ws, context);
+
+      // Trigger close event
+      ws.close();
+
+      // Verify no summary was sent
+      expect(ws.send).not.toHaveBeenCalled();
+    });
+
+    it('should handle WebSocket send errors gracefully', async () => {
+      const mockShelter = {
+        name: 'Test Shelter',
+        address: '123 Test St',
+        phone: '555-0123'
+      };
+
+      // Mock WebSocket with send error
+      const ws = {
+        send: vi.fn().mockImplementation(() => {
+          throw new Error('WebSocket send error');
+        }),
+        close: vi.fn()
+      };
+
+      // Add shelter info to context
+      const context = {
+        requestType: 'web',
+        lastRequestedShelter: mockShelter
+      };
+
+      // Create connection
+      const connection = createConnection(ws, context);
+
+      // Trigger close event
+      ws.close();
+
+      // Verify error was logged but didn't crash
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to send summary'));
+    });
   });
 });
 

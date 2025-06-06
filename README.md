@@ -111,10 +111,17 @@ Required environment variables:
 - Improved pattern matching for shelter-related queries
 - Added detailed logging for better monitoring
 - Enhanced WebSocket error handling and recovery
-- Increased response timeouts for better reliability
-- Added connection timeouts to prevent hanging calls
-- Improved error messages and user feedback
+- Optimized timeout configuration for better call handling:
+  - 45-second response timeout for complex queries
+  - 10-second speech input timeout for user responses
+  - 30-second WebSocket connection timeout
+- Improved retry mechanism with max 3 attempts
+- Added 1-second pause between responses for better user experience
+- Enhanced error messages and user feedback
 - Added comprehensive query examples and documentation
+- Fixed async/await handling in WebSocket connections
+- Improved SMS error handling and logging
+- Enhanced test reliability for error scenarios
 - **Note:** Some integration and performance tests have been removed or consolidated for maintainability.
 
 ## Contributing

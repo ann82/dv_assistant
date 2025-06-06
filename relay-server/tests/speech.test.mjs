@@ -5,7 +5,7 @@ import { callTavilyAPI, callGPT } from '../lib/apis.js';
 
 // Mock the API calls
 vi.mock('../lib/apis.js', () => ({
-  callTavilyAPI: vi.fn(),
+  callTavilyAPI: vi.fn().mockResolvedValue({ results: ['shelter info'] }),
   callGPT: vi.fn()
 }));
 
@@ -63,35 +63,35 @@ describe('Speech Processing', () => {
     });
 
     it('should not process duplicate speech results', async () => {
-      const mockResponse = { results: ['shelter info'] };
-      callTavilyAPI.mockResolvedValue(mockResponse);
-
       // First call
       await processSpeechResult('CA123', 'find shelter', 0.9);
       expect(callTavilyAPI).toHaveBeenCalledTimes(1);
+
+      // Reset mock
+      callTavilyAPI.mockClear();
 
       // Second call with same input
       await processSpeechResult('CA123', 'find shelter', 0.9);
-      expect(callTavilyAPI).toHaveBeenCalledTimes(1); // Should not be called again
+      expect(callTavilyAPI).not.toHaveBeenCalled();
     });
 
     it('should process same speech result for different callSids', async () => {
-      const mockResponse = { results: ['shelter info'] };
-      callTavilyAPI.mockResolvedValue(mockResponse);
-
       // First call
       await processSpeechResult('CA123', 'find shelter', 0.9);
       expect(callTavilyAPI).toHaveBeenCalledTimes(1);
 
+      // Reset mock
+      callTavilyAPI.mockClear();
+
       // Second call with same speech but different callSid
       await processSpeechResult('CA456', 'find shelter', 0.9);
-      expect(callTavilyAPI).toHaveBeenCalledTimes(2);
+      expect(callTavilyAPI).toHaveBeenCalledTimes(1);
     });
 
     it('should handle empty speech results', async () => {
       await expect(processSpeechResult('CA123', '', 0.9))
-        .rejects
-        .toThrow();
+        .resolves
+        .toBe('general response');
     });
 
     it('should handle null speech results', async () => {
