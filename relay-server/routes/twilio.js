@@ -47,10 +47,10 @@ router.setWebSocketServer = (server, mockServer) => {
 
 // Get the global WebSocket server instance
 const getWebSocketServer = () => {
-  if (!global.wss) {
-    throw new Error('WebSocket server or audio service not initialized');
+  if (!wsServer) {
+    throw new Error('WebSocket server not initialized');
   }
-  return global.wss;
+  return wsServer;
 };
 
 // Add after other global variables
@@ -353,7 +353,32 @@ router.post('/consent', async (req, res) => {
     
     // Enhanced validation
     if (!CallSid || !From || !SpeechResult) {
-      logger.warn(`
-```
-export { processSpeechResult };
+      logger.warn(`[Request ${requestId}] Missing required parameters`);
+      return res.status(400).send('Missing required parameters');
+    }
+
+    // Process consent
+    const consentKeywords = ['yes', 'agree', 'consent', 'ok', 'okay', 'sure'];
+    const isConsent = consentKeywords.some(keyword => 
+      SpeechResult.toLowerCase().includes(keyword)
+    );
+
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    if (isConsent) {
+      twiml.say('Thank you for your consent. You will receive follow-up messages about your call summary and support resources.');
+      // TODO: Update user's consent status in database
+    } else {
+      twiml.say('I understand you do not wish to receive follow-up messages. You will not receive any SMS updates.');
+      // TODO: Update user's consent status in database
+    }
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  } catch (error) {
+    logger.error(`[Request ${requestId}] Error processing consent:`, error);
+    res.status(500).send('Error processing consent');
+  }
+});
+
 export default router;
