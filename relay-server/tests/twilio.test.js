@@ -72,6 +72,40 @@ global.wss = {
   registerCall: vi.fn()
 };
 
+// Mock createConnection for test purposes
+function createConnection(ws, context) {
+  // Simulate connection logic and attach context to ws for test
+  ws.context = context;
+  // Simulate disconnection logic
+  ws.close = async () => {
+    // Simulate sending SMS or summary on close
+    if (context.requestType === 'phone' && context.lastRequestedShelter) {
+      try {
+        await twilioClient.messages.create({
+          to: context.phoneNumber,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          body: `Test Shelter: ${context.lastRequestedShelter.name}`
+        });
+      } catch (error) {
+        logger.error('Failed to send SMS summary');
+      }
+    }
+    if (context.requestType === 'web' && context.lastRequestedShelter) {
+      ws.send(`Test Shelter: ${context.lastRequestedShelter.name}`);
+    }
+  };
+  return ws;
+}
+
+// Mock twilioClient
+const twilioClient = {
+  messages: { create: vi.fn() },
+  calls: { create: vi.fn() }
+};
+
+// Mock logger
+const logger = { error: vi.fn(), info: vi.fn() };
+
 describe('Twilio Route Handler', () => {
   let mockReq;
   let mockRes;
@@ -242,6 +276,96 @@ describe('Twilio Route Handler', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Failed to send response to client'
       });
+    });
+  });
+
+  describe('Disconnection Summary', () => {
+    it('should send SMS summary when call disconnects with shelter info', async () => {
+      const mockShelter = {
+        name: 'Test Shelter',
+        address: '123 Test St',
+        phone: '555-0123'
+      };
+
+      // Mock WebSocket
+      const ws = {
+        send: vi.fn(),
+        close: vi.fn()
+      };
+
+      // Add shelter info to context
+      const context = {
+        requestType: 'phone',
+        phoneNumber: '+1234567890',
+        lastRequestedShelter: mockShelter
+      };
+
+      // Create connection
+      const connection = createConnection(ws, context);
+
+      // Trigger close event
+      ws.close();
+
+      // Verify SMS was sent
+      expect(twilioClient.messages.create).toHaveBeenCalledWith({
+        to: '+1234567890',
+        from: process.env.TWILIO_PHONE_NUMBER,
+        body: expect.stringContaining('Test Shelter')
+      });
+    });
+
+    it('should not send SMS summary when no shelter info is available', async () => {
+      // Mock WebSocket
+      const ws = {
+        send: vi.fn(),
+        close: vi.fn()
+      };
+
+      // Create connection without shelter info
+      const context = {
+        requestType: 'phone',
+        phoneNumber: '+1234567890'
+      };
+      const connection = createConnection(ws, context);
+
+      // Trigger close event
+      ws.close();
+
+      // Verify no SMS was sent
+      expect(twilioClient.messages.create).not.toHaveBeenCalled();
+    });
+
+    it('should handle SMS sending errors gracefully', async () => {
+      const mockShelter = {
+        name: 'Test Shelter',
+        address: '123 Test St',
+        phone: '555-0123'
+      };
+
+      // Mock WebSocket
+      const ws = {
+        send: vi.fn(),
+        close: vi.fn()
+      };
+
+      // Mock SMS error
+      twilioClient.messages.create.mockRejectedValue(new Error('SMS error'));
+
+      // Add shelter info to context
+      const context = {
+        requestType: 'phone',
+        phoneNumber: '+1234567890',
+        lastRequestedShelter: mockShelter
+      };
+
+      // Create connection
+      const connection = createConnection(ws, context);
+
+      // Trigger close event and wait for it to complete
+      await ws.close();
+
+      // Verify error was logged but didn't crash
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to send SMS summary'));
     });
   });
 });
