@@ -67,4 +67,19 @@ All notable changes to this project will be documented in this file.
 - Response time tracking accuracy
 - Cache cleanup timing issues
 
+## [Unreleased]
+
+### Added
+- Lightweight in-memory cache system for query responses
+- Cache statistics reporting
+
+### Changed
+- Refactored caching mechanism to use a dedicated QueryCache class
+- Updated tests to reflect new cache implementation
+
+### Removed
+- Obsolete tests referencing old confidenceCache
+- Unused files: audioService.js, audio.js, .babelrc, webpack.config.js, tsconfig.json, src/reportWebVitals.ts, src/setupTests.ts, src/logo.svg, and unused toggle component
+- Unused dependencies from package.json
+
 // ... existing changelog entries ... 

@@ -1,40 +1,35 @@
 # Relay Server
 
-This server acts as a relay between the Twilio voice call and the AI assistant, handling speech-to-text, text-to-speech, and response generation.
+A lightweight server for handling real-time communication and caching query responses.
 
 ## Features
 
-- **Speech-to-Text**: Converts spoken audio to text using Twilio's speech recognition.
-- **Text-to-Speech**: Converts AI responses to spoken audio using Twilio's text-to-speech.
-- **Response Generation**: Uses a combination of Tavily and GPT to generate responses.
-- **Speech Deduplication**: Prevents duplicate speech results from being processed multiple times.
-- **WebSocket Server**: Real-time communication with the client.
-- **Performance Monitoring**: Tracks routing performance and response times.
+- Real-time communication using WebSockets
+- Lightweight in-memory cache system for query responses
+- Cache statistics reporting
+- Comprehensive test suite
 
-## Setup
+## Recent Changes
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+- Removed obsolete tests referencing the old confidenceCache
+- Deleted unused files: audioService.js, audio.js, .babelrc, webpack.config.js, tsconfig.json, src/reportWebVitals.ts, src/setupTests.ts, src/logo.svg, and unused toggle component
+- Removed unused dependencies from package.json
+- Updated cache size limits test to work with the new cache system
 
-2. Create a `.env` file with the following variables:
-   ```
-   TWILIO_ACCOUNT_SID=your_account_sid
-   TWILIO_AUTH_TOKEN=your_auth_token
-   TWILIO_PHONE_NUMBER=your_twilio_phone_number
-   OPENAI_API_KEY=your_openai_api_key
-   TAVILY_API_KEY=your_tavily_api_key
-   ```
+## Installation
 
-3. Start the server:
-   ```bash
-   npm start
-   ```
+```bash
+npm install
+```
+
+## Usage
+
+```bash
+npm start
+```
 
 ## Testing
 
-The test suite uses Vitest. Run the tests with:
 ```bash
 npm test
 ```
