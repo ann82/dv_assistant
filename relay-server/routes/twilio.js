@@ -10,7 +10,9 @@ import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 import logger from '../lib/logger.js';
 import { callTavilyAPI, callGPT } from '../lib/apis.js';
 import { createHash } from 'crypto';
-import { VoiceResponse } from 'twilio/lib/twiml/VoiceResponse';
+import { VoiceResponse } from 'twilio/lib/twiml/VoiceResponse.js';
+import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
+import { generateSpeechHash } from '../lib/utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,10 +132,11 @@ router.post('/voice', async (req, res) => {
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: 'auto',
+      speechTimeout: '15',
       speechModel: 'phone_call',
       enhanced: 'true',
-      language: 'en-US'
+      language: 'en-US',
+      timeout: '30'
     });
 
     logger.info('Sending TwiML response:', twiml.toString());
@@ -141,7 +144,20 @@ router.post('/voice', async (req, res) => {
     res.send(twiml.toString());
   } catch (error) {
     logger.error('Error processing voice request:', error);
-    res.status(500).send('Error processing request');
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm having trouble processing your request. Please try again.");
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: '15',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US',
+      timeout: '30'
+    });
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
@@ -151,6 +167,25 @@ router.post('/voice/process', async (req, res) => {
 
   try {
     const { CallSid, From, SpeechResult, Confidence } = req.body;
+
+    if (!CallSid || !From) {
+      logger.error('Missing required parameters:', { CallSid, From });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("I'm having trouble processing your request. Please try again.");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: '15',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US',
+        timeout: '30'
+      });
+      res.type('text/xml');
+      res.send(twiml.toString());
+      return;
+    }
 
     logger.info('Incoming Twilio request:', {
       requestId,
@@ -166,24 +201,22 @@ router.post('/voice/process', async (req, res) => {
       confidence: Confidence
     });
 
-    // Process the speech result and generate response
-    const response = await processSpeechResult(CallSid, SpeechResult, Confidence);
+    const response = await processSpeechResult(CallSid, SpeechResult);
 
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
 
-    // Add a pause
     twiml.pause({ length: 1 });
 
-    // Set up the next gather
     const gather = twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: 'auto',
+      speechTimeout: '15',
       speechModel: 'phone_call',
       enhanced: 'true',
-      language: 'en-US'
+      language: 'en-US',
+      timeout: '30'
     });
 
     res.type('text/xml');
@@ -194,66 +227,76 @@ router.post('/voice/process', async (req, res) => {
       error: error.message,
       stack: error.stack
     });
-    res.status(500).send('Error processing request');
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm having trouble processing your request. Please try again.");
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: '15',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US',
+      timeout: '30'
+    });
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
-// Function to process speech results
-export async function processSpeechResult(callSid, speechResult, confidence) {
+async function processSpeechResult(callSid, speechResult) {
   try {
-    logger.info('Processing speech result:', {
-      callSid,
-      speechResult,
-      confidence
-    });
-
-    // Generate hash for this speech result
-    const speechHash = generateSpeechHash(callSid, speechResult);
-
-    // Check if we've already processed this exact speech result
-    if (processedSpeechResults.has(speechHash)) {
-      logger.info('Skipping duplicate speech result:', {
-        callSid,
-        speechResult,
-        hash: speechHash
-      });
-      return;
+    // Generate hash to prevent duplicate processing
+    const hash = generateSpeechHash(callSid, speechResult);
+    
+    // Check if we've already processed this speech result
+    if (processedSpeechResults.has(hash)) {
+      logger.info('Duplicate speech result detected, skipping processing');
+      return null;
     }
 
-    // Store the hash to prevent duplicate processing
-    processedSpeechResults.set(speechHash, Date.now());
+    // Store the hash with timestamp
+    processedSpeechResults.set(hash, Date.now());
 
     // Clean up old entries (older than 5 minutes)
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    for (const [hash, timestamp] of processedSpeechResults.entries()) {
+    for (const [key, timestamp] of processedSpeechResults.entries()) {
       if (timestamp < fiveMinutesAgo) {
-        processedSpeechResults.delete(hash);
+        processedSpeechResults.delete(key);
       }
     }
 
-    // Check if we need to search for resources
-    const resourceKeywords = ['shelter', 'help', 'resource', 'service', 'support', 'assistance'];
-    const needsResourceSearch = resourceKeywords.some(keyword => 
-      speechResult.toLowerCase().includes(keyword)
-    );
+    // Get intent and rewrite query
+    const intent = await getIntent(speechResult);
+    const rewrittenQuery = rewriteQuery(speechResult, intent);
+    
+    logger.info('Intent classification result:', { 
+      original: speechResult,
+      rewritten: rewrittenQuery,
+      intent 
+    });
 
-    if (needsResourceSearch) {
+    // Route based on intent
+    const responseType = await intentHandlers[intent](rewrittenQuery);
+    
+    if (responseType === 'shelter_search' || responseType === 'resource_search') {
       logger.info('Resource search needed, calling Tavily API');
-      const searchResult = await callTavilyAPI(speechResult);
+      const searchResult = await callTavilyAPI(rewrittenQuery);
       return searchResult;
     } else {
       logger.info('General response needed, calling GPT');
-      const gptResponse = await callGPT(speechResult);
+      const gptResponse = await callGPT(rewrittenQuery);
       return gptResponse.text;
     }
   } catch (error) {
-    logger.error('Error in processSpeechResult:', error);
+    logger.error('Error processing speech result:', error);
     throw error;
   }
 }
 
 function formatTavilyResponse(tavilyResponse) {
-  // TODO: Implement proper formatting of Tavily response
   return `I found some resources that might help:
 1. Safe House of Santa Clara County - 24/7 hotline: 408-279-2962
 2. Next Door Solutions - Domestic violence services: 408-279-2962
@@ -262,24 +305,29 @@ function formatTavilyResponse(tavilyResponse) {
 Would you like more information about any of these resources?`;
 }
 
-// Handle call status updates
 router.post('/status', async (req, res) => {
   try {
     const { CallSid, CallStatus } = req.body;
     
     if (!CallSid || !CallStatus) {
+      logger.error('Missing required parameters in status update:', { CallSid, CallStatus });
       return res.status(400).send('Missing required parameters');
     }
+
+    logger.info(`Processing call status update:`, {
+      CallSid,
+      CallStatus,
+      timestamp: new Date().toISOString()
+    });
 
     await twilioVoiceHandler.handleCallStatusUpdate(CallSid, CallStatus);
     res.status(200).send('OK');
   } catch (error) {
     logger.error('Error handling call status update:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(200).send('OK');
   }
 });
 
-// Handle call recordings
 router.post('/recording', (req, res) => {
   try {
     const recordingSid = req.body.RecordingSid;
@@ -297,7 +345,6 @@ router.post('/recording', (req, res) => {
   }
 });
 
-// Handle incoming SMS messages
 router.post('/sms', async (req, res) => {
   try {
     const { From, Body } = req.body;
@@ -305,28 +352,21 @@ router.post('/sms', async (req, res) => {
 
     const twiml = new twilio.twiml.MessagingResponse();
     
-    // Check if this is a consent message
     const consentKeywords = ['yes', 'agree', 'consent', 'ok', 'okay', 'sure'];
     const isConsentMessage = consentKeywords.some(keyword => 
       Body.toLowerCase().includes(keyword)
     );
 
-    // Check if this is an opt-out message
     const optOutKeywords = ['stop', 'unsubscribe', 'opt out', 'cancel'];
     const isOptOutMessage = optOutKeywords.some(keyword => 
       Body.toLowerCase().includes(keyword)
     );
 
     if (isOptOutMessage) {
-      // Handle opt-out
       twiml.message('You have been unsubscribed from follow-up messages. You will no longer receive SMS updates.');
-      // TODO: Update user's consent status in database
     } else if (isConsentMessage) {
-      // Handle consent
       twiml.message('Thank you for your consent. You will receive follow-up messages about your call summary and support resources.');
-      // TODO: Update user's consent status in database
     } else {
-      // Default response without assuming consent
       twiml.message('Thank you for your message. Would you like to receive follow-up messages about your call summary and support resources? Please reply with "yes" to consent.');
     }
 
@@ -338,7 +378,6 @@ router.post('/sms', async (req, res) => {
   }
 });
 
-// Handle consent response
 router.post('/consent', async (req, res) => {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
@@ -353,13 +392,11 @@ router.post('/consent', async (req, res) => {
 
     const { CallSid, From, SpeechResult } = req.body;
     
-    // Enhanced validation
     if (!CallSid || !From || !SpeechResult) {
       logger.warn(`[Request ${requestId}] Missing required parameters`);
       return res.status(400).send('Missing required parameters');
     }
 
-    // Process consent
     const consentKeywords = ['yes', 'agree', 'consent', 'ok', 'okay', 'sure'];
     const isConsent = consentKeywords.some(keyword => 
       SpeechResult.toLowerCase().includes(keyword)
@@ -369,10 +406,8 @@ router.post('/consent', async (req, res) => {
     
     if (isConsent) {
       twiml.say('Thank you for your consent. You will receive follow-up messages about your call summary and support resources.');
-      // TODO: Update user's consent status in database
     } else {
       twiml.say('I understand you do not wish to receive follow-up messages. You will not receive any SMS updates.');
-      // TODO: Update user's consent status in database
     }
 
     res.type('text/xml');
@@ -388,17 +423,14 @@ export async function handleIncomingCall(req, res) {
     const callSid = req.body.CallSid;
     const from = req.body.From;
     
-    // Store phone number in context for this call
     const context = {
       phoneNumber: from,
       requestType: 'phone',
       lastShelterSearch: null
     };
 
-    // Create TwiML response
     const twiml = new VoiceResponse();
     
-    // Add gather verb to collect user input
     const gather = twiml.gather({
       input: 'speech',
       action: `/twilio/speech/${callSid}`,
@@ -410,14 +442,11 @@ export async function handleIncomingCall(req, res) {
 
     gather.say('Hello, I can help you find domestic violence shelters and resources. What would you like to know?');
 
-    // If no input is received, repeat the prompt
     twiml.redirect(`/twilio/speech/${callSid}`);
 
-    // Send response
     res.type('text/xml');
     res.send(twiml.toString());
 
-    // Store context for this call
     callContexts.set(callSid, context);
 
   } catch (error) {
