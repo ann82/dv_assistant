@@ -1,81 +1,16 @@
 {
-  "name": "openai-realtime-console",
-  "version": "0.0.0",
+  "name": "dv_assistant",
+  "version": "1.0.0",
+  "description": "Domestic Violence Support Assistant",
   "type": "module",
-  "private": true,
-  "dependencies": {
-    "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
-    "async-retry": "^1.3.3",
-    "body-parser": "^2.2.0",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "gpt-tokenizer": "^2.9.0",
-    "openai": "^4.103.0",
-    "p-throttle": "^5.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "twilio": "^5.5.2",
-    "uuid": "^9.0.1",
-    "winston": "^3.11.0",
-    "ws": "^8.18.0"
-  },
+  "workspaces": [
+    "relay-server"
+  ],
   "scripts": {
-    "start": "node relay-server/index.js",
-    "build": "NODE_ENV=production webpack --mode production",
-    "dev": "webpack serve --mode development",
-    "relay": "nodemon ./relay-server/index.js",
-    "test": "OPENAI_API_KEY=test-api-key vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --testPathPattern=integration",
-    "test:performance": "vitest run --testPathPattern=performance"
+    "start": "node relay-server/server.js",
+    "test": "cd relay-server && npm test"
   },
-  "devDependencies": {
-    "@babel/core": "^7.27.3",
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-    "@babel/preset-env": "^7.24.0",
-    "@babel/preset-react": "^7.27.1",
-    "@babel/preset-typescript": "^7.23.3",
-    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.0",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/leaflet": "^1.9.12",
-    "@types/node": "^22.15.23",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
-    "@vitest/ui": "^3.1.4",
-    "babel-loader": "^10.0.0",
-    "css-loader": "^7.1.2",
-    "leaflet": "^1.9.4",
-    "nodemon": "^3.1.7",
-    "react-feather": "^2.0.10",
-    "react-leaflet": "^4.2.1",
-    "sass": "^1.89.0",
-    "sass-loader": "^16.0.5",
-    "source-map-loader": "^5.0.0",
-    "style-loader": "^4.0.0",
-    "supertest": "^6.3.4",
-    "terser-webpack-plugin": "^5.3.10",
-    "typescript": "^4.9.5",
-    "vitest": "^3.1.4",
-    "web-vitals": "^2.1.4",
-    "webpack": "^5.99.9",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.1"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
