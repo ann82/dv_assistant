@@ -927,22 +927,53 @@ export class ResponseGenerator {
       const validResults = data.results.filter(result => {
         const content = (result.content || '').toLowerCase();
         const title = (result.title || '').toLowerCase();
+        const url = (result.url || '').toLowerCase();
         
-        // Check for relevant keywords
-        const relevantKeywords = [
+        // Primary keywords that must be present
+        const primaryKeywords = [
           'domestic violence',
-          'shelter',
-          'safe house',
-          'women\'s shelter',
-          'family shelter',
-          'emergency shelter',
-          'crisis center',
-          'support services',
-          'victim services',
-          'abuse shelter'
+          'abuse',
+          'victim',
+          'survivor',
+          'family violence',
+          'intimate partner violence'
         ];
         
-        // Check for irrelevant keywords
+        // Secondary keywords that should be present
+        const secondaryKeywords = [
+          'shelter',
+          'safe house',
+          'emergency housing',
+          'crisis center',
+          'support services',
+          // Pet-friendly terms
+          'pet-friendly',
+          'pet friendly',
+          'allows pets',
+          'accepts pets',
+          // Child-friendly terms
+          'child-friendly',
+          'child friendly',
+          'kid-friendly',
+          'kid friendly',
+          'allows children',
+          'accepts children',
+          'family shelter',
+          'children welcome',
+          'kids welcome',
+          'family housing',
+          'family services',
+          'children\'s services',
+          'kids\' services',
+          'family support',
+          'child care',
+          'childcare',
+          'daycare',
+          'children\'s programs',
+          'kids\' programs'
+        ];
+        
+        // Keywords that indicate irrelevant content
         const irrelevantKeywords = [
           'animal shelter',
           'pet shelter',
@@ -950,20 +981,42 @@ export class ResponseGenerator {
           'cat shelter',
           'wildlife',
           'veterinary',
-          'animal control'
+          'animal control',
+          'animal rescue',
+          'daycare center',
+          'childcare center',
+          'preschool',
+          'kindergarten',
+          'school',
+          'education center'
         ];
         
-        // Must contain at least one relevant keyword
-        const hasRelevantKeyword = relevantKeywords.some(keyword => 
-          content.includes(keyword) || title.includes(keyword)
+        // Must contain at least one primary keyword
+        const hasPrimaryKeyword = primaryKeywords.some(keyword => 
+          content.includes(keyword) || title.includes(keyword) || url.includes(keyword)
         );
         
-        // Must not contain any irrelevant keywords
+        // Must contain at least one secondary keyword
+        const hasSecondaryKeyword = secondaryKeywords.some(keyword => 
+          content.includes(keyword) || title.includes(keyword) || url.includes(keyword)
+        );
+        
+        // Must not contain any irrelevant keywords unless it's specifically about family-friendly or pet-friendly domestic violence shelters
         const hasIrrelevantKeyword = irrelevantKeywords.some(keyword => 
-          content.includes(keyword) || title.includes(keyword)
+          (content.includes(keyword) || title.includes(keyword) || url.includes(keyword)) &&
+          !content.includes('domestic violence') && !title.includes('domestic violence')
         );
         
-        return hasRelevantKeyword && !hasIrrelevantKeyword;
+        // Check if it's specifically about family-friendly or pet-friendly domestic violence shelters
+        const isFamilyOrPetFriendlyDV = (
+          ((content.includes('pet') || title.includes('pet') || 
+            content.includes('child') || title.includes('child') ||
+            content.includes('kid') || title.includes('kid') ||
+            content.includes('family') || title.includes('family')) &&
+          (content.includes('domestic violence') || title.includes('domestic violence')))
+        );
+        
+        return hasPrimaryKeyword && hasSecondaryKeyword && (!hasIrrelevantKeyword || isFamilyOrPetFriendlyDV);
       });
 
       if (validResults.length === 0) {
@@ -997,10 +1050,23 @@ export class ResponseGenerator {
       
       topResults.forEach((result, index) => {
         const title = result.title.replace(/[^\w\s-]/g, '');
-        const content = result.content.split('.')[0]; // Get first sentence
+        // Get first meaningful sentence that contains relevant information
+        const sentences = result.content.split(/[.!?]+/);
+        const relevantSentence = sentences.find(sentence => {
+          const lowerSentence = sentence.toLowerCase();
+          return (
+            lowerSentence.includes('domestic violence') ||
+            lowerSentence.includes('shelter') ||
+            lowerSentence.includes('safe') ||
+            lowerSentence.includes('support') ||
+            lowerSentence.includes('family') ||
+            lowerSentence.includes('child') ||
+            lowerSentence.includes('pet')
+          );
+        }) || sentences[0];
         
         response += `${index + 1}. ${title}\n`;
-        response += `${content}\n\n`;
+        response += `${relevantSentence.trim()}.\n\n`;
       });
       
       response += "Would you like more specific information about any of these resources?";
