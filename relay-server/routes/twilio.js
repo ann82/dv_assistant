@@ -336,7 +336,17 @@ async function processSpeechResult(callSid, speechResult) {
     if (responseType === 'shelter_search' || responseType === 'resource_search') {
       logger.info('Resource search needed, calling Tavily API');
       const searchResult = await callTavilyAPI(rewrittenQuery);
-      return searchResult;
+      // Format the search result into a readable response
+      if (searchResult && searchResult.results && searchResult.results.length > 0) {
+        const formattedResponse = formatTavilyResponse(searchResult);
+        logger.info('Formatted search response:', {
+          requestId,
+          formattedResponse
+        });
+        return formattedResponse;
+      } else {
+        return "I'm sorry, I couldn't find any specific resources in that area. Would you like me to search for resources in a different location?";
+      }
     } else {
       logger.info('General response needed, calling GPT');
       const gptResponse = await callGPT(rewrittenQuery);
@@ -348,14 +358,38 @@ async function processSpeechResult(callSid, speechResult) {
   }
 }
 
-function formatTavilyResponse(tavilyResponse) {
-  return `I found some resources that might help:
-1. Safe House of Santa Clara County - 24/7 hotline: 408-279-2962
-2. Next Door Solutions - Domestic violence services: 408-279-2962
-3. Community Solutions - Emergency shelter: 408-278-2160
+// Export the function for testing
+export const formatTavilyResponse = (tavilyResponse) => {
+  try {
+    if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
+      return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
+    }
 
-Would you like more information about any of these resources?`;
-}
+    const results = tavilyResponse.results.slice(0, 3); // Only use first 3 results
+    let formattedResponse = "I found some resources that might help:\n\n";
+
+    results.forEach((result, index) => {
+      const orgName = result.title || 'Unknown Organization';
+      const content = result.content || '';
+      
+      // Extract phone number if present
+      const phoneMatch = content.match(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/);
+      const phoneNumber = phoneMatch ? phoneMatch[0] : null;
+
+      formattedResponse += `${index + 1}. ${orgName}\n`;
+      if (phoneNumber) {
+        formattedResponse += `   Phone: ${phoneNumber}\n`;
+      }
+      formattedResponse += '\n';
+    });
+
+    formattedResponse += "Would you like more information about any of these resources?";
+    return formattedResponse;
+  } catch (error) {
+    console.error('Error formatting Tavily response:', error);
+    return "I'm sorry, I'm having trouble formatting the search results. Please try asking your question again.";
+  }
+};
 
 router.post('/status', async (req, res) => {
   try {

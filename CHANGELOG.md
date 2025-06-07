@@ -305,6 +305,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New caching mechanism for improved performance
 - Cost logging system for API usage tracking
 - Central module exports through lib/index.js
+- Enhanced Tavily API response formatting with better organization and phone number extraction
+- Comprehensive test suite for Tavily response formatting
+- Improved error handling for API responses
+- Better user feedback messages for resource searches
 
 ### Changed
 - Refactored caching mechanism to use a more efficient approach
@@ -318,6 +322,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified module imports using index.js
 - Updated package.json with proper module exports
 - Removed unnecessary build step from deployment
+- Updated response formatting to be more concise and user-friendly
+- Improved error messages for better user experience
+- Enhanced test coverage for response processing
 
 ### Removed
 - Obsolete tests and unused files
@@ -334,6 +341,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment configuration to ensure all files are included
 - File structure issues in deployment
 - Module resolution in production environment
+- Fixed error handling in Tavily response formatting
+- Resolved test suite dependencies by adding supertest package
+- Improved test assertions for better reliability
 
 ## [1.0.0] - 2024-03-19
 

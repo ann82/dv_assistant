@@ -17,20 +17,6 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-// Test Tavily API key
-async function testTavilyAPI() {
-  try {
-    logger.info('Testing Tavily API connection...');
-    const result = await callTavilyAPI('test query');
-    logger.info('Tavily API test successful:', result);
-  } catch (error) {
-    logger.error('Tavily API test failed:', error);
-  }
-}
-
-// Run the test
-testTavilyAPI();
-
 // Verify required environment variables
 const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'TAVILY_API_KEY', 'OPENAI_API_KEY'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);

@@ -107,10 +107,27 @@ npm start
 
 ## Testing
 
-Run the test suite:
+The project uses Vitest for testing. Run tests with:
+
 ```bash
 npm test
 ```
+
+### Test Coverage
+
+The test suite includes:
+- Twilio webhook handling and response processing
+- Tavily API response formatting
+- Audio service functionality
+- WebSocket server operations
+- Response generation and processing
+
+Key test files:
+- `tests/twilio.test.js`: Tests for Twilio webhook handling
+- `tests/tavilyResponse.test.js`: Tests for Tavily API response formatting
+- `tests/response.test.js`: Tests for response generation
+- `tests/websocketServer.test.js`: Tests for WebSocket functionality
+- `tests/audioService.test.js`: Tests for audio processing
 
 ## Deployment
 
