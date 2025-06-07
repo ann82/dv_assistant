@@ -72,6 +72,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Lightweight in-memory cache system for query responses
 - Cache statistics reporting
+- **Enhanced Location Extraction**: Improved extraction of location information from speech input, including handling of complex mentions and removal of leading articles.
+- **Improved Prompts**: More natural and empathetic prompts for user interaction.
+- **Comprehensive Testing**: Added tests for location extraction and prompt generation to ensure reliability.
 
 ### Changed
 - Refactored caching mechanism to use a dedicated QueryCache class

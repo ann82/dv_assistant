@@ -160,11 +160,28 @@ router.post('/voice', async (req, res) => {
   }
 });
 
-router.post('/voice/process', async (req, res) => {
+// Helper function to determine request type
+function getRequestType(req) {
+  // Check if it's a Twilio request
+  if (req.body.CallSid || req.body.From || req.headers['x-twilio-signature']) {
+    return 'twilio';
+  }
+  
+  // Check if it's a web request
+  if (req.headers['user-agent'] && !req.headers['x-twilio-signature']) {
+    return 'web';
+  }
+
+  // Default to web if we can't determine
+  return 'web';
+}
+
+// Web route handler
+router.post('/web/process', async (req, res) => {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
 
-  logger.info('=== Starting new voice process request ===', {
+  logger.info('=== Starting new web process request ===', {
     requestId,
     timestamp: new Date().toISOString(),
     url: req.originalUrl,
@@ -172,101 +189,122 @@ router.post('/voice/process', async (req, res) => {
   });
 
   try {
-    logger.info('Raw request body:', {
-      requestId,
-      body: req.body,
-      headers: req.headers,
-      query: req.query
-    });
+    const { speechResult } = req.body;
 
-    const { CallSid, From, SpeechResult, Confidence } = req.body;
-
-    // Validate all required parameters
-    if (!CallSid || !From || !SpeechResult) {
-      logger.error('Missing required parameters:', { 
+    if (!speechResult) {
+      logger.error('Missing speech result:', { 
         requestId,
-        CallSid, 
-        From, 
-        SpeechResult,
-        hasConfidence: !!Confidence,
-        rawBody: req.body
+        body: req.body
       });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("I'm having trouble processing your request. Please try again.");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: '15',
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        timeout: '30'
-      });
-      res.type('text/xml');
-      res.send(twiml.toString());
-      return;
+      return res.status(400).json({ error: 'Missing speech result' });
     }
 
-    // Process the speech result
-    const response = await processSpeechResult(CallSid, SpeechResult, requestId);
+    // Process the speech result as web request
+    const response = await processSpeechResult(null, speechResult, requestId, 'web');
     
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(response);
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: '15',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
-    });
-
-    res.type('text/xml');
-    res.send(twiml.toString());
-
-    logger.info('=== Completed voice process request ===', {
-      requestId,
-      duration: Date.now() - startTime
-    });
+    res.json({ response });
   } catch (error) {
-    logger.error('Error processing voice request:', {
+    logger.error('Error processing web request:', {
       requestId,
       error: error.message,
       stack: error.stack
     });
-    
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm having trouble processing your request. Please try again.");
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: '15',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
-    });
-    res.type('text/xml');
-    res.send(twiml.toString());
+    res.status(500).json({ error: 'Error processing request' });
   }
 });
 
-async function processSpeechResult(callSid, speechResult, requestId) {
+// Helper function to extract location from speech
+function extractLocationFromSpeech(speechResult) {
+  // Common patterns for location mentions
+  const locationPatterns = [
+    /(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco"
+    /(?:find|looking for|search for|need)\s+(?:shelters|help|resources)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco"
+    /(?:shelters|help|resources)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco"
+    /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco"
+    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i  // "my location is San Francisco"
+  ];
+
+  // Try each pattern
+  for (const pattern of locationPatterns) {
+    const match = speechResult.match(pattern);
+    if (match && match[1]) {
+      // Remove leading articles like 'the'
+      const location = match[1].trim().replace(/^the\s+/i, '');
+      return location;
+    }
+  }
+
+  return null;
+}
+
+// Helper function to generate location prompt
+function generateLocationPrompt() {
+  const prompts = [
+    // Empathetic prompts
+    "I want to make sure I find the right resources for you. Could you tell me which city or area you're in?",
+    "To help you find the closest support, I need to know your location. Which city or area are you in?",
+    "I'm here to help you find local resources. Could you tell me which area you're in?",
+    
+    // Conversational prompts with examples
+    "I can help you find resources in your area. You can say something like 'I'm in San Francisco' or 'Find help in Santa Clara'.",
+    "Let me know your location, and I'll find the nearest resources. For example, you can say 'I need help in San Jose' or 'I'm in Oakland'.",
+    "Which area are you looking for resources in? You can say 'Find shelters near San Mateo' or 'I'm in Redwood City'.",
+    
+    // Reassuring prompts
+    "Don't worry, I'll help you find the right resources. Which city or area are you in?",
+    "I understand this is important. To find the closest help, could you tell me your location?",
+    "I'm here to connect you with local support. Which area are you in?",
+    
+    // Specific guidance prompts
+    "To find the nearest resources, I need your location. You can say the city name, like 'San Francisco' or 'Santa Clara'.",
+    "I can search for resources in your area. Just let me know which city you're in, for example 'San Jose' or 'Oakland'.",
+    "Which city would you like me to search in? You can simply say the city name, like 'San Mateo' or 'Redwood City'.",
+    
+    // Follow-up prompts
+    "I didn't quite catch the location. Could you tell me again which city or area you're in?",
+    "I want to make sure I understand correctly. Which area are you looking for resources in?",
+    "Let me help you find local support. Which city are you in?"
+  ];
+  
+  // For testing, return immediately without delay
+  if (process.env.NODE_ENV === 'test') {
+    return Promise.resolve(prompts[Math.floor(Math.random() * prompts.length)]);
+  }
+  
+  // Add a small delay to make it feel more natural
+  const delay = Math.floor(Math.random() * 1000) + 500;
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve(prompts[Math.floor(Math.random() * prompts.length)]);
+    }, delay);
+  });
+}
+
+// Handler for Twilio voice calls
+async function processTwilioRequest(speechResult, requestId) {
   try {
-    logger.info('Processing speech result:', {
+    logger.info('Processing Twilio request:', {
       requestId,
-      callSid,
       speechResult
     });
 
-    // Call Tavily API to get relevant resources
-    const tavilyResponse = await callTavilyAPI(speechResult);
+    // Extract location from speech input
+    const location = extractLocationFromSpeech(speechResult);
+
+    if (!location) {
+      logger.info('No location specified in speech input:', {
+        requestId,
+        speechResult
+      });
+      return await generateLocationPrompt();
+    }
+
+    // Call Tavily API with location-specific query
+    const query = `domestic violence shelters and resources in ${location}`;
+    const tavilyResponse = await callTavilyAPI(query);
     logger.info('Tavily API response:', {
       requestId,
+      location,
       response: tavilyResponse
     });
 
@@ -279,7 +317,33 @@ async function processSpeechResult(callSid, speechResult, requestId) {
 
     return formattedResponse;
   } catch (error) {
-    logger.error('Error processing speech result:', {
+    logger.error('Error processing Twilio request:', {
+      requestId,
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Main process function that routes to appropriate handler
+async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+  try {
+    logger.info('Processing speech result:', {
+      requestId,
+      callSid,
+      speechResult,
+      requestType
+    });
+
+    // Route to appropriate handler based on request type
+    const response = requestType === 'twilio' 
+      ? await processTwilioRequest(speechResult, requestId)
+      : await processWebRequest(speechResult, requestId);
+
+    return response;
+  } catch (error) {
+    logger.error('Error in processSpeechResult:', {
       requestId,
       error: error.message,
       stack: error.stack
@@ -298,26 +362,36 @@ export const formatTavilyResponse = (tavilyResponse) => {
     let formattedResponse = "I found some resources that might help:\n\n";
 
     results.forEach((result, index) => {
-      // Extract organization name from title
-      const orgName = result.title?.split('|')[0]?.trim() || 
-                     result.title?.split('-')[0]?.trim() || 
-                     'Unknown Organization';
-
+      // Extract organization name and location from title
+      const titleParts = result.title?.split('|') || result.title?.split('-') || [result.title];
+      const orgName = titleParts[0]?.trim() || 'Unknown Organization';
+      
       // Extract phone number if present
       const phoneMatch = result.content?.match(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/);
       const phoneNumber = phoneMatch ? phoneMatch[0] : null;
 
-      // Extract location/coverage area if present
+      // Extract coverage area if present
       const coverageMatch = result.content?.match(/Coverage Area:?\s*([^.]+)/i);
       const coverageArea = coverageMatch ? coverageMatch[1].trim() : null;
 
+      // Extract service description (first sentence)
+      const serviceMatch = result.content?.match(/^([^.]*)/);
+      const serviceDescription = serviceMatch ? serviceMatch[1].trim() : null;
+
       formattedResponse += `${index + 1}. ${orgName}\n`;
+      
+      if (serviceDescription) {
+        formattedResponse += `   ${serviceDescription}\n`;
+      }
+      
       if (phoneNumber) {
         formattedResponse += `   Phone: ${phoneNumber}\n`;
       }
+      
       if (coverageArea) {
         formattedResponse += `   Coverage: ${coverageArea}\n`;
       }
+      
       formattedResponse += '\n';
     });
 
@@ -478,5 +552,12 @@ export async function handleIncomingCall(req, res) {
     res.status(500).send('Error processing call');
   }
 }
+
+// Export functions for testing
+export {
+  formatTavilyResponse,
+  extractLocationFromSpeech,
+  generateLocationPrompt
+};
 
 export default router;
