@@ -307,7 +307,7 @@ async function processTwilioRequest(speechResult, requestId) {
     });
 
     // Format the response
-    const formattedResponse = formatTavilyResponse(tavilyResponse);
+    const formattedResponse = formatTavilyResponse(tavilyResponse, 'twilio');
     logger.info('Formatted response:', {
       requestId,
       response: formattedResponse
@@ -326,40 +326,116 @@ async function processTwilioRequest(speechResult, requestId) {
 
 // Main process function that routes to appropriate handler
 async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+  logger.info('Processing speech result:', {
+    requestId,
+    callSid,
+    speechResult,
+    requestType,
+    timestamp: new Date().toISOString()
+  });
+
   try {
-    logger.info('Processing speech result:', {
+    // Extract location from speech
+    const location = extractLocationFromSpeech(speechResult);
+    logger.info('Extracted location:', {
       requestId,
       callSid,
-      speechResult,
-      requestType
+      location,
+      originalSpeech: speechResult
     });
 
-    // Route to appropriate handler based on request type
-    const response = requestType === 'twilio' 
-      ? await processTwilioRequest(speechResult, requestId)
-      : await processWebRequest(speechResult, requestId);
+    if (!location) {
+      logger.info('No location found in speech, generating prompt:', {
+        requestId,
+        callSid,
+        speechResult
+      });
+      return generateLocationPrompt();
+    }
 
-    return response;
-  } catch (error) {
-    logger.error('Error in processSpeechResult:', {
+    // Construct query for Tavily API
+    const query = `Find domestic violence shelters and resources near ${location}`;
+    logger.info('Constructed Tavily query:', {
       requestId,
+      callSid,
+      query,
+      location
+    });
+
+    // Call Tavily API
+    logger.info('Calling Tavily API:', {
+      requestId,
+      callSid,
+      query
+    });
+    const tavilyResponse = await callTavilyAPI(query);
+    logger.info('Received Tavily API response:', {
+      requestId,
+      callSid,
+      responseLength: tavilyResponse?.length,
+      hasResults: !!tavilyResponse?.results,
+      resultCount: tavilyResponse?.results?.length,
+      firstResultTitle: tavilyResponse?.results?.[0]?.title,
+      firstResultUrl: tavilyResponse?.results?.[0]?.url
+    });
+
+    // Format response based on request type
+    const formattedResponse = formatTavilyResponse(tavilyResponse, requestType);
+    logger.info('Formatted response:', {
+      requestId,
+      callSid,
+      responseLength: formattedResponse.length,
+      responsePreview: formattedResponse.substring(0, 100) + '...'
+    });
+
+    return formattedResponse;
+  } catch (error) {
+    logger.error('Error processing speech result:', {
+      requestId,
+      callSid,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      speechResult
     });
     throw error;
   }
 }
 
-const formatTavilyResponse = (tavilyResponse) => {
+const formatTavilyResponse = (tavilyResponse, requestType) => {
+  logger.info('Starting Tavily response formatting:', {
+    requestType,
+    hasResponse: !!tavilyResponse,
+    hasResults: !!tavilyResponse?.results,
+    resultCount: tavilyResponse?.results?.length
+  });
+
   try {
     if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
+      logger.warn('No results found in Tavily response:', {
+        response: tavilyResponse,
+        requestType
+      });
       return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
     }
+
+    logger.info('Processing Tavily results:', {
+      requestType,
+      resultCount: tavilyResponse.results.length,
+      firstResultTitle: tavilyResponse.results[0]?.title,
+      firstResultUrl: tavilyResponse.results[0]?.url
+    });
 
     const results = tavilyResponse.results.slice(0, 3); // Only use first 3 results
     let formattedResponse = "I found some resources that might help:\n\n";
 
     results.forEach((result, index) => {
+      logger.debug('Formatting result:', {
+        index,
+        title: result.title,
+        url: result.url,
+        contentLength: result.content?.length
+      });
+
       // Extract organization name and location from title
       const titleParts = result.title?.split('|') || result.title?.split('-') || [result.title];
       const orgName = titleParts[0]?.trim() || 'Unknown Organization';
@@ -394,9 +470,21 @@ const formatTavilyResponse = (tavilyResponse) => {
     });
 
     formattedResponse += "Would you like more information about any of these resources?";
+    
+    logger.info('Formatted response:', {
+      requestType,
+      responseLength: formattedResponse.length,
+      responsePreview: formattedResponse.substring(0, 100) + '...'
+    });
+
     return formattedResponse;
   } catch (error) {
-    logger.error('Error formatting Tavily response:', error);
+    logger.error('Error formatting Tavily response:', {
+      error: error.message,
+      stack: error.stack,
+      requestType,
+      response: tavilyResponse
+    });
     return "I'm sorry, I'm having trouble formatting the search results. Please try asking your question again.";
   }
 };
