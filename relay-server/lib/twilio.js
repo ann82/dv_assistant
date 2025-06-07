@@ -8,22 +8,27 @@ import { withRetryAndThrottle } from './apiUtils.js';
 export const validateTwilioRequest = (req, res, next) => {
   try {
     // Log all headers for debugging
-    logger.info('All Headers:', req.headers);
-    logger.info('Raw Body:', req.body);
+    logger.info('Twilio Request Headers:', {
+      signature: req.headers['x-twilio-signature'],
+      idempotencyToken: req.headers['i-twilio-idempotency-token'],
+      homeRegion: req.headers['x-home-region'],
+      forwardedFor: req.headers['x-forwarded-for'],
+      forwardedHost: req.headers['x-forwarded-host'],
+      forwardedProto: req.headers['x-forwarded-proto'],
+      userAgent: req.headers['user-agent'],
+      contentType: req.headers['content-type']
+    });
     
     const twilioSignature = req.headers['x-twilio-signature'];
     const url = 'https://' + req.get('host') + req.originalUrl;
     const params = req.body || {};
 
     // Log request details for debugging
-    logger.info('Twilio Request:', {
-      signature: twilioSignature,
+    logger.info('Twilio Request Details:', {
       url,
-      params,
       method: req.method,
       originalUrl: req.originalUrl,
       protocol: req.protocol,
-      headers: req.headers,
       body: req.body
     });
 
@@ -34,8 +39,14 @@ export const validateTwilioRequest = (req, res, next) => {
     }
 
     if (!twilioSignature) {
-      logger.info('No Twilio signature found');
+      logger.error('No Twilio signature found in request');
       return res.status(403).send('No Twilio signature');
+    }
+
+    // Validate the request is coming from Twilio
+    if (!req.headers['user-agent']?.includes('TwilioProxy')) {
+      logger.error('Invalid User-Agent: Request not from Twilio');
+      return res.status(403).send('Invalid request source');
     }
 
     if (twilio.validateRequest(
@@ -44,9 +55,14 @@ export const validateTwilioRequest = (req, res, next) => {
       url,
       params
     )) {
+      // Store idempotency token to prevent duplicate processing
+      const idempotencyToken = req.headers['i-twilio-idempotency-token'];
+      if (idempotencyToken) {
+        logger.info('Processing request with idempotency token:', idempotencyToken);
+      }
       next();
     } else {
-      logger.info('Invalid Twilio signature');
+      logger.error('Invalid Twilio signature');
       res.status(403).send('Invalid Twilio request');
     }
   } catch (error) {

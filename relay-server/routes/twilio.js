@@ -203,39 +203,17 @@ router.post('/voice/process', async (req, res) => {
         language: 'en-US',
         timeout: '30'
       });
-      const twimlResponse = twiml.toString();
-      logger.info('Sending error TwiML response:', {
-        requestId,
-        twiml: twimlResponse
-      });
       res.type('text/xml');
-      res.send(twimlResponse);
+      res.send(twiml.toString());
       return;
     }
 
-    logger.info('Processing speech result:', {
-      requestId,
-      callSid: CallSid,
-      from: From,
-      speechResult: SpeechResult,
-      confidence: Confidence,
-      processingTime: Date.now() - startTime
-    });
-
-    const response = await processSpeechResult(CallSid, SpeechResult);
+    // Process the speech result
+    const response = await processSpeechResult(CallSid, SpeechResult, requestId);
     
-    logger.info('Received AI response:', {
-      requestId,
-      response,
-      processingTime: Date.now() - startTime
-    });
-
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
-
-    twiml.pause({ length: 1 });
-
-    const gather = twiml.gather({
+    twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
@@ -246,27 +224,18 @@ router.post('/voice/process', async (req, res) => {
       timeout: '30'
     });
 
-    const twimlResponse = twiml.toString();
-    logger.info('Sending TwiML response:', {
-      requestId,
-      twiml: twimlResponse,
-      totalProcessingTime: Date.now() - startTime
-    });
-
     res.type('text/xml');
-    res.write(twimlResponse);
-    res.end();
+    res.send(twiml.toString());
 
     logger.info('=== Completed voice process request ===', {
       requestId,
-      totalTime: Date.now() - startTime
+      duration: Date.now() - startTime
     });
   } catch (error) {
-    logger.error('Error processing request:', {
+    logger.error('Error processing voice request:', {
       requestId,
       error: error.message,
-      stack: error.stack,
-      processingTime: Date.now() - startTime
+      stack: error.stack
     });
     
     const twiml = new twilio.twiml.VoiceResponse();
@@ -281,84 +250,44 @@ router.post('/voice/process', async (req, res) => {
       language: 'en-US',
       timeout: '30'
     });
-    
-    const twimlResponse = twiml.toString();
-    logger.info('Sending error TwiML response:', {
-      requestId,
-      twiml: twimlResponse
-    });
-
     res.type('text/xml');
-    res.send(twimlResponse);
-
-    logger.info('=== Completed error response ===', {
-      requestId,
-      totalTime: Date.now() - startTime
-    });
+    res.send(twiml.toString());
   }
 });
 
-async function processSpeechResult(callSid, speechResult) {
+async function processSpeechResult(callSid, speechResult, requestId) {
   try {
-    // Generate hash to prevent duplicate processing
-    const hash = generateSpeechHash(callSid, speechResult);
-    
-    // Check if we've already processed this speech result
-    if (processedSpeechResults.has(hash)) {
-      logger.info('Duplicate speech result detected, skipping processing');
-      return null;
-    }
-
-    // Store the hash with timestamp
-    processedSpeechResults.set(hash, Date.now());
-
-    // Clean up old entries (older than 5 minutes)
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    for (const [key, timestamp] of processedSpeechResults.entries()) {
-      if (timestamp < fiveMinutesAgo) {
-        processedSpeechResults.delete(key);
-      }
-    }
-
-    // Get intent and rewrite query
-    const intent = await getIntent(speechResult);
-    const rewrittenQuery = rewriteQuery(speechResult, intent);
-    
-    logger.info('Intent classification result:', { 
-      original: speechResult,
-      rewritten: rewrittenQuery,
-      intent 
+    logger.info('Processing speech result:', {
+      requestId,
+      callSid,
+      speechResult
     });
 
-    // Route based on intent
-    const responseType = await intentHandlers[intent](rewrittenQuery);
-    
-    if (responseType === 'shelter_search' || responseType === 'resource_search') {
-      logger.info('Resource search needed, calling Tavily API');
-      const searchResult = await callTavilyAPI(rewrittenQuery);
-      // Format the search result into a readable response
-      if (searchResult && searchResult.results && searchResult.results.length > 0) {
-        const formattedResponse = formatTavilyResponse(searchResult);
-        logger.info('Formatted search response:', {
-          requestId,
-          formattedResponse
-        });
-        return formattedResponse;
-      } else {
-        return "I'm sorry, I couldn't find any specific resources in that area. Would you like me to search for resources in a different location?";
-      }
-    } else {
-      logger.info('General response needed, calling GPT');
-      const gptResponse = await callGPT(rewrittenQuery);
-      return gptResponse.text;
-    }
+    // Call Tavily API to get relevant resources
+    const tavilyResponse = await callTavilyAPI(speechResult);
+    logger.info('Tavily API response:', {
+      requestId,
+      response: tavilyResponse
+    });
+
+    // Format the response
+    const formattedResponse = formatTavilyResponse(tavilyResponse);
+    logger.info('Formatted response:', {
+      requestId,
+      response: formattedResponse
+    });
+
+    return formattedResponse;
   } catch (error) {
-    logger.error('Error processing speech result:', error);
+    logger.error('Error processing speech result:', {
+      requestId,
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 }
 
-// Export the function for testing
 export const formatTavilyResponse = (tavilyResponse) => {
   try {
     if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
@@ -369,16 +298,25 @@ export const formatTavilyResponse = (tavilyResponse) => {
     let formattedResponse = "I found some resources that might help:\n\n";
 
     results.forEach((result, index) => {
-      const orgName = result.title || 'Unknown Organization';
-      const content = result.content || '';
-      
+      // Extract organization name from title
+      const orgName = result.title?.split('|')[0]?.trim() || 
+                     result.title?.split('-')[0]?.trim() || 
+                     'Unknown Organization';
+
       // Extract phone number if present
-      const phoneMatch = content.match(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/);
+      const phoneMatch = result.content?.match(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/);
       const phoneNumber = phoneMatch ? phoneMatch[0] : null;
+
+      // Extract location/coverage area if present
+      const coverageMatch = result.content?.match(/Coverage Area:?\s*([^.]+)/i);
+      const coverageArea = coverageMatch ? coverageMatch[1].trim() : null;
 
       formattedResponse += `${index + 1}. ${orgName}\n`;
       if (phoneNumber) {
         formattedResponse += `   Phone: ${phoneNumber}\n`;
+      }
+      if (coverageArea) {
+        formattedResponse += `   Coverage: ${coverageArea}\n`;
       }
       formattedResponse += '\n';
     });
@@ -386,7 +324,7 @@ export const formatTavilyResponse = (tavilyResponse) => {
     formattedResponse += "Would you like more information about any of these resources?";
     return formattedResponse;
   } catch (error) {
-    console.error('Error formatting Tavily response:', error);
+    logger.error('Error formatting Tavily response:', error);
     return "I'm sorry, I'm having trouble formatting the search results. Please try asking your question again.";
   }
 };
