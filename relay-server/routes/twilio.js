@@ -215,13 +215,16 @@ router.post('/web/process', async (req, res) => {
 
 // Helper function to extract location from speech
 function extractLocationFromSpeech(speechResult) {
+  logger.info('Extracting location from speech:', { speechResult });
+
   // Common patterns for location mentions
   const locationPatterns = [
     /(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco"
-    /(?:find|looking for|search for|need)\s+(?:shelters|help|resources)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco"
-    /(?:shelters|help|resources)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco"
+    /(?:find|looking for|search for|need|help me find)\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco"
+    /(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco"
     /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco"
-    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i  // "my location is San Francisco"
+    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "my location is San Francisco"
+    /(?:can you|could you|please)\s+(?:help|find|search for)\s+(?:me|us)?\s+(?:some|any)?\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i  // "can you help me find some shelters near San Jose"
   ];
 
   // Try each pattern
@@ -230,52 +233,47 @@ function extractLocationFromSpeech(speechResult) {
     if (match && match[1]) {
       // Remove leading articles like 'the'
       const location = match[1].trim().replace(/^the\s+/i, '');
+      logger.info('Location extracted:', { location, pattern: pattern.toString() });
       return location;
     }
   }
 
+  logger.info('No location found in speech input');
   return null;
 }
 
 // Helper function to generate location prompt
 function generateLocationPrompt() {
   const prompts = [
-    // Empathetic prompts
-    "I want to make sure I find the right resources for you. Could you tell me which city or area you're in?",
-    "To help you find the closest support, I need to know your location. Which city or area are you in?",
-    "I'm here to help you find local resources. Could you tell me which area you're in?",
-    
-    // Conversational prompts with examples
-    "I can help you find resources in your area. You can say something like 'I'm in San Francisco' or 'Find help in Santa Clara'.",
-    "Let me know your location, and I'll find the nearest resources. For example, you can say 'I need help in San Jose' or 'I'm in Oakland'.",
-    "Which area are you looking for resources in? You can say 'Find shelters near San Mateo' or 'I'm in Redwood City'.",
-    
-    // Reassuring prompts
-    "Don't worry, I'll help you find the right resources. Which city or area are you in?",
-    "I understand this is important. To find the closest help, could you tell me your location?",
-    "I'm here to connect you with local support. Which area are you in?",
-    
-    // Specific guidance prompts
-    "To find the nearest resources, I need your location. You can say the city name, like 'San Francisco' or 'Santa Clara'.",
-    "I can search for resources in your area. Just let me know which city you're in, for example 'San Jose' or 'Oakland'.",
-    "Which city would you like me to search in? You can simply say the city name, like 'San Mateo' or 'Redwood City'.",
-    
-    // Follow-up prompts
-    "I didn't quite catch the location. Could you tell me again which city or area you're in?",
-    "I want to make sure I understand correctly. Which area are you looking for resources in?",
-    "Let me help you find local support. Which city are you in?"
+    "I need to know your location to help you find resources. Could you please tell me which city or area you're in?",
+    "To help you better, I need to know where you are. Could you please specify your location?",
+    "I want to make sure I find resources close to you. What city or area are you currently in?",
+    "To provide the most relevant help, I need to know your location. Could you please tell me where you are?",
+    "I can help you find resources in your area. Could you please let me know which city you're in?",
+    "To connect you with local resources, I need to know your location. What city or area are you in?",
+    "I want to find help that's accessible to you. Could you please tell me your location?",
+    "To better assist you, I need to know where you are. What city or area are you currently in?",
+    "I can help you find nearby resources. Could you please specify your location?",
+    "To provide the most relevant assistance, I need to know your location. What city are you in?"
   ];
-  
-  // For testing, return immediately without delay
-  if (process.env.NODE_ENV === 'test') {
-    return Promise.resolve(prompts[Math.floor(Math.random() * prompts.length)]);
-  }
-  
+
+  // Add example locations to some prompts
+  const exampleLocations = [
+    "For example, you could say 'I'm in San Francisco' or 'I'm in San Jose'",
+    "You can say something like 'I'm in Oakland' or 'I'm in Santa Clara'",
+    "Try saying 'I'm in San Mateo' or 'I'm in Redwood City'",
+    "You could say 'I'm in Mountain View' or 'I'm in Sunnyvale'"
+  ];
+
+  // Randomly select a prompt and an example location
+  const prompt = prompts[Math.floor(Math.random() * prompts.length)];
+  const example = exampleLocations[Math.floor(Math.random() * exampleLocations.length)];
+
   // Add a small delay to make it feel more natural
   const delay = Math.floor(Math.random() * 1000) + 500;
   return new Promise(resolve => {
     setTimeout(() => {
-      resolve(prompts[Math.floor(Math.random() * prompts.length)]);
+      resolve(`${prompt} ${example}`);
     }, delay);
   });
 }
@@ -559,5 +557,101 @@ export {
   extractLocationFromSpeech,
   generateLocationPrompt
 };
+
+// Twilio route handler
+router.post('/twilio/voice/process', async (req, res) => {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+
+  logger.info('=== Starting new voice process request ===', {
+    requestId,
+    timestamp: new Date().toISOString(),
+    url: req.originalUrl,
+    method: req.method
+  });
+
+  try {
+    logger.info('Raw request body:', {
+      requestId,
+      body: req.body,
+      headers: req.headers,
+      query: req.query
+    });
+
+    const { CallSid, From, SpeechResult, Confidence } = req.body;
+
+    // Validate all required parameters
+    if (!CallSid || !From || !SpeechResult) {
+      logger.error('Missing required parameters:', { 
+        requestId,
+        CallSid, 
+        From, 
+        SpeechResult,
+        hasConfidence: !!Confidence,
+        rawBody: req.body
+      });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("I'm having trouble processing your request. Please try again.");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: '15',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US',
+        timeout: '30'
+      });
+      res.type('text/xml');
+      res.send(twiml.toString());
+      return;
+    }
+
+    // Process the speech result as Twilio request
+    const response = await processSpeechResult(CallSid, SpeechResult, requestId, 'twilio');
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say(response);
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: '15',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US',
+      timeout: '30'
+    });
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+    logger.info('=== Completed voice process request ===', {
+      requestId,
+      duration: Date.now() - startTime
+    });
+  } catch (error) {
+    logger.error('Error processing voice request:', {
+      requestId,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm having trouble processing your request. Please try again.");
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice/process',
+      method: 'POST',
+      speechTimeout: '15',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US',
+      timeout: '30'
+    });
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
 
 export default router;
