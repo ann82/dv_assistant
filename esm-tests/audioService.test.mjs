@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AudioService } from '../relay-server/services/audioService.js';
+import { gptCache } from '../relay-server/lib/queryCache.js';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
@@ -85,6 +86,7 @@ describe('AudioService', () => {
     });
     const { OpenAI } = await import('openai');
     audioService = new AudioService(new OpenAI());
+    gptCache.clear();
   });
 
   afterEach(async () => {
@@ -141,23 +143,52 @@ describe('AudioService', () => {
       expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('old1.mp3'));
       expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('old2.mp3'));
     });
-  });
 
-  describe('GPT Response Caching', () => {
-    it('should cache GPT responses', async () => {
+    it('should cache and retrieve GPT responses', async () => {
       const transcript = 'test transcript';
-      const response1 = await audioService.getGptReply(transcript);
-      const response2 = await audioService.getGptReply(transcript);
+      const response = { text: 'test response', model: 'gpt-3.5-turbo' };
+      
+      // Mock OpenAI response
+      audioService.openai.chat.completions.create = vi.fn().mockResolvedValue({
+        choices: [{ message: { content: response.text } }],
+        usage: { prompt_tokens: 10, completion_tokens: 20 }
+      });
 
-      expect(response1).toEqual(response2);
-      expect(fs.writeFile).toHaveBeenCalledTimes(1);
+      // First call should hit the API
+      const result1 = await audioService.getGptReply(transcript);
+      expect(result1.text).toBe(response.text);
+      expect(audioService.openai.chat.completions.create).toHaveBeenCalledTimes(1);
+
+      // Second call should use cache
+      const result2 = await audioService.getGptReply(transcript);
+      expect(result2).toEqual(result1);
+      expect(audioService.openai.chat.completions.create).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle cache misses', async () => {
-      fs.readFile.mockRejectedValueOnce(new Error('Cache miss'));
-      const response = await audioService.getGptReply('new transcript');
-      expect(response).toBeDefined();
-      expect(fs.writeFile).toHaveBeenCalled();
+    it('should handle cache expiration', async () => {
+      const transcript = 'test transcript';
+      const response = { text: 'test response', model: 'gpt-3.5-turbo' };
+      
+      // Mock OpenAI response
+      audioService.openai.chat.completions.create = vi.fn().mockResolvedValue({
+        choices: [{ message: { content: response.text } }],
+        usage: { prompt_tokens: 10, completion_tokens: 20 }
+      });
+
+      // First call
+      await audioService.getGptReply(transcript);
+
+      // Advance time past TTL
+      const originalDateNow = Date.now;
+      const futureTime = originalDateNow() + 24 * 60 * 60 * 1000 + 1000; // 24 hours + 1 second
+      Date.now = vi.fn(() => futureTime);
+
+      // Second call should hit API again
+      await audioService.getGptReply(transcript);
+      expect(audioService.openai.chat.completions.create).toHaveBeenCalledTimes(2);
+
+      // Restore Date.now
+      Date.now = originalDateNow;
     });
   });
 

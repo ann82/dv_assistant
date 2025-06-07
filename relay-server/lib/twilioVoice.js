@@ -152,7 +152,7 @@ export class TwilioVoiceHandler {
             this.sendTwiMLResponse(res, twiml);
           }
         }
-      }, 30000);
+      }, 60000); // Increased to 60 seconds
 
       ws.on('open', () => {
         logger.info(`WebSocket connected for call ${callSid}`);
@@ -171,7 +171,10 @@ export class TwilioVoiceHandler {
       this.activeCalls.set(callSid, {
         ws,
         from,
-        startTime: new Date()
+        startTime: new Date(),
+        retryCount: 0,
+        lastActivity: Date.now(),
+        timeouts: new Set()
       });
 
       return ws;
@@ -191,14 +194,40 @@ export class TwilioVoiceHandler {
     let lastRequestId = null;
     let retryCount = 0;
     const MAX_RETRIES = 3;
-    const RESPONSE_TIMEOUT = 45000; // 45 seconds for response generation
-    const SPEECH_TIMEOUT = 10000; // 10 seconds for speech input
-    const CONNECTION_TIMEOUT = 30000; // 30 seconds for WebSocket connection
+    const RESPONSE_TIMEOUT = 90000; // Increased to 90 seconds for response generation
+    const SPEECH_TIMEOUT = 15000; // Increased to 15 seconds for speech input
+    const CONNECTION_TIMEOUT = 60000; // Increased to 60 seconds for WebSocket connection
+    const ACTIVITY_CHECK_INTERVAL = 30000; // Check for activity every 30 seconds
+
+    // Set up activity monitoring
+    const activityCheck = setInterval(() => {
+      const call = this.activeCalls.get(callSid);
+      if (call) {
+        const timeSinceLastActivity = Date.now() - call.lastActivity;
+        if (timeSinceLastActivity > CONNECTION_TIMEOUT) {
+          logger.error(`No activity detected for call ${callSid} for ${timeSinceLastActivity}ms`);
+          clearInterval(activityCheck);
+          this.handleCallTimeout(callSid, res);
+        }
+      }
+    }, ACTIVITY_CHECK_INTERVAL);
+
+    // Store the interval in the call's timeouts set
+    const call = this.activeCalls.get(callSid);
+    if (call) {
+      call.timeouts.add(activityCheck);
+    }
 
     ws.on('message', async (data) => {
       try {
         const event = JSON.parse(data);
         if (event.type === 'response.text') {
+          // Update last activity time
+          const call = this.activeCalls.get(callSid);
+          if (call) {
+            call.lastActivity = Date.now();
+          }
+
           // Check for duplicate requests
           if (event.requestId === lastRequestId) {
             logger.info(`Duplicate response request for call ${callSid}, ignoring`);
@@ -224,12 +253,15 @@ export class TwilioVoiceHandler {
                 this.sendTwiMLResponse(res, twiml);
               } else {
                 logger.error(`Max retries reached for call ${callSid}`);
-                const twiml = this.generateTwiML("I'm having trouble processing your request. Please try again.", true);
-                this.sendTwiMLResponse(res, twiml);
-                this.cleanupCall(callSid);
+                this.handleCallTimeout(callSid, res);
               }
             }
           }, RESPONSE_TIMEOUT);
+
+          // Store the timeout in the call's timeouts set
+          if (call) {
+            call.timeouts.add(responseTimeout);
+          }
 
           // Process the response
           const response = event.text;
@@ -254,37 +286,61 @@ export class TwilioVoiceHandler {
         }
       } catch (error) {
         logger.error(`Error processing WebSocket message for call ${callSid}:`, error);
-        const twiml = this.generateTwiML("I encountered an error. Please try again.", true);
-        this.sendTwiMLResponse(res, twiml);
+        this.handleCallError(callSid, res, error);
       }
     });
 
     ws.on('close', () => {
       logger.info(`WebSocket connection closed for call ${callSid}`);
-      if (responseTimeout) {
-        clearTimeout(responseTimeout);
-      }
       this.cleanupCall(callSid);
     });
 
     ws.on('error', (error) => {
       logger.error(`WebSocket error for call ${callSid}:`, error);
-      if (responseTimeout) {
-        clearTimeout(responseTimeout);
-      }
-      this.cleanupCall(callSid);
+      this.handleCallError(callSid, res, error);
     });
+  }
+
+  async handleCallTimeout(callSid, res) {
+    logger.error(`Call timeout for ${callSid}`);
+    const twiml = this.generateTwiML("I'm having trouble processing your request. Please try again.", true);
+    await this.sendTwiMLResponse(res, twiml);
+    this.cleanupCall(callSid);
+  }
+
+  async handleCallError(callSid, res, error) {
+    logger.error(`Call error for ${callSid}:`, error);
+    const twiml = this.generateTwiML("I encountered an error. Please try again.", true);
+    await this.sendTwiMLResponse(res, twiml);
+    this.cleanupCall(callSid);
   }
 
   async cleanupCall(callSid) {
     const call = this.activeCalls.get(callSid);
     if (call) {
       try {
-        call.ws.close();
+        // Clear all timeouts
+        call.timeouts.forEach(timeout => {
+          if (typeof timeout === 'number') {
+            clearTimeout(timeout);
+          } else if (typeof timeout === 'object') {
+            clearInterval(timeout);
+          }
+        });
+        call.timeouts.clear();
+
+        // Close WebSocket connection
+        if (call.ws) {
+          call.ws.close();
+        }
+
+        // Remove from active calls
+        this.activeCalls.delete(callSid);
+        
+        logger.info(`Cleaned up call ${callSid}`);
       } catch (error) {
-        logger.error(`Error closing WebSocket for call ${callSid}:`, error);
+        logger.error(`Error cleaning up call ${callSid}:`, error);
       }
-      this.activeCalls.delete(callSid);
     }
   }
 

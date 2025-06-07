@@ -1,4 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn()
+  },
+  default: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn()
+  }
+}));
 // Mock OpenAI
 vi.mock('openai', () => {
   const OpenAI = vi.fn().mockImplementation(() => ({

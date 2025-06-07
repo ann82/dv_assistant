@@ -6,6 +6,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { gptCache } from '../lib/queryCache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,8 +27,7 @@ export class AudioService {
     this.openai = openaiClient;
     this.audioBuffer = new Map(); // Store audio chunks by callSid
     this.audioDir = path.join(process.cwd(), 'public', 'audio');
-    this.cacheDir = CACHE_DIR;
-    this.responseCache = new Map(); // In-memory cache for GPT responses
+    this.cacheDir = path.join(process.cwd(), 'cache', 'audio');
     this.ensureDirectories();
   }
 
@@ -172,25 +172,11 @@ export class AudioService {
   async getGptReply(transcript, context = {}) {
     try {
       const cacheKey = this.generateCacheKey(transcript);
-      const cachedResponse = this.responseCache.get(cacheKey);
+      const cachedResponse = gptCache.get(cacheKey);
 
-      // Check in-memory cache first
-      if (cachedResponse && this.isValidCacheEntry(cachedResponse.timestamp)) {
+      if (cachedResponse) {
         console.log('Using cached GPT response');
-        return cachedResponse.data;
-      }
-
-      // Check file cache
-      const cacheFilePath = path.join(this.cacheDir, `gpt_${cacheKey}.json`);
-      try {
-        const cachedData = JSON.parse(await fs.readFile(cacheFilePath, 'utf8'));
-        if (this.isValidCacheEntry(cachedData.timestamp)) {
-          console.log('Using file cached GPT response');
-          this.responseCache.set(cacheKey, cachedData);
-          return cachedData.data;
-        }
-      } catch (error) {
-        // Cache miss or invalid, continue with API call
+        return cachedResponse;
       }
 
       const model = this.shouldUseGPT4(transcript) ? config.GPT4_MODEL : config.GPT35_MODEL;
@@ -218,19 +204,7 @@ export class AudioService {
       };
 
       // Cache the response
-      const cacheData = {
-        timestamp: Date.now(),
-        data: result
-      };
-
-      // Update in-memory cache
-      this.responseCache.set(cacheKey, cacheData);
-
-      // Update file cache
-      await fs.writeFile(cacheFilePath, JSON.stringify(cacheData));
-
-      // Clean up old cache files
-      await this.cleanupCache();
+      gptCache.set(cacheKey, result, CACHE_TTL);
 
       return result;
     } catch (error) {

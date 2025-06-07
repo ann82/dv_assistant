@@ -10,7 +10,8 @@ import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 import logger from '../lib/logger.js';
 import { callTavilyAPI, callGPT } from '../lib/apis.js';
 import { createHash } from 'crypto';
-import { VoiceResponse } from 'twilio/lib/twiml/VoiceResponse.js';
+import pkg from 'twilio/lib/twiml/VoiceResponse.js';
+const { VoiceResponse } = pkg;
 import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
 import { generateSpeechHash } from '../lib/utils.js';
 

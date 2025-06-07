@@ -1,20 +1,14 @@
 import { config } from './config.js';
-import { cache } from './cache.js';
 import { OpenAI } from 'openai';
 import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { withRetryAndThrottle } from './apiUtils.js';
+import { gptCache } from './queryCache.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
 export class ResponseGenerator {
-  static confidenceCache = new Map();
-  static CACHE_TTL = 1000 * 60 * 60; // 1 hour in milliseconds
-  static CLEANUP_INTERVAL = 1000 * 60 * 15; // 15 minutes in milliseconds
-  static lastCleanup = Date.now();
-  static cleanupInterval = null;
-
   // Add routing performance monitoring
   static routingStats = {
     totalRequests: 0,
@@ -36,91 +30,18 @@ export class ResponseGenerator {
     }
   };
 
-  // Initialize cleanup interval
-  static initializeCleanup() {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-    }
-    
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupCache();
-    }, this.CLEANUP_INTERVAL);
-
-    // Ensure cleanup runs on process exit
-    process.on('SIGTERM', () => {
-      if (this.cleanupInterval) {
-        clearInterval(this.cleanupInterval);
-      }
-    });
-  }
-
-  static cleanupCache() {
-    const now = Date.now();
-    if (now - this.lastCleanup < this.CLEANUP_INTERVAL) {
-      return; // Skip if not enough time has passed
-    }
-
-    logger.info('Starting cache cleanup', {
-      timestamp: new Date().toISOString(),
-      cacheSize: this.confidenceCache.size
-    });
-
-    let expiredCount = 0;
-    for (const [key, value] of this.confidenceCache.entries()) {
-      if (now - value.timestamp > this.CACHE_TTL) {
-        this.confidenceCache.delete(key);
-        expiredCount++;
-      }
-    }
-
-    this.lastCleanup = now;
-
-    logger.info('Cache cleanup completed', {
-      timestamp: new Date().toISOString(),
-      expiredCount,
-      remainingSize: this.confidenceCache.size
-    });
-  }
-
   static getCachedAnalysis(input) {
     const normalizedInput = input.toLowerCase().trim();
-    return cache.get(normalizedInput);
+    return gptCache.get(normalizedInput);
   }
 
   static setCachedAnalysis(input, analysis) {
     const normalizedInput = input.toLowerCase().trim();
-    cache.set(normalizedInput, {
-      ...analysis,
-      timestamp: Date.now()
-    });
+    gptCache.set(normalizedInput, analysis, 3600000); // Cache for 1 hour
   }
 
   static getCacheStats() {
-    const now = Date.now();
-    const stats = {
-      totalEntries: this.confidenceCache.size,
-      expiredEntries: 0,
-      validEntries: 0,
-      oldestEntry: null,
-      newestEntry: null
-    };
-
-    for (const [key, value] of this.confidenceCache.entries()) {
-      const age = now - value.timestamp;
-      if (age > this.CACHE_TTL) {
-        stats.expiredEntries++;
-      } else {
-        stats.validEntries++;
-        if (!stats.oldestEntry || value.timestamp < stats.oldestEntry.timestamp) {
-          stats.oldestEntry = { key, timestamp: value.timestamp };
-        }
-        if (!stats.newestEntry || value.timestamp > stats.newestEntry.timestamp) {
-          stats.newestEntry = { key, timestamp: value.timestamp };
-        }
-      }
-    }
-
-    return stats;
+    return gptCache.getStats();
   }
 
   static analyzeQuery(input) {
@@ -659,7 +580,7 @@ export class ResponseGenerator {
 
     // Cache the full shelter details
     const cacheKey = `shelter_search_${Date.now()}`;
-    cache.set(cacheKey, {
+    this.setCachedAnalysis(cacheKey, {
       shelters,
       timestamp: Date.now()
     });
@@ -742,7 +663,7 @@ export class ResponseGenerator {
   static async getDetailedResponse(input, context) {
     const cacheKey = context.lastShelterSearch?.cacheKey;
     if (cacheKey) {
-      const cachedResults = cache.get(cacheKey);
+      const cachedResults = this.getCachedAnalysis(cacheKey);
       if (cachedResults) {
         const shelterNumber = input.match(/shelter (\d+)/i)?.[1];
         if (shelterNumber) {
@@ -912,7 +833,7 @@ export class ResponseGenerator {
           query: enhancedQuery,
           search_depth: 'advanced',
           include_domains: [],
-          exclude_domains: [],
+          exclude_domains: ['yelp.com', 'maddiesfund.org'], // Exclude irrelevant domains
           max_results: 5
         })
       });
@@ -928,6 +849,41 @@ export class ResponseGenerator {
         const content = (result.content || '').toLowerCase();
         const title = (result.title || '').toLowerCase();
         const url = (result.url || '').toLowerCase();
+        
+        // Exclude domains that are not relevant
+        const excludedDomains = [
+          'yelp.com',
+          'maddiesfund.org',
+          'facebook.com',
+          'instagram.com',
+          'twitter.com',
+          'linkedin.com',
+          'pinterest.com',
+          'tiktok.com',
+          'youtube.com',
+          'reddit.com',
+          'tripadvisor.com',
+          'zillow.com',
+          'realtor.com',
+          'trulia.com',
+          'hotels.com',
+          'booking.com',
+          'airbnb.com',
+          'vrbo.com',
+          'expedia.com',
+          'orbitz.com',
+          'priceline.com',
+          'hotwire.com',
+          'kayak.com',
+          'cheaptickets.com',
+          'travelocity.com'
+        ];
+        
+        // Check if URL contains any excluded domains
+        const isExcludedDomain = excludedDomains.some(domain => url.includes(domain));
+        if (isExcludedDomain) {
+          return false;
+        }
         
         // Primary keywords that must be present
         const primaryKeywords = [
@@ -988,7 +944,22 @@ export class ResponseGenerator {
           'preschool',
           'kindergarten',
           'school',
-          'education center'
+          'education center',
+          'homeless shelter',
+          'homeless housing',
+          'homeless services',
+          'homeless program',
+          'homeless assistance',
+          'homeless support',
+          'homeless center',
+          'homeless facility',
+          'homeless shelter',
+          'homeless housing',
+          'homeless program',
+          'homeless assistance',
+          'homeless support',
+          'homeless center',
+          'homeless facility'
         ];
         
         // Must contain at least one primary keyword
@@ -1015,8 +986,14 @@ export class ResponseGenerator {
             content.includes('family') || title.includes('family')) &&
           (content.includes('domestic violence') || title.includes('domestic violence')))
         );
+
+        // Additional check for homeless shelter content
+        const isHomelessShelter = content.includes('homeless') || title.includes('homeless') || url.includes('homeless');
         
-        return hasPrimaryKeyword && hasSecondaryKeyword && (!hasIrrelevantKeyword || isFamilyOrPetFriendlyDV);
+        return hasPrimaryKeyword && 
+               hasSecondaryKeyword && 
+               (!hasIrrelevantKeyword || isFamilyOrPetFriendlyDV) &&
+               !isHomelessShelter;
       });
 
       if (validResults.length === 0) {
@@ -1078,9 +1055,6 @@ export class ResponseGenerator {
     }
   }
 }
-
-// Initialize cleanup when the module is loaded
-ResponseGenerator.initializeCleanup();
 
 // Export the pattern categories and keywords
 export { patternCategories, shelterKeywords }; 
