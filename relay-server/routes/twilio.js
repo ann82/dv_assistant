@@ -352,7 +352,7 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
   }
 }
 
-export const formatTavilyResponse = (tavilyResponse) => {
+const formatTavilyResponse = (tavilyResponse) => {
   try {
     if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
       return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
