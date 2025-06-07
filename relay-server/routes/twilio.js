@@ -559,7 +559,7 @@ export {
 };
 
 // Twilio route handler
-router.post('/twilio/voice/process', async (req, res) => {
+router.post('/voice/process', async (req, res) => {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
 
