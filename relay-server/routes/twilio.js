@@ -117,6 +117,8 @@ router.use((req, res, next) => {
 });
 
 router.post('/voice', async (req, res) => {
+  logger.info('--- /twilio/voice endpoint hit ---');
+  logger.info('Request body:', req.body);
   try {
     logger.info('Processing voice request:', req.body);
     
@@ -135,7 +137,9 @@ router.post('/voice', async (req, res) => {
 
     logger.info('Sending TwiML response:', twiml.toString());
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.write(twiml.toString());
+    res.end();
+    logger.info('--- /twilio/voice endpoint response sent ---');
   } catch (error) {
     logger.error('Error processing voice request:', error);
     const twiml = new twilio.twiml.VoiceResponse();
@@ -152,6 +156,7 @@ router.post('/voice', async (req, res) => {
     });
     res.type('text/xml');
     res.send(twiml.toString());
+    logger.info('--- /twilio/voice endpoint error response sent ---');
   }
 });
 
@@ -159,11 +164,33 @@ router.post('/voice/process', async (req, res) => {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
 
+  logger.info('=== Starting new voice process request ===', {
+    requestId,
+    timestamp: new Date().toISOString(),
+    url: req.originalUrl,
+    method: req.method
+  });
+
   try {
+    logger.info('Raw request body:', {
+      requestId,
+      body: req.body,
+      headers: req.headers,
+      query: req.query
+    });
+
     const { CallSid, From, SpeechResult, Confidence } = req.body;
 
-    if (!CallSid || !From) {
-      logger.error('Missing required parameters:', { CallSid, From });
+    // Validate all required parameters
+    if (!CallSid || !From || !SpeechResult) {
+      logger.error('Missing required parameters:', { 
+        requestId,
+        CallSid, 
+        From, 
+        SpeechResult,
+        hasConfidence: !!Confidence,
+        rawBody: req.body
+      });
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say("I'm having trouble processing your request. Please try again.");
       twiml.gather({
@@ -176,26 +203,32 @@ router.post('/voice/process', async (req, res) => {
         language: 'en-US',
         timeout: '30'
       });
+      const twimlResponse = twiml.toString();
+      logger.info('Sending error TwiML response:', {
+        requestId,
+        twiml: twimlResponse
+      });
       res.type('text/xml');
-      res.send(twiml.toString());
+      res.send(twimlResponse);
       return;
     }
-
-    logger.info('Incoming Twilio request:', {
-      requestId,
-      method: req.method,
-      path: req.path,
-      headers: req.headers
-    });
 
     logger.info('Processing speech result:', {
       requestId,
       callSid: CallSid,
+      from: From,
       speechResult: SpeechResult,
-      confidence: Confidence
+      confidence: Confidence,
+      processingTime: Date.now() - startTime
     });
 
     const response = await processSpeechResult(CallSid, SpeechResult);
+    
+    logger.info('Received AI response:', {
+      requestId,
+      response,
+      processingTime: Date.now() - startTime
+    });
 
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
@@ -213,13 +246,27 @@ router.post('/voice/process', async (req, res) => {
       timeout: '30'
     });
 
+    const twimlResponse = twiml.toString();
+    logger.info('Sending TwiML response:', {
+      requestId,
+      twiml: twimlResponse,
+      totalProcessingTime: Date.now() - startTime
+    });
+
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.write(twimlResponse);
+    res.end();
+
+    logger.info('=== Completed voice process request ===', {
+      requestId,
+      totalTime: Date.now() - startTime
+    });
   } catch (error) {
     logger.error('Error processing request:', {
       requestId,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      processingTime: Date.now() - startTime
     });
     
     const twiml = new twilio.twiml.VoiceResponse();
@@ -235,8 +282,19 @@ router.post('/voice/process', async (req, res) => {
       timeout: '30'
     });
     
+    const twimlResponse = twiml.toString();
+    logger.info('Sending error TwiML response:', {
+      requestId,
+      twiml: twimlResponse
+    });
+
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.send(twimlResponse);
+
+    logger.info('=== Completed error response ===', {
+      requestId,
+      totalTime: Date.now() - startTime
+    });
   }
 });
 

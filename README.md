@@ -12,6 +12,31 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Test suite for all components
 - Cost logging for API usage tracking
 - Health check endpoint for monitoring
+- Enhanced logging and debugging capabilities
+
+## Enhanced Logging and Debugging
+
+The system includes comprehensive logging throughout the request-response lifecycle:
+
+- **Request Tracking**: Each request is assigned a unique ID for tracking
+- **Parameter Validation**: Detailed logging of required parameters
+- **Processing Time**: Tracking of processing time at each step
+- **Error Handling**: Enhanced error logging with stack traces
+- **Response Logging**: TwiML response logging before sending
+
+### Logging Levels
+
+- **INFO**: Normal operation logs
+- **ERROR**: Error and exception logs
+- **DEBUG**: Detailed debugging information
+
+### Debugging Tips
+
+1. Check the logs for the request ID to track a specific call
+2. Look for processing time spikes
+3. Monitor parameter validation errors
+4. Check TwiML response formatting
+5. Review error responses and stack traces
 
 ## Recent Changes
 
@@ -122,3 +147,30 @@ The application consists of several key components:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Parameters**
+   - Check logs for parameter validation errors
+   - Verify Twilio webhook configuration
+   - Ensure all required parameters are being sent
+
+2. **Response Issues**
+   - Review TwiML response logs
+   - Check processing time logs
+   - Verify response formatting
+
+3. **Timeout Issues**
+   - Monitor processing time logs
+   - Check for long-running operations
+   - Review timeout configurations
+
+### Debugging Steps
+
+1. Check the server logs for the request ID
+2. Review parameter validation logs
+3. Check processing time at each step
+4. Verify TwiML response format
+5. Review error logs if present

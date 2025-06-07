@@ -453,3 +453,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Resolved Twilio configuration access issues
 - Fixed `config.twilio`
+
+## [1.11.0] - 2024-04-03
+
+### Added
+- Enhanced logging throughout Twilio voice processing
+  - Comprehensive request lifecycle tracking
+  - Detailed parameter validation logging
+  - Processing time tracking at each step
+  - Request ID tracking for better debugging
+  - Raw request body and headers logging
+  - TwiML response logging before sending
+  - Error response tracking
+- Improved parameter validation
+  - Added validation for SpeechResult parameter
+  - Enhanced error messages for missing parameters
+  - Better error response handling
+
+### Changed
+- Updated TwiML response handling
+  - More consistent response formatting
+  - Better error message formatting
+  - Improved gather verb configuration
+- Enhanced error handling
+  - More detailed error logging
+  - Better error response structure
+  - Processing time tracking in errors
