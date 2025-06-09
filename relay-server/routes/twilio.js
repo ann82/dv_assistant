@@ -14,6 +14,7 @@ import pkg from 'twilio/lib/twiml/VoiceResponse.js';
 const { VoiceResponse } = pkg;
 import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
 import { generateSpeechHash } from '../lib/utils.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,11 @@ const getWebSocketServer = () => {
 // Add after other global variables
 const processedSpeechResults = new Map();
 const callContexts = new Map();
+
+// Cache for Tavily API responses
+const tavilyCache = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+const MAX_CACHE_SIZE = 1000; // Maximum number of cached responses
 
 // Function to fetch and log Twilio call details
 async function fetchCallDetails(callSid) {
@@ -242,40 +248,15 @@ function extractLocationFromSpeech(speechResult) {
   return null;
 }
 
-// Helper function to generate location prompt
+// Generate a prompt asking for location
 function generateLocationPrompt() {
   const prompts = [
-    "I need to know your location to help you find resources. Could you please tell me which city or area you're in?",
-    "To help you better, I need to know where you are. Could you please specify your location?",
-    "I want to make sure I find resources close to you. What city or area are you currently in?",
-    "To provide the most relevant help, I need to know your location. Could you please tell me where you are?",
-    "I can help you find resources in your area. Could you please let me know which city you're in?",
-    "To connect you with local resources, I need to know your location. What city or area are you in?",
-    "I want to find help that's accessible to you. Could you please tell me your location?",
-    "To better assist you, I need to know where you are. What city or area are you currently in?",
-    "I can help you find nearby resources. Could you please specify your location?",
-    "To provide the most relevant assistance, I need to know your location. What city are you in?"
+    "I need to know your location to find nearby resources. Could you please tell me your city or area? For example, you could say San Francisco, Oakland, or San Jose.",
+    "To help you find local resources, I need to know where you are. Please tell me your city or area, like San Mateo, Santa Clara, or any other city in the Bay Area.",
+    "I can help you find resources in your area. Could you please tell me which city you're in? For example, you could say San Francisco, San Jose, or any other city nearby.",
+    "To find the closest resources to you, I need to know your location. Please tell me your city or area, such as Oakland, San Mateo, or any other city in the region."
   ];
-
-  // Add example locations to some prompts
-  const exampleLocations = [
-    "For example, you could say 'I'm in San Francisco' or 'I'm in San Jose'",
-    "You can say something like 'I'm in Oakland' or 'I'm in Santa Clara'",
-    "Try saying 'I'm in San Mateo' or 'I'm in Redwood City'",
-    "You could say 'I'm in Mountain View' or 'I'm in Sunnyvale'"
-  ];
-
-  // Randomly select a prompt and an example location
-  const prompt = prompts[Math.floor(Math.random() * prompts.length)];
-  const example = exampleLocations[Math.floor(Math.random() * exampleLocations.length)];
-
-  // Add a small delay to make it feel more natural
-  const delay = Math.floor(Math.random() * 1000) + 500;
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve(`${prompt} ${example}`);
-    }, delay);
-  });
+  return prompts[Math.floor(Math.random() * prompts.length)];
 }
 
 // Handler for Twilio voice calls
@@ -646,37 +627,36 @@ export {
   generateLocationPrompt
 };
 
-// Twilio route handler
+// Handle incoming voice calls
 router.post('/voice/process', async (req, res) => {
   const startTime = Date.now();
-  const requestId = Math.random().toString(36).substring(7);
-
-  logger.info('=== Starting new voice process request ===', {
+  const requestId = uuidv4();
+  const callSid = req.body.CallSid;
+  
+  logger.info('Received voice call request:', {
     requestId,
-    timestamp: new Date().toISOString(),
-    url: req.originalUrl,
-    method: req.method
+    callSid,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+
+  // Handle request abort
+  req.on('aborted', () => {
+    logger.warn('Request aborted by client:', {
+      requestId,
+      callSid,
+      timestamp: new Date().toISOString(),
+      duration: Date.now() - startTime
+    });
   });
 
   try {
-    logger.info('Raw request body:', {
-      requestId,
-      body: req.body,
-      headers: req.headers,
-      query: req.query
-    });
-
-    const { CallSid, From, SpeechResult, Confidence } = req.body;
-
-    // Validate all required parameters
-    if (!CallSid || !From || !SpeechResult) {
-      logger.error('Missing required parameters:', { 
+    // Validate request
+    if (!req.body || !req.body.CallSid) {
+      logger.error('Invalid request body:', {
         requestId,
-        CallSid, 
-        From, 
-        SpeechResult,
-        hasConfidence: !!Confidence,
-        rawBody: req.body
+        body: req.body,
+        duration: Date.now() - startTime
       });
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say("I'm having trouble processing your request. Please try again.");
@@ -691,13 +671,60 @@ router.post('/voice/process', async (req, res) => {
         timeout: '30'
       });
       res.type('text/xml');
-      res.send(twiml.toString());
-      return;
+      return res.send(twiml.toString());
     }
 
-    // Process the speech result as Twilio request
-    const response = await processSpeechResult(CallSid, SpeechResult, requestId, 'twilio');
+    // Check if this is a new call
+    const isNewCall = !req.body.SpeechResult;
     
+    if (isNewCall) {
+      logger.info('New call received, generating welcome prompt:', {
+        requestId,
+        callSid,
+        duration: Date.now() - startTime
+      });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say(generateWelcomePrompt());
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: '15',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US',
+        timeout: '30'
+      });
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    // Process speech result
+    const processStartTime = Date.now();
+    logger.info('Processing speech result:', {
+      requestId,
+      callSid,
+      speechResult: req.body.SpeechResult,
+      duration: processStartTime - startTime
+    });
+
+    const response = await processSpeechResult(
+      req.body.CallSid,
+      req.body.SpeechResult,
+      requestId,
+      'twilio'
+    );
+
+    const processEndTime = Date.now();
+    logger.info('Speech processing completed:', {
+      requestId,
+      callSid,
+      responseLength: response.length,
+      responsePreview: response.substring(0, 100) + '...',
+      processingDuration: processEndTime - processStartTime,
+      totalDuration: processEndTime - startTime
+    });
+
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
     twiml.gather({
@@ -710,23 +737,27 @@ router.post('/voice/process', async (req, res) => {
       language: 'en-US',
       timeout: '30'
     });
-
     res.type('text/xml');
     res.send(twiml.toString());
 
-    logger.info('=== Completed voice process request ===', {
+    logger.info('Response sent to client:', {
       requestId,
-      duration: Date.now() - startTime
+      callSid,
+      totalDuration: Date.now() - startTime
     });
   } catch (error) {
-    logger.error('Error processing voice request:', {
+    logger.error('Error processing voice call:', {
       requestId,
+      callSid,
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      body: req.body,
+      duration: Date.now() - startTime
     });
-    
+
+    // Send a user-friendly error response
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm having trouble processing your request. Please try again.");
+    twiml.say("I'm sorry, I'm having trouble processing your request. Please try again.");
     twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
@@ -741,5 +772,120 @@ router.post('/voice/process', async (req, res) => {
     res.send(twiml.toString());
   }
 });
+
+// Call Tavily API with optimized caching and error handling
+async function callTavilyAPI(query) {
+  const cacheKey = query.toLowerCase().trim();
+  const cachedResponse = tavilyCache.get(cacheKey);
+  
+  if (cachedResponse && (Date.now() - cachedResponse.timestamp) < CACHE_TTL) {
+    logger.info('Using cached Tavily response:', {
+      query,
+      cacheAge: Date.now() - cachedResponse.timestamp,
+      cacheSize: tavilyCache.size
+    });
+    return cachedResponse.data;
+  }
+
+  logger.info('Calling Tavily API:', { query });
+  const startTime = Date.now();
+
+  try {
+    // Prepare search parameters
+    const searchParams = {
+      query,
+      search_depth: 'basic', // Use basic search for faster results
+      max_results: 3, // Limit results to reduce response size
+      include_answer: false, // Don't need AI-generated answer
+      include_domains: [], // Don't need domain filtering
+      include_raw_content: false, // Don't need raw content
+      sort_by_date: false, // Don't need date sorting
+      include_images: false, // Don't need images
+      include_videos: false, // Don't need videos
+      include_news: false, // Don't need news
+      include_domains: [], // Don't need domain filtering
+      exclude_domains: [], // Don't need domain exclusion
+      time_period: null // Don't need time period filtering
+    };
+
+    // Make API call with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': process.env.TAVILY_API_KEY
+      },
+      body: JSON.stringify(searchParams),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const duration = Date.now() - startTime;
+    
+    logger.info('Tavily API response received:', {
+      query,
+      duration,
+      resultCount: data.results?.length,
+      responseSize: JSON.stringify(data).length
+    });
+
+    // Clean up cache if it's too large
+    if (tavilyCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = Array.from(tavilyCache.entries())
+        .sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
+      tavilyCache.delete(oldestKey);
+      logger.info('Cleaned up oldest cache entry:', {
+        removedKey: oldestKey,
+        newCacheSize: tavilyCache.size
+      });
+    }
+
+    // Cache the response
+    tavilyCache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+
+    return data;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    
+    if (error.name === 'AbortError') {
+      logger.error('Tavily API call timed out:', {
+        query,
+        duration,
+        timeout: 10000
+      });
+      throw new Error('Search request timed out. Please try again.');
+    }
+
+    logger.error('Error calling Tavily API:', {
+      query,
+      error: error.message,
+      duration,
+      stack: error.stack
+    });
+
+    // If we have a cached response, use it even if expired
+    if (cachedResponse) {
+      logger.info('Using expired cache due to API error:', {
+        query,
+        cacheAge: Date.now() - cachedResponse.timestamp
+      });
+      return cachedResponse.data;
+    }
+
+    throw error;
+  }
+}
 
 export default router;

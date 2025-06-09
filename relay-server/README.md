@@ -1,44 +1,97 @@
-# Relay Server
+# DV Assistant Relay Server
 
-## Overview
-The Relay Server is responsible for handling incoming requests, processing speech input, and interacting with external APIs to provide relevant resources and information.
+A Node.js server that handles Twilio voice calls and Tavily API integration for domestic violence resource search.
 
 ## Features
-- **Speech Processing**: Converts speech input to text and extracts relevant information.
-- **Location Extraction**: Intelligently extracts location information from user input.
-- **Resource Retrieval**: Uses the Tavily API to fetch relevant resources based on user queries.
-- **Response Formatting**: Formats responses to be clear and user-friendly.
-- **Error Handling**: Robust error handling and logging for better debugging.
 
-## Recent Updates
-- **Enhanced Location Extraction**: Improved extraction of location information from speech input, including handling of complex mentions and removal of leading articles.
-- **Improved Prompts**: More natural and empathetic prompts for user interaction.
-- **Comprehensive Testing**: Added tests for location extraction and prompt generation to ensure reliability.
+- **Twilio Voice Integration**: Handles incoming voice calls and processes speech input
+- **Tavily API Integration**: Searches for domestic violence resources based on location
+- **Real-time Communication**: WebSocket server for live updates
+- **Audio File Handling**: Manages audio file storage and caching
+- **Performance Optimizations**:
+  - Response caching with automatic cleanup
+  - Request timeout handling
+  - Optimized API payloads
+  - Detailed performance metrics
+
+## Performance Optimizations
+
+### Tavily API Integration
+- **Response Caching**: 30-minute TTL with automatic cleanup
+- **Cache Management**: Maximum 1000 entries with LRU eviction
+- **API Timeout**: 10-second timeout for API calls
+- **Optimized Payload**: Reduced search depth and disabled unnecessary features
+- **Error Handling**: Fallback to expired cache on API errors
+
+### Request Processing
+- **Timing Metrics**: Detailed timing for each processing step
+- **Request Abort Handling**: Proper cleanup on client disconnection
+- **Error Recovery**: User-friendly error messages and graceful degradation
 
 ## Getting Started
-1. **Installation**:
-   ```bash
-   npm install
-   ```
 
-2. **Running the Server**:
-   ```bash
-   npm start
-   ```
+### Prerequisites
+- Node.js 18 or higher
+- Twilio account and credentials
+- Tavily API key
 
-3. **Running Tests**:
-   ```bash
-   npm test
-   ```
+### Installation
+```bash
+npm install
+```
 
-## Configuration
-- Ensure environment variables are set for API keys and other configurations.
-- Check `config.js` for detailed configuration options.
+### Configuration
+Create a `.env` file with the following variables:
+```
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TAVILY_API_KEY=your_tavily_api_key
+```
+
+### Running the Server
+```bash
+npm start
+```
+
+### Running Tests
+```bash
+npm test
+```
+
+## API Endpoints
+
+### Twilio Voice
+- `POST /twilio/voice/process`: Handles incoming voice calls and processes speech input
+
+### WebSocket
+- `WS /ws`: WebSocket endpoint for real-time updates
+
+## Error Handling
+
+The server implements comprehensive error handling:
+- Request timeouts
+- API failures
+- Client disconnections
+- Invalid inputs
+
+All errors are logged with detailed context for debugging.
+
+## Performance Monitoring
+
+The server logs detailed performance metrics:
+- Request processing time
+- API call duration
+- Cache hit/miss rates
+- Response sizes
 
 ## Contributing
-- Fork the repository.
-- Create a feature branch.
-- Submit a pull request.
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
-This project is licensed under the MIT License. 
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

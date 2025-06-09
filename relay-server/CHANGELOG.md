@@ -70,19 +70,24 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Lightweight in-memory cache system for query responses
-- Cache statistics reporting
-- **Enhanced Location Extraction**: Improved extraction of location information from speech input, including handling of complex mentions and removal of leading articles.
-- **Improved Prompts**: More natural and empathetic prompts for user interaction.
-- **Comprehensive Testing**: Added tests for location extraction and prompt generation to ensure reliability.
+- Detailed timing metrics for request processing
+- Request abort handling and logging
+- Improved error handling with user-friendly messages
+- Enhanced logging for better debugging
 
 ### Changed
-- Refactored caching mechanism to use a dedicated QueryCache class
-- Updated tests to reflect new cache implementation
+- Optimized Tavily API integration:
+  - Added response caching with 30-minute TTL
+  - Implemented cache size management (max 1000 entries)
+  - Added 10-second timeout for API calls
+  - Reduced API payload size and search depth
+  - Added fallback to expired cache on API errors
+- Updated location prompts to include example cities
+- Improved error messages for better user experience
 
-### Removed
-- Obsolete tests referencing old confidenceCache
-- Unused files: audioService.js, audio.js, .babelrc, webpack.config.js, tsconfig.json, src/reportWebVitals.ts, src/setupTests.ts, src/logo.svg, and unused toggle component
-- Unused dependencies from package.json
+### Fixed
+- Fixed request abort handling to prevent server hanging
+- Fixed location prompt test to include example cities
+- Fixed duplicate route path issue in Twilio integration
 
 // ... existing changelog entries ... 
