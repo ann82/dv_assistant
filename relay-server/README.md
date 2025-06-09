@@ -84,6 +84,11 @@ The server logs detailed performance metrics:
 - Cache hit/miss rates
 - Response sizes
 
+## Security
+
+- Some moderate vulnerabilities remain in dev dependencies (esbuild, vite, vitest) due to upstream issues in the testing toolchain. These do **not** affect production code or runtime security.
+- Attempted to update all dev dependencies to the latest compatible versions. See CHANGELOG for details.
+
 ## Contributing
 
 1. Fork the repository

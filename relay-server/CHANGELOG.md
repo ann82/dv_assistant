@@ -90,4 +90,17 @@ All notable changes to this project will be documented in this file.
 - Fixed location prompt test to include example cities
 - Fixed duplicate route path issue in Twilio integration
 
+### Security
+- Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
+
+## [1.0.0] - 2024-03-19
+
+### Added
+- Initial release
+- Twilio voice call integration
+- Tavily API integration for resource search
+- WebSocket server for real-time communication
+- Audio file handling and caching
+- Basic error handling and logging
+
 // ... existing changelog entries ... 
