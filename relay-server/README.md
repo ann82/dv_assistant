@@ -89,6 +89,10 @@ The server logs detailed performance metrics:
 - Some moderate vulnerabilities remain in dev dependencies (esbuild, vite, vitest) due to upstream issues in the testing toolchain. These do **not** affect production code or runtime security.
 - Attempted to update all dev dependencies to the latest compatible versions. See CHANGELOG for details.
 
+## Recent Fixes
+
+- Removed duplicate declaration of `callTavilyAPI` and fixed import to use `lib/apis.js`.
+
 ## Contributing
 
 1. Fork the repository

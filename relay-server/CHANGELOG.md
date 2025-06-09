@@ -89,6 +89,7 @@ All notable changes to this project will be documented in this file.
 - Fixed request abort handling to prevent server hanging
 - Fixed location prompt test to include example cities
 - Fixed duplicate route path issue in Twilio integration
+- Removed duplicate declaration of callTavilyAPI and fixed import to use lib/apis.js
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
