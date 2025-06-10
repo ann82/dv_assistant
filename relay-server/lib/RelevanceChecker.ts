@@ -3,7 +3,9 @@ export class RelevanceChecker {
 
   isRelevant(query: string): boolean {
     const lowerQuery = query.toLowerCase();
-    return this.relevantKeywords.some(keyword => lowerQuery.includes(keyword));
+    const isRelevant = this.relevantKeywords.some(keyword => lowerQuery.includes(keyword));
+    console.log(`Relevance check for query: "${query}" - Result: ${isRelevant}`);
+    return isRelevant;
   }
 
   async checkRelevanceWithGPT(query: string): Promise<boolean> {
