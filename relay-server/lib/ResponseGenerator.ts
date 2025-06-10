@@ -1,4 +1,4 @@
-import { IntentExtractor } from './IntentExtractor';
+import { IntentExtractor } from './IntentExtractor.js';
 import { EntityExtractor } from './EntityExtractor';
 import { ContextManager } from './ContextManager';
 import { RelevanceChecker } from './RelevanceChecker';
