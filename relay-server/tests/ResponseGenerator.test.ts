@@ -63,7 +63,7 @@ describe('ResponseGenerator', () => {
     vi.spyOn(entityExtractor, 'extractTopic').mockReturnValue('shelter');
     vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue({ results: ['Shelter 1', 'Shelter 2'] });
     const response = await responseGenerator.generateResponse('session1', 'Are there shelters in San Jose?');
-    expect(response).toBe('Here are some resources: {"results":["Shelter 1","Shelter 2"]}');
+    expect(response).toBe('Here are some resources: ["Shelter 1","Shelter 2"]');
   });
 
   it('should call Tavily API if no cached response', async () => {
@@ -74,7 +74,7 @@ describe('ResponseGenerator', () => {
     vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue(null);
     vi.spyOn(tavilyService, 'callTavilyAPI').mockResolvedValue({ results: ['Shelter 1', 'Shelter 2'] });
     const response = await responseGenerator.generateResponse('session1', 'Are there shelters in San Jose?');
-    expect(response).toBe('Here are some resources: {"results":["Shelter 1","Shelter 2"]}');
+    expect(response).toBe('Here are some resources: ["Shelter 1","Shelter 2"]');
   });
 
   it('should fallback to GPT if Tavily API fails', async () => {
@@ -88,7 +88,7 @@ describe('ResponseGenerator', () => {
     expect(response).toBe('GPT Fallback: You\'re a trauma-informed assistant helping someone with a domestic violence concern. They asked: \'Are there shelters in San Jose?\'. Location: \'San Jose\'. Context: \'undefined\'. Give safe, non-judgmental guidance.');
   });
 
-  it('should handle follow-up queries correctly', async () => {
+  it('should handle follow-up questions correctly', async () => {
     vi.spyOn(relevanceChecker, 'isRelevant').mockReturnValue(true);
     vi.spyOn(intentExtractor, 'classifyIntent').mockReturnValue('get_info');
     vi.spyOn(entityExtractor, 'extractLocation').mockReturnValue(null);
@@ -97,6 +97,50 @@ describe('ResponseGenerator', () => {
     vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue(null);
     vi.spyOn(tavilyService, 'callTavilyAPI').mockResolvedValue({ results: ['Shelter 1 allows pets', 'Shelter 2 does not allow pets'] });
     const response = await responseGenerator.generateResponse('session1', 'Do they allow pets?');
-    expect(response).toBe('Here are some resources: {"results":["Shelter 1 allows pets","Shelter 2 does not allow pets"]}');
+    expect(response).toBe('Here\'s what I found about your question: [{"title":"Shelter 1 allows pets","url":null},{"title":"Shelter 2 does not allow pets","url":null}]');
+  });
+
+  it('should return a message if location is missing in follow-up', async () => {
+    vi.spyOn(relevanceChecker, 'isRelevant').mockReturnValue(true);
+    vi.spyOn(intentExtractor, 'classifyIntent').mockReturnValue('get_info');
+    vi.spyOn(entityExtractor, 'extractLocation').mockReturnValue(null);
+    vi.spyOn(entityExtractor, 'extractTopic').mockReturnValue('pets');
+    vi.spyOn(contextManager, 'getContext').mockReturnValue({ location: null });
+    const response = await responseGenerator.generateResponse('session1', 'Do they allow pets?');
+    expect(response).toBe("I couldn't find the previous location. Please specify a location.");
+  });
+
+  it('should handle initial question with topic', async () => {
+    vi.spyOn(relevanceChecker, 'isRelevant').mockReturnValue(true);
+    vi.spyOn(intentExtractor, 'classifyIntent').mockReturnValue('get_info');
+    vi.spyOn(entityExtractor, 'extractLocation').mockReturnValue('San Jose');
+    vi.spyOn(entityExtractor, 'extractTopic').mockReturnValue('legal help');
+    vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue(null);
+    vi.spyOn(tavilyService, 'callTavilyAPI').mockResolvedValue({ results: ['Shelter 1 provides legal help', 'Shelter 2 does not provide legal help'] });
+    const response = await responseGenerator.generateResponse('session1', 'Do they provide legal help in San Jose?');
+    expect(response).toBe('Here are some resources: ["Shelter 1 provides legal help","Shelter 2 does not provide legal help"]');
+  });
+
+  it('should handle follow-up question with missing topic', async () => {
+    vi.spyOn(relevanceChecker, 'isRelevant').mockReturnValue(true);
+    vi.spyOn(intentExtractor, 'classifyIntent').mockReturnValue('get_info');
+    vi.spyOn(entityExtractor, 'extractLocation').mockReturnValue(null);
+    vi.spyOn(entityExtractor, 'extractTopic').mockReturnValue(null);
+    vi.spyOn(contextManager, 'getContext').mockReturnValue({ location: 'San Jose' });
+    vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue(null);
+    vi.spyOn(tavilyService, 'callTavilyAPI').mockResolvedValue({ results: ['Shelter 1', 'Shelter 2'] });
+    const response = await responseGenerator.generateResponse('session1', 'What about them?');
+    expect(response).toBe('Here\'s what I found about your question: [{"title":"Shelter 1","url":null},{"title":"Shelter 2","url":null}]');
+  });
+
+  it('should fallback to GPT if Tavily API fails', async () => {
+    vi.spyOn(relevanceChecker, 'isRelevant').mockReturnValue(true);
+    vi.spyOn(intentExtractor, 'classifyIntent').mockReturnValue('find_shelter');
+    vi.spyOn(entityExtractor, 'extractLocation').mockReturnValue('San Jose');
+    vi.spyOn(entityExtractor, 'extractTopic').mockReturnValue('shelter');
+    vi.spyOn(tavilyService, 'getCachedResponse').mockReturnValue(null);
+    vi.spyOn(tavilyService, 'callTavilyAPI').mockRejectedValue(new Error('API error'));
+    const response = await responseGenerator.generateResponse('session1', 'Are there shelters in San Jose?');
+    expect(response).toBe('GPT Fallback: You\'re a trauma-informed assistant helping someone with a domestic violence concern. They asked: \'Are there shelters in San Jose?\'. Location: \'San Jose\'. Context: \'undefined\'. Give safe, non-judgmental guidance.');
   });
 }); 
