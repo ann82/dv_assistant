@@ -74,6 +74,7 @@ All notable changes to this project will be documented in this file.
 - Request abort handling and logging
 - Improved error handling with user-friendly messages
 - Enhanced logging for better debugging
+- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions. This ensures that follow-up questions do not require a new location extraction.
 
 ### Changed
 - Optimized Tavily API integration:
@@ -85,12 +86,14 @@ All notable changes to this project will be documented in this file.
 - Updated location prompts to include example cities
 - Improved error messages for better user experience
 - Migrated tests from Jest to Vitest for faster execution and better ESM support
+- Updated the `ResponseGenerator` to handle follow-up questions differently from initial questions, improving the user experience by maintaining context.
 
 ### Fixed
 - Fixed request abort handling to prevent server hanging
 - Fixed location prompt test to include example cities
 - Fixed duplicate route path issue in Twilio integration
 - Removed duplicate declaration of callTavilyAPI and fixed import to use lib/apis.js
+- Fixed a linter error in the `ResponseGenerator` class related to the `location` type.
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.

@@ -1,107 +1,40 @@
-# DV Assistant Relay Server
+# Relay Server
 
-A Node.js server that handles Twilio voice calls and Tavily API integration for domestic violence resource search.
+This server handles incoming requests from Twilio, processes them, and returns appropriate responses.
 
 ## Features
 
-- **Twilio Voice Integration**: Handles incoming voice calls and processes speech input
-- **Tavily API Integration**: Searches for domestic violence resources based on location
-- **Real-time Communication**: WebSocket server for live updates
-- **Audio File Handling**: Manages audio file storage and caching
-- **Performance Optimizations**:
-  - Response caching with automatic cleanup
-  - Request timeout handling
-  - Optimized API payloads
-  - Detailed performance metrics
+- **Twilio Integration:** Handles incoming calls and messages from Twilio.
+- **Intent Classification:** Classifies user intents using the `IntentExtractor`.
+- **Entity Extraction:** Extracts locations and topics from user queries using the `EntityExtractor`.
+- **Context Management:** Manages conversation context to handle follow-up questions.
+- **Relevance Checking:** Ensures queries are relevant to the domain.
+- **Tavily API Integration:** Fetches relevant information using the Tavily API.
+- **Fallback to GPT:** Provides a fallback mechanism using GPT for responses when the Tavily API fails.
 
-## Performance Optimizations
+## Recent Updates
 
-### Tavily API Integration
-- **Response Caching**: 30-minute TTL with automatic cleanup
-- **Cache Management**: Maximum 1000 entries with LRU eviction
-- **API Timeout**: 10-second timeout for API calls
-- **Optimized Payload**: Reduced search depth and disabled unnecessary features
-- **Error Handling**: Fallback to expired cache on API errors
+- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions. This ensures that follow-up questions do not require a new location extraction.
 
-### Request Processing
-- **Timing Metrics**: Detailed timing for each processing step
-- **Request Abort Handling**: Proper cleanup on client disconnection
-- **Error Recovery**: User-friendly error messages and graceful degradation
+## Installation
 
-## Getting Started
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the server:
+   ```bash
+   npm start
+   ```
 
-### Prerequisites
-- Node.js 18 or higher
-- Twilio account and credentials
-- Tavily API key
+## Testing
 
-### Installation
-```bash
-npm install
-```
-
-### Configuration
-Create a `.env` file with the following variables:
-```
-TWILIO_ACCOUNT_SID=your_account_sid
-TWILIO_AUTH_TOKEN=your_auth_token
-TAVILY_API_KEY=your_tavily_api_key
-```
-
-### Running the Server
-```bash
-npm start
-```
-
-### Running Tests
+Run the tests using:
 ```bash
 npm test
 ```
 
-## API Endpoints
-
-### Twilio Voice
-- `POST /twilio/voice/process`: Handles incoming voice calls and processes speech input
-
-### WebSocket
-- `WS /ws`: WebSocket endpoint for real-time updates
-
-## Error Handling
-
-The server implements comprehensive error handling:
-- Request timeouts
-- API failures
-- Client disconnections
-- Invalid inputs
-
-All errors are logged with detailed context for debugging.
-
-## Performance Monitoring
-
-The server logs detailed performance metrics:
-- Request processing time
-- API call duration
-- Cache hit/miss rates
-- Response sizes
-
-## Security
-
-- Some moderate vulnerabilities remain in dev dependencies (esbuild, vite, vitest) due to upstream issues in the testing toolchain. These do **not** affect production code or runtime security.
-- Attempted to update all dev dependencies to the latest compatible versions. See CHANGELOG for details.
-
-## Recent Fixes
-
-- Removed duplicate declaration of `callTavilyAPI` and fixed import to use `lib/apis.js`.
-- Migrated tests from Jest to Vitest for faster execution and better ESM support.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License. 
