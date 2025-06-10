@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { config } from './config.js';
 import { AudioProcessor } from './audio.js';
-import { ResponseGenerator } from './ResponseGenerator.js';
+import { ResponseGenerator } from '../dist/ResponseGenerator.js';
 import { costLogger } from './costLogger.js';
 import logger from './logger.js';
 
