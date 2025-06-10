@@ -2,7 +2,9 @@ export class EntityExtractor {
   extractLocation(query: string): string | null {
     // Remove trailing punctuation
     const cleanedQuery = query.replace(/[.,!?;]$/, '');
+    console.log(`Cleaned query for location extraction: "${cleanedQuery}"`);
     const locationMatch = cleanedQuery.match(/(?:in|near|at)\s+([A-Za-z\s]+)/i);
+    console.log(`Location match result: ${locationMatch ? locationMatch[1].trim() : 'null'}`);
     return locationMatch ? locationMatch[1].trim() : null;
   }
 
