@@ -1,8 +1,8 @@
 import { IntentExtractor } from './IntentExtractor.js';
-import { EntityExtractor } from './EntityExtractor';
-import { ContextManager } from './ContextManager';
-import { RelevanceChecker } from './RelevanceChecker';
-import { TavilyService } from './TavilyService';
+import { EntityExtractor } from './EntityExtractor.js';
+import { ContextManager } from './ContextManager.js';
+import { RelevanceChecker } from './RelevanceChecker.js';
+import { TavilyService } from './TavilyService.js';
 
 export class ResponseGenerator {
   private intentExtractor: IntentExtractor;
