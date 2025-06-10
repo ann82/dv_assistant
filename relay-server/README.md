@@ -15,6 +15,7 @@ This server handles incoming requests from Twilio, processes them, and returns a
 ## Recent Updates
 
 - **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions. This ensures that follow-up questions do not require a new location extraction.
+- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction, ensuring accurate extraction of locations like 'New York'.
 
 ## Installation
 
