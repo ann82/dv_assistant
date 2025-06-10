@@ -70,31 +70,19 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Detailed timing metrics for request processing
-- Request abort handling and logging
-- Improved error handling with user-friendly messages
-- Enhanced logging for better debugging
-- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions. This ensures that follow-up questions do not require a new location extraction.
-- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction, ensuring accurate extraction of locations like 'New York'.
+- **TypeScript Migration:** Core components have been migrated to TypeScript for better type safety and maintainability.
+- **Response Handling Improvements:** Enhanced response generation for irrelevant queries with proper domain-specific responses.
+- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions.
+- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction.
 
 ### Changed
-- Optimized Tavily API integration:
-  - Added response caching with 30-minute TTL
-  - Implemented cache size management (max 1000 entries)
-  - Added 10-second timeout for API calls
-  - Reduced API payload size and search depth
-  - Added fallback to expired cache on API errors
-- Updated location prompts to include example cities
-- Improved error messages for better user experience
-- Migrated tests from Jest to Vitest for faster execution and better ESM support
 - Updated the `ResponseGenerator` to handle follow-up questions differently from initial questions, improving the user experience by maintaining context.
+- Migrated core components from JavaScript to TypeScript for better type safety and maintainability.
+- Updated build process to include TypeScript compilation.
 
 ### Fixed
-- Fixed request abort handling to prevent server hanging
-- Fixed location prompt test to include example cities
-- Fixed duplicate route path issue in Twilio integration
-- Removed duplicate declaration of callTavilyAPI and fixed import to use lib/apis.js
 - Fixed a linter error in the `ResponseGenerator` class related to the `location` type.
+- Fixed response handling for irrelevant queries to ensure proper domain-specific responses.
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.

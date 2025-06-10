@@ -1,6 +1,6 @@
 import { WebSocket as RealWebSocket } from 'ws';
 import { config } from './config.js';
-import { ResponseGenerator } from './response.js';
+import { ResponseGenerator } from './ResponseGenerator.js';
 import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
 import logger from './logger.js';

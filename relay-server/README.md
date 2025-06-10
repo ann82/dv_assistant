@@ -14,8 +14,10 @@ This server handles incoming requests from Twilio, processes them, and returns a
 
 ## Recent Updates
 
-- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions. This ensures that follow-up questions do not require a new location extraction.
-- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction, ensuring accurate extraction of locations like 'New York'.
+- **TypeScript Migration:** Core components have been migrated to TypeScript for better type safety and maintainability.
+- **Response Handling Improvements:** Enhanced response generation for irrelevant queries with proper domain-specific responses.
+- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions.
+- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction.
 
 ## Installation
 
@@ -24,16 +26,31 @@ This server handles incoming requests from Twilio, processes them, and returns a
    ```bash
    npm install
    ```
-3. Start the server:
+3. Build TypeScript files:
+   ```bash
+   npm run build
+   ```
+4. Start the server:
    ```bash
    npm start
    ```
 
-## Testing
+## Development
 
-Run the tests using:
+The project uses TypeScript for better type safety and maintainability. Key development commands:
+
 ```bash
+# Run tests
 npm test
+
+# Watch mode for tests
+npm run test:watch
+
+# Generate test coverage
+npm run test:coverage
+
+# Build TypeScript files
+npm run build
 ```
 
 ## License
