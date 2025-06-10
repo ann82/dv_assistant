@@ -92,6 +92,7 @@ The server logs detailed performance metrics:
 ## Recent Fixes
 
 - Removed duplicate declaration of `callTavilyAPI` and fixed import to use `lib/apis.js`.
+- Migrated tests from Jest to Vitest for faster execution and better ESM support.
 
 ## Contributing
 

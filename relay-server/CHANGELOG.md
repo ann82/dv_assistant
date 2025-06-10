@@ -84,6 +84,7 @@ All notable changes to this project will be documented in this file.
   - Added fallback to expired cache on API errors
 - Updated location prompts to include example cities
 - Improved error messages for better user experience
+- Migrated tests from Jest to Vitest for faster execution and better ESM support
 
 ### Fixed
 - Fixed request abort handling to prevent server hanging
