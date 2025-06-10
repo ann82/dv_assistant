@@ -1,4 +1,4 @@
-import { Cache } from './Cache';
+import { Cache } from './Cache.js';
 
 export class TavilyService {
   private cache: Cache;
