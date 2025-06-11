@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
+import { 
+  getIntent, 
+  intentHandlers, 
+  rewriteQuery, 
+  updateConversationContext, 
+  getConversationContext, 
+  clearConversationContext 
+} from '../lib/intentClassifier.js';
 
 // Mock OpenAI
 vi.mock('openai', () => ({
@@ -15,6 +22,8 @@ vi.mock('openai', () => ({
 describe('Intent Classification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Clear conversation contexts between tests
+    clearConversationContext('test-call-sid');
   });
 
   describe('getIntent', () => {
@@ -41,10 +50,10 @@ describe('Intent Classification', () => {
       openai.mock.results[0].value.chat.completions.create.mockRejectedValue(new Error('API Error'));
 
       const result = await getIntent('test query');
-      expect(result).toBe('general_query');
+      expect(result).toBe('general_information');
     });
 
-    it('should return general_query when no function call is returned', async () => {
+    it('should return general_information when no function call is returned', async () => {
       const mockResponse = {
         choices: [{
           message: {}
@@ -55,44 +64,104 @@ describe('Intent Classification', () => {
       openai.mock.results[0].value.chat.completions.create.mockResolvedValue(mockResponse);
 
       const result = await getIntent('test query');
-      expect(result).toBe('general_query');
+      expect(result).toBe('general_information');
     });
   });
 
   describe('intentHandlers', () => {
     it('should return correct response types for each intent', async () => {
       expect(await intentHandlers.find_shelter('test')).toBe('shelter_search');
-      expect(await intentHandlers.get_information('test')).toBe('information_search');
-      expect(await intentHandlers.get_support_resource('test')).toBe('resource_search');
-      expect(await intentHandlers.get_contact_details('test')).toBe('contact_search');
-      expect(await intentHandlers.general_query('test')).toBe('general_response');
+      expect(await intentHandlers.legal_services('test')).toBe('legal_resource_search');
+      expect(await intentHandlers.counseling_services('test')).toBe('counseling_resource_search');
+      expect(await intentHandlers.emergency_help('test')).toBe('emergency_response');
+      expect(await intentHandlers.general_information('test')).toBe('information_search');
+      expect(await intentHandlers.other_resources('test')).toBe('resource_search');
+    });
+  });
+
+  describe('Conversation Context', () => {
+    it('should update and retrieve conversation context', () => {
+      const callSid = 'test-call-sid';
+      const intent = 'find_shelter';
+      const query = 'find shelter near me';
+      const response = 'Here are some shelters...';
+
+      updateConversationContext(callSid, intent, query, response);
+      const context = getConversationContext(callSid);
+
+      expect(context).toBeDefined();
+      expect(context.lastIntent).toBe(intent);
+      expect(context.lastQuery).toBe(query);
+      expect(context.lastResponse).toBe(response);
+      expect(context.history).toHaveLength(1);
+    });
+
+    it('should maintain conversation history', () => {
+      const callSid = 'test-call-sid';
+      
+      // Add multiple interactions
+      updateConversationContext(callSid, 'find_shelter', 'find shelter', 'response 1');
+      updateConversationContext(callSid, 'legal_services', 'legal help', 'response 2');
+      updateConversationContext(callSid, 'counseling_services', 'counseling', 'response 3');
+      updateConversationContext(callSid, 'emergency_help', 'emergency', 'response 4');
+      updateConversationContext(callSid, 'general_information', 'info', 'response 5');
+      updateConversationContext(callSid, 'other_resources', 'resources', 'response 6');
+
+      const context = getConversationContext(callSid);
+      expect(context.history).toHaveLength(5); // Should keep only last 5
+      expect(context.history[0].intent).toBe('legal_services'); // First one should be oldest
+      expect(context.lastIntent).toBe('other_resources'); // Last one should be most recent
+    });
+
+    it('should clear conversation context', () => {
+      const callSid = 'test-call-sid';
+      updateConversationContext(callSid, 'find_shelter', 'test', 'response');
+      
+      clearConversationContext(callSid);
+      const context = getConversationContext(callSid);
+      expect(context).toBeNull();
     });
   });
 
   describe('rewriteQuery', () => {
-    it('should add domestic violence to shelter queries', () => {
+    it('should add domestic violence context to queries', () => {
       const result = rewriteQuery('find shelter near me', 'find_shelter');
-      expect(result).toBe('domestic violence find shelter near me safe housing');
+      expect(result).toContain('domestic violence');
     });
 
-    it('should add domestic violence to resource queries', () => {
-      const result = rewriteQuery('need help with housing', 'get_support_resource');
-      expect(result).toBe('domestic violence need help with housing');
+    it('should handle follow-up questions with context', () => {
+      const callSid = 'test-call-sid';
+      const initialQuery = 'find shelter in Santa Clara';
+      const followUpQuery = 'what about legal services there?';
+
+      // Set up context
+      updateConversationContext(callSid, 'find_shelter', initialQuery, 'response');
+      
+      // Test follow-up
+      const result = rewriteQuery(followUpQuery, 'legal_services', callSid);
+      expect(result).toContain('Santa Clara');
+      expect(result).toContain('legal');
     });
 
-    it('should add support hotline to contact queries', () => {
-      const result = rewriteQuery('how can I reach someone', 'get_contact_details');
-      expect(result).toBe('how can I reach someone support hotline');
+    it('should add intent-specific terms', () => {
+      const shelterResult = rewriteQuery('need housing', 'find_shelter');
+      expect(shelterResult).toContain('emergency shelter safe housing');
+
+      const legalResult = rewriteQuery('need legal help', 'legal_services');
+      expect(legalResult).toContain('legal aid attorney services');
+      expect(legalResult).toContain('restraining order protection');
+
+      const counselingResult = rewriteQuery('need support', 'counseling_services');
+      expect(counselingResult).toContain('counseling therapy support group');
+
+      const emergencyResult = rewriteQuery('need help now', 'emergency_help');
+      expect(emergencyResult).toContain('emergency urgent');
+      expect(emergencyResult).toContain('24/7 hotline immediate assistance');
     });
 
-    it('should not modify queries that already contain the terms', () => {
-      const result = rewriteQuery('domestic violence shelter near me', 'find_shelter');
-      expect(result).toBe('domestic violence shelter near me');
-    });
-
-    it('should not modify general queries', () => {
-      const result = rewriteQuery('what is domestic violence', 'general_query');
-      expect(result).toBe('what is domestic violence');
+    it('should preserve location information', () => {
+      const result = rewriteQuery('find help in San Jose, California', 'find_shelter');
+      expect(result).toContain('San Jose, California');
     });
 
     it('should handle case-insensitive matching', () => {

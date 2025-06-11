@@ -14,6 +14,10 @@ This server handles incoming requests from Twilio, processes them, and returns a
 
 ## Recent Updates
 
+- **Enhanced Conversation Context:** Added comprehensive conversation context management for better follow-up question handling.
+- **Intent-Based Query Rewriting:** Improved query rewriting based on intent classification and conversation context.
+- **Location Context Preservation:** Enhanced location extraction and preservation across conversation turns.
+- **Emergency Response Handling:** Added specific handling for emergency situations and urgent requests.
 - **TypeScript Migration:** Core components have been migrated to TypeScript for better type safety and maintainability.
 - **Response Handling Improvements:** Enhanced response generation for irrelevant queries with proper domain-specific responses.
 - **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions.
@@ -54,6 +58,17 @@ npm run test:coverage
 # Build TypeScript files
 npm run build
 ```
+
+## Conversation Context Features
+
+The server now includes enhanced conversation context management:
+
+- **Context Preservation:** Maintains conversation history for up to 5 interactions
+- **Follow-up Detection:** Automatically detects and handles follow-up questions
+- **Intent Tracking:** Tracks user intents across conversation turns
+- **Location Memory:** Remembers location context for subsequent queries
+- **Emergency Prioritization:** Special handling for emergency situations
+- **Service-Specific Context:** Maintains context for different types of services (shelters, legal, counseling)
 
 ## License
 

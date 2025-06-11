@@ -131,7 +131,7 @@ router.post('/voice', async (req, res) => {
     logger.info('Processing voice request:', req.body);
     
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say('Welcome to the Domestic Violence Support Assistant. How can I help you today?');
+    twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes, legal services, counseling, and other resources related to domestic violence. How can I help you today?');
     twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
@@ -227,12 +227,12 @@ function extractLocationFromSpeech(speechResult) {
 
   // Common patterns for location mentions
   const locationPatterns = [
-    /(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco"
-    /(?:find|looking for|search for|need|help me find)\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco"
-    /(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco"
-    /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco"
-    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i,  // "my location is San Francisco"
-    /(?:can you|could you|please)\s+(?:help|find|search for)\s+(?:me|us)?\s+(?:some|any)?\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?)(?:\s+and|\s+area|\s+county|$)/i  // "can you help me find some shelters near San Jose"
+    /(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco, California"
+    /(?:find|looking for|search for|need|help me find)\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco, California"
+    /(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco, California"
+    /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco, California"
+    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "my location is San Francisco, California"
+    /(?:can you|could you|please)\s+(?:help|find|search for)\s+(?:me|us)?\s+(?:some|any)?\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i  // "can you help me find some shelters near San Jose, California"
   ];
 
   // Try each pattern
@@ -318,6 +318,24 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
   });
 
   try {
+    // Get intent classification
+    const intent = await getIntent(speechResult);
+    logger.info('Classified intent:', {
+      requestId,
+      callSid,
+      intent,
+      speechResult
+    });
+
+    // Get conversation context
+    const context = callSid ? getConversationContext(callSid) : null;
+    logger.info('Retrieved conversation context:', {
+      requestId,
+      callSid,
+      hasContext: !!context,
+      lastIntent: context?.lastIntent
+    });
+
     // Extract location from speech
     const location = extractLocationFromSpeech(speechResult);
     logger.info('Extracted location:', {
@@ -336,22 +354,23 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
       return generateLocationPrompt();
     }
 
-    // Construct query for Tavily API
-    const query = `Find domestic violence shelters and resources near ${location}`;
-    logger.info('Constructed Tavily query:', {
+    // Rewrite query with context
+    const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+    logger.info('Rewritten query:', {
       requestId,
       callSid,
-      query,
-      location
+      originalQuery: speechResult,
+      rewrittenQuery,
+      intent
     });
 
-    // Call Tavily API
+    // Call Tavily API with rewritten query
     logger.info('Calling Tavily API:', {
       requestId,
       callSid,
-      query
+      query: rewrittenQuery
     });
-    const tavilyResponse = await callTavilyAPI(query);
+    const tavilyResponse = await callTavilyAPI(rewrittenQuery);
     logger.info('Received Tavily API response:', {
       requestId,
       callSid,
@@ -370,6 +389,18 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
       responseLength: formattedResponse.length,
       responsePreview: formattedResponse.substring(0, 100) + '...'
     });
+
+    // Update conversation context
+    if (callSid) {
+      updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
+      logger.info('Updated conversation context:', {
+        requestId,
+        callSid,
+        intent,
+        queryLength: rewrittenQuery.length,
+        responseLength: formattedResponse.length
+      });
+    }
 
     return formattedResponse;
   } catch (error) {
@@ -486,6 +517,15 @@ router.post('/status', async (req, res) => {
       CallStatus,
       timestamp: new Date().toISOString()
     });
+
+    // Clear conversation context when call ends
+    if (CallStatus === 'completed' || CallStatus === 'failed' || CallStatus === 'busy' || CallStatus === 'no-answer') {
+      clearConversationContext(CallSid);
+      logger.info('Cleared conversation context for ended call:', {
+        CallSid,
+        CallStatus
+      });
+    }
 
     await twilioVoiceHandler.handleCallStatusUpdate(CallSid, CallStatus);
     res.status(200).send('OK');

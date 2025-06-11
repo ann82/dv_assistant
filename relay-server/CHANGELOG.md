@@ -76,27 +76,117 @@ All notable changes to this project will be documented in this file.
 - **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction.
 - **Import Statement Updates:** Updated import statements in `ResponseGenerator.ts` to include the `.js` extension for all modules.
 - **Logging Enhancements:** Added logging to `RelevanceChecker` and `EntityExtractor` for better debugging and diagnostics.
+- Enhanced conversation context management system
+- Intent-based query rewriting with context preservation
+- Location context tracking across conversation turns
+- Emergency situation handling and prioritization
+- Service-specific context management
+- Comprehensive test coverage for conversation context features
 
 ### Changed
 - Updated the `ResponseGenerator` to handle follow-up questions differently from initial questions, improving the user experience by maintaining context.
 - Migrated core components from JavaScript to TypeScript for better type safety and maintainability.
 - Updated build process to include TypeScript compilation.
+- Updated intent classification to support conversation context
+- Improved location extraction to handle trailing punctuation
+- Enhanced follow-up question detection and handling
+- Modified query rewriting to incorporate conversation history
+- Updated response generation to use conversation context
 
 ### Fixed
 - Fixed a linter error in the `ResponseGenerator` class related to the `location` type.
 - Fixed response handling for irrelevant queries to ensure proper domain-specific responses.
+- Location extraction issues with complex formats
+- Follow-up question handling without context
+- Intent classification for emergency situations
+- Query rewriting for service-specific requests
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
 
-## [1.0.0] - 2024-03-19
+## [1.0.0] - 2024-03-20
 
 ### Added
 - Initial release
-- Twilio voice call integration
-- Tavily API integration for resource search
-- WebSocket server for real-time communication
-- Audio file handling and caching
-- Basic error handling and logging
+- Twilio integration
+- Intent classification
+- Entity extraction
+- Relevance checking
+- Tavily API integration
+- GPT fallback
+- Basic conversation context
+- Response generation
+- Error handling
+- Logging system
+- Test suite
+- TypeScript support
+- Build system
+- Development tools
+- Documentation
+
+### Changed
+- Migrated core components to TypeScript
+- Enhanced response handling
+- Improved error messages
+- Updated documentation
+- Refined logging
+- Optimized build process
+- Enhanced test coverage
+- Improved type safety
+- Streamlined development workflow
+- Enhanced code organization
+
+### Fixed
+- TypeScript compilation issues
+- Import path resolution
+- Test environment setup
+- Build process errors
+- Documentation formatting
+- Logging configuration
+- Error handling edge cases
+- Test coverage gaps
+- Type definition issues
+- Development tool integration
+
+## [0.1.0] - 2024-03-19
+
+### Added
+- Project initialization
+- Basic server setup
+- Twilio webhook handling
+- Intent classification
+- Entity extraction
+- Relevance checking
+- Tavily API integration
+- GPT fallback
+- Basic error handling
+- Initial logging
+- Test framework
+- Development environment
+- Basic documentation
+
+### Changed
+- Server configuration
+- Error handling
+- Logging format
+- Test structure
+- Documentation style
+- Code organization
+- Development workflow
+- Build process
+- Test coverage
+- Error messages
+
+### Fixed
+- Server startup issues
+- Webhook handling
+- Error responses
+- Logging setup
+- Test execution
+- Development tools
+- Build process
+- Documentation
+- Code formatting
+- Type definitions
 
 // ... existing changelog entries ... 

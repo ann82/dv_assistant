@@ -165,6 +165,7 @@ export class TwilioHandler {
       }
 
       logger.info(`Processing speech for call ${CallSid}:`, SpeechResult);
+      logger.info(`Raw audio input for call ${CallSid}:`, req.body.RecordingUrl);
       
       const aiResponse = await this.processWithAI(SpeechResult);
       
