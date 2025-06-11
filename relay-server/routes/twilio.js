@@ -67,6 +67,8 @@ const tavilyCache = new Map();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached responses
 
+const SPEECH_TIMEOUT = '30'; // Standardized speech timeout in seconds
+
 // Function to fetch and log Twilio call details
 async function fetchCallDetails(callSid) {
   try {
@@ -134,7 +136,7 @@ router.post('/voice', async (req, res) => {
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: '15',
+      speechTimeout: SPEECH_TIMEOUT,
       speechModel: 'phone_call',
       enhanced: 'true',
       language: 'en-US',
@@ -154,7 +156,7 @@ router.post('/voice', async (req, res) => {
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: '15',
+      speechTimeout: SPEECH_TIMEOUT,
       speechModel: 'phone_call',
       enhanced: 'true',
       language: 'en-US',
@@ -664,7 +666,7 @@ router.post('/voice/process', async (req, res) => {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: '15',
+        speechTimeout: SPEECH_TIMEOUT,
         speechModel: 'phone_call',
         enhanced: 'true',
         language: 'en-US',
@@ -689,7 +691,7 @@ router.post('/voice/process', async (req, res) => {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: '15',
+        speechTimeout: SPEECH_TIMEOUT,
         speechModel: 'phone_call',
         enhanced: 'true',
         language: 'en-US',
@@ -731,7 +733,7 @@ router.post('/voice/process', async (req, res) => {
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: '15',
+      speechTimeout: SPEECH_TIMEOUT,
       speechModel: 'phone_call',
       enhanced: 'true',
       language: 'en-US',
@@ -762,7 +764,7 @@ router.post('/voice/process', async (req, res) => {
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: '15',
+      speechTimeout: SPEECH_TIMEOUT,
       speechModel: 'phone_call',
       enhanced: 'true',
       language: 'en-US',
