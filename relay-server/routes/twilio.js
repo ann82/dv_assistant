@@ -12,9 +12,10 @@ import { callTavilyAPI, callGPT } from '../lib/apis.js';
 import { createHash } from 'crypto';
 import pkg from 'twilio/lib/twiml/VoiceResponse.js';
 const { VoiceResponse } = pkg;
-import { getIntent, intentHandlers, rewriteQuery } from '../lib/intentClassifier.js';
+import { getIntent, intentHandlers, rewriteQuery, updateConversationContext, getConversationContext } from '../lib/intentClassifier.js';
 import { generateSpeechHash } from '../lib/utils.js';
 import { v4 as uuidv4 } from 'uuid';
+import { extractLocationFromSpeech, generateLocationPrompt } from '../lib/speechProcessor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -221,35 +222,6 @@ router.post('/web/process', async (req, res) => {
   }
 });
 
-// Helper function to extract location from speech
-function extractLocationFromSpeech(speechResult) {
-  logger.info('Extracting location from speech:', { speechResult });
-
-  // Common patterns for location mentions
-  const locationPatterns = [
-    /(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco, California"
-    /(?:find|looking for|search for|need|help me find)\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco, California"
-    /(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco, California"
-    /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco, California"
-    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "my location is San Francisco, California"
-    /(?:can you|could you|please)\s+(?:help|find|search for)\s+(?:me|us)?\s+(?:some|any)?\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i  // "can you help me find some shelters near San Jose, California"
-  ];
-
-  // Try each pattern
-  for (const pattern of locationPatterns) {
-    const match = speechResult.match(pattern);
-    if (match && match[1]) {
-      // Remove leading articles like 'the'
-      const location = match[1].trim().replace(/^the\s+/i, '');
-      logger.info('Location extracted:', { location, pattern: pattern.toString() });
-      return location;
-    }
-  }
-
-  logger.info('No location found in speech input');
-  return null;
-}
-
 // Generate a prompt asking for location
 function generateLocationPrompt() {
   const prompts = [
@@ -371,6 +343,7 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
       query: rewrittenQuery
     });
     const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+
     logger.info('Received Tavily API response:', {
       requestId,
       callSid,
@@ -586,42 +559,51 @@ router.post('/sms', async (req, res) => {
 });
 
 router.post('/consent', async (req, res) => {
-  const startTime = Date.now();
-  const requestId = Math.random().toString(36).substring(7);
-  
   try {
-    logger.info(`[Request ${requestId}] Processing consent request:`, {
-      timestamp: new Date().toISOString(),
-      headers: req.headers,
-      body: req.body,
-      memoryUsage: process.memoryUsage()
-    });
+    const { CallSid, SpeechResult } = req.body;
+    logger.info('Processing consent response:', { CallSid, SpeechResult });
 
-    const { CallSid, From, SpeechResult } = req.body;
-    
-    if (!CallSid || !From || !SpeechResult) {
-      logger.warn(`[Request ${requestId}] Missing required parameters`);
+    if (!CallSid || !SpeechResult) {
+      logger.error('Missing required parameters in consent response');
       return res.status(400).send('Missing required parameters');
     }
 
-    const consentKeywords = ['yes', 'agree', 'consent', 'ok', 'okay', 'sure'];
-    const isConsent = consentKeywords.some(keyword => 
-      SpeechResult.toLowerCase().includes(keyword)
-    );
-
-    const twiml = new twilio.twiml.VoiceResponse();
-    
-    if (isConsent) {
-      twiml.say('Thank you for your consent. You will receive follow-up messages about your call summary and support resources.');
-    } else {
-      twiml.say('I understand you do not wish to receive follow-up messages. You will not receive any SMS updates.');
+    const call = twilioVoiceHandler.activeCalls.get(CallSid);
+    if (!call) {
+      logger.error(`No active call found for CallSid: ${CallSid}`);
+      return res.status(404).send('Call not found');
     }
+
+    // Process consent response
+    const hasConsent = SpeechResult.toLowerCase().includes('yes');
+    call.hasConsent = hasConsent;
+    twilioVoiceHandler.activeCalls.set(CallSid, call);
+
+    // Generate and send summary if consent was given
+    if (hasConsent) {
+      const summary = await twilioVoiceHandler.generateCallSummary(CallSid, call);
+      await twilioVoiceHandler.sendSMSWithRetry(CallSid, call, summary);
+    }
+
+    // End the call
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say(hasConsent ? 
+      "Thank you. You will receive a text message with the summary and resources shortly." :
+      "Thank you. Have a great day.");
+    twiml.hangup();
 
     res.type('text/xml');
     res.send(twiml.toString());
+
+    // Clean up call data
+    await twilioVoiceHandler.cleanupCall(CallSid);
   } catch (error) {
-    logger.error(`[Request ${requestId}] Error processing consent:`, error);
-    res.status(500).send('Error processing consent');
+    logger.error('Error processing consent response:', error);
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm sorry, I encountered an error. The call will now end.");
+    twiml.hangup();
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
