@@ -1,67 +1,58 @@
-# Relay Server
+# Domestic Violence Support Assistant
 
-This server handles incoming requests from Twilio, processes them, and returns appropriate responses.
+A comprehensive system for providing support and resources to individuals affected by domestic violence.
 
 ## Features
 
-- **Twilio Integration:** Handles incoming calls and messages from Twilio.
-- **Intent Classification:** Classifies user intents using the `IntentExtractor`.
-- **Entity Extraction:** Extracts locations and topics from user queries using the `EntityExtractor`.
-- **Context Management:** Manages conversation context to handle follow-up questions.
-- **Relevance Checking:** Ensures queries are relevant to the domain.
-- **Tavily API Integration:** Fetches relevant information using the Tavily API.
-- **Fallback to GPT:** Provides a fallback mechanism using GPT for responses when the Tavily API fails.
-- **Performance Optimizations:** Implements caching, parallel processing, and optimized timeouts for faster responses.
-- **Error Handling:** Robust error handling with proper fallback mechanisms and statistics tracking.
+### Response Generation
+- **Multi-format Response System**
+  - Web-optimized responses with detailed information
+  - Voice-optimized responses for Twilio calls
+  - Context-aware formatting based on request type
+  - Emergency response prioritization
+
+### Response Formatting
+- **Voice-Optimized Format**
+  - Clear, concise structure for speech
+  - Numbered lists for easy reference
+  - Essential information prioritized
+  - Natural pauses and flow
+  - Limited to 3 results for clarity
+
+- **Web Format**
+  - Detailed resource information
+  - Relevance scoring
+  - Full service descriptions
+  - Coverage areas
+  - Contact information
+
+### Error Handling
+- Robust error handling with fallback mechanisms
+- Comprehensive logging
+- Graceful degradation
+- User-friendly error messages
+
+### Performance Features
+- Response caching
+- Parallel processing
+- Optimized timeouts
+- Error handling mechanisms
+
+### Conversation Context Features
+- Context preservation
+- Follow-up detection
+- Location tracking
+- Intent classification
+- Entity extraction
 
 ## Recent Updates
-
-- **Error Handling Improvements:**
-  - Enhanced error handling with proper confidence tracking
-  - Improved fallback statistics for error cases
-  - Better error logging and diagnostics
-  - Automatic confidence preservation in error paths
-- **Performance Improvements:** 
-  - Added response caching with 30-minute TTL
-  - Implemented parallel processing for API calls
-  - Optimized timeouts and delays
-  - Enhanced speech handling efficiency
-- **Enhanced Conversation Context:** Added comprehensive conversation context management for better follow-up question handling.
-- **Intent-Based Query Rewriting:** Improved query rewriting based on intent classification and conversation context.
-- **Location Context Preservation:** Enhanced location extraction and preservation across conversation turns.
-- **Emergency Response Handling:** Added specific handling for emergency situations and urgent requests.
-- **TypeScript Migration:** Core components have been migrated to TypeScript for better type safety and maintainability.
-- **Response Handling Improvements:** Enhanced response generation for irrelevant queries with proper domain-specific responses.
-- **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions.
-- **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction.
-- **Import Statement Updates:** Updated import statements in `ResponseGenerator.ts` to include the `.js` extension for all modules.
-- **Logging Enhancements:** Added logging to `RelevanceChecker` and `EntityExtractor` for better debugging and diagnostics.
-
-## Performance Features
-
-The server includes several performance optimizations:
-
-- **Response Caching:**
-  - 30-minute cache TTL for frequently requested responses
-  - LRU cache implementation with size limits
-  - Automatic cache invalidation
-
-- **Parallel Processing:**
-  - Concurrent intent classification and API calls
-  - Optimized speech handling
-  - Reduced inter-response delays
-
-- **Optimized Timeouts:**
-  - 30-second response timeout
-  - 10-second speech timeout
-  - 30-second connection timeout
-  - 15-second activity check interval
-
-- **Error Handling:**
-  - Automatic fallback to GPT on API errors
-  - Confidence preservation in error paths
-  - Comprehensive error statistics tracking
-  - Detailed error logging and diagnostics
+- Enhanced response formatting system
+- Voice-optimized responses for Twilio
+- Improved error handling
+- Better fallback statistics
+- Enhanced conversation context management
+- Updated EntityExtractor for better location extraction
+- Logging enhancements
 
 ## Installation
 
@@ -70,44 +61,3 @@ The server includes several performance optimizations:
    ```bash
    npm install
    ```
-3. Build TypeScript files:
-   ```bash
-   npm run build
-   ```
-4. Start the server:
-   ```bash
-   npm start
-   ```
-
-## Development
-
-The project uses TypeScript for better type safety and maintainability. Key development commands:
-
-```bash
-# Run tests
-npm test
-
-# Watch mode for tests
-npm run test:watch
-
-# Generate test coverage
-npm run test:coverage
-
-# Build TypeScript files
-npm run build
-```
-
-## Conversation Context Features
-
-The server now includes enhanced conversation context management:
-
-- **Context Preservation:** Maintains conversation history for up to 5 interactions
-- **Follow-up Detection:** Automatically detects and handles follow-up questions
-- **Intent Tracking:** Tracks user intents across conversation turns
-- **Location Memory:** Remembers location context for subsequent queries
-- **Emergency Prioritization:** Special handling for emergency situations
-- **Service-Specific Context:** Maintains context for different types of services (shelters, legal, counseling)
-
-## License
-
-This project is licensed under the MIT License. 

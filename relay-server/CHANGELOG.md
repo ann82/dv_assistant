@@ -92,6 +92,12 @@ All notable changes to this project will be documented in this file.
 - LRU cache implementation for response storage
 - Performance monitoring and logging
 - Comprehensive test coverage for caching and parallel processing
+- Enhanced response formatting system with multi-format support
+- Voice-optimized responses for Twilio calls
+- Improved error handling with confidence tracking
+- Better fallback statistics
+- Comprehensive test coverage for response formatting
+- New response format tests for different scenarios
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios
@@ -110,6 +116,9 @@ All notable changes to this project will be documented in this file.
 - Reduced connection timeout from 60s to 30s
 - Reduced activity check interval from 30s to 15s
 - Reduced speech response delay from 300ms to 100ms
+- Updated response formatting for better voice interaction
+- Optimized voice response format for better clarity
+- Updated response formatting based on request type
 
 ### Fixed
 - Fixed error handling to properly track fallback statistics
@@ -123,9 +132,13 @@ All notable changes to this project will be documented in this file.
 - Speech handling performance issues
 - Response time delays
 - Cache management edge cases
+- Response formatting issues in voice calls
+- Error handling in response generation
+- Phone number extraction in voice responses
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
+- Attempted to update development dependencies to address vulnerabilities
 
 ## [1.0.0] - 2024-03-20
 
@@ -146,6 +159,7 @@ All notable changes to this project will be documented in this file.
 - Build system
 - Development tools
 - Documentation
+- Basic response generation
 
 ### Changed
 - Migrated core components to TypeScript
