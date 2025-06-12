@@ -11,9 +11,21 @@ This server handles incoming requests from Twilio, processes them, and returns a
 - **Relevance Checking:** Ensures queries are relevant to the domain.
 - **Tavily API Integration:** Fetches relevant information using the Tavily API.
 - **Fallback to GPT:** Provides a fallback mechanism using GPT for responses when the Tavily API fails.
+- **Performance Optimizations:** Implements caching, parallel processing, and optimized timeouts for faster responses.
+- **Error Handling:** Robust error handling with proper fallback mechanisms and statistics tracking.
 
 ## Recent Updates
 
+- **Error Handling Improvements:**
+  - Enhanced error handling with proper confidence tracking
+  - Improved fallback statistics for error cases
+  - Better error logging and diagnostics
+  - Automatic confidence preservation in error paths
+- **Performance Improvements:** 
+  - Added response caching with 30-minute TTL
+  - Implemented parallel processing for API calls
+  - Optimized timeouts and delays
+  - Enhanced speech handling efficiency
 - **Enhanced Conversation Context:** Added comprehensive conversation context management for better follow-up question handling.
 - **Intent-Based Query Rewriting:** Improved query rewriting based on intent classification and conversation context.
 - **Location Context Preservation:** Enhanced location extraction and preservation across conversation turns.
@@ -24,6 +36,32 @@ This server handles incoming requests from Twilio, processes them, and returns a
 - **Location Extraction Enhancement:** The `EntityExtractor` has been updated to handle trailing punctuation in location extraction.
 - **Import Statement Updates:** Updated import statements in `ResponseGenerator.ts` to include the `.js` extension for all modules.
 - **Logging Enhancements:** Added logging to `RelevanceChecker` and `EntityExtractor` for better debugging and diagnostics.
+
+## Performance Features
+
+The server includes several performance optimizations:
+
+- **Response Caching:**
+  - 30-minute cache TTL for frequently requested responses
+  - LRU cache implementation with size limits
+  - Automatic cache invalidation
+
+- **Parallel Processing:**
+  - Concurrent intent classification and API calls
+  - Optimized speech handling
+  - Reduced inter-response delays
+
+- **Optimized Timeouts:**
+  - 30-second response timeout
+  - 10-second speech timeout
+  - 30-second connection timeout
+  - 15-second activity check interval
+
+- **Error Handling:**
+  - Automatic fallback to GPT on API errors
+  - Confidence preservation in error paths
+  - Comprehensive error statistics tracking
+  - Detailed error logging and diagnostics
 
 ## Installation
 

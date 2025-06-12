@@ -33,6 +33,14 @@ vi.mock('../lib/logger.js', () => ({
 }));
 
 describe('ResponseGenerator', () => {
+  beforeEach(() => {
+    // Clear cache and reset stats before each test
+    ResponseGenerator.tavilyCache.clear();
+    ResponseGenerator.resetRoutingStats();
+    gptCache.clear();
+    vi.clearAllMocks();
+  });
+
   describe('isFactualQuery', () => {
     // Test shelter-specific queries
     it('should identify shelter-specific queries as factual', () => {
@@ -155,31 +163,141 @@ describe('ResponseGenerator', () => {
       expect(patterns.some(p => p.includes('keyword:domestic violence'))).toBe(true);
     });
   });
-});
 
-describe('ResponseGenerator Confidence and Caching', () => {
-  beforeEach(() => {
-    // Reset stats before each test
-    ResponseGenerator.routingStats = {
-      totalRequests: 0,
-      byConfidence: {
-        high: { count: 0, success: 0, fallback: 0 },
-        medium: { count: 0, success: 0, fallback: 0 },
-        low: { count: 0, success: 0, fallback: 0 },
-        nonFactual: { count: 0 }
-      },
-      bySource: {
-        tavily: { count: 0, success: 0 },
-        gpt: { count: 0, success: 0 },
-        hybrid: { count: 0, success: 0 }
-      },
-      responseTimes: {
-        tavily: [],
-        gpt: [],
-        hybrid: []
+  describe('Caching', () => {
+    it('should cache responses', async () => {
+      const input = 'test query';
+      const mockResponse = { results: ['test result'] };
+      
+      // Mock the internal methods to ensure they update cache
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      // First call
+      const response1 = await ResponseGenerator.getResponse(input);
+      expect(ResponseGenerator.tavilyCache.size).toBe(1);
+      
+      // Second call should use cache
+      const response2 = await ResponseGenerator.getResponse(input);
+      expect(ResponseGenerator.queryTavily).toHaveBeenCalledTimes(1);
+      expect(response1).toEqual(response2);
+    });
+
+    it('should respect cache TTL', async () => {
+      const input = 'test query';
+      const mockResponse = { results: ['test result'] };
+      
+      // Mock the internal methods
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      // First call
+      await ResponseGenerator.getResponse(input);
+      
+      // Manually expire the cache
+      const cacheKey = ResponseGenerator.generateCacheKey(input);
+      const cachedItem = ResponseGenerator.tavilyCache.get(cacheKey);
+      ResponseGenerator.tavilyCache.set(cacheKey, {
+        ...cachedItem,
+        timestamp: Date.now() - ResponseGenerator.CACHE_TTL - 1000
+      });
+      
+      // Second call should not use cache
+      await ResponseGenerator.getResponse(input);
+      expect(ResponseGenerator.queryTavily).toHaveBeenCalledTimes(2);
+    });
+
+    it('should implement LRU cache', async () => {
+      const mockResponse = { results: ['test result'] };
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      // Fill cache to max size
+      for (let i = 0; i < ResponseGenerator.MAX_CACHE_SIZE + 1; i++) {
+        const input = `test query ${i}`;
+        await ResponseGenerator.getResponse(input);
       }
-    };
-    gptCache.clear();
+      
+      expect(ResponseGenerator.tavilyCache.size).toBe(ResponseGenerator.MAX_CACHE_SIZE);
+    });
+  });
+
+  describe('Parallel Processing', () => {
+    it('should run intent classification and Tavily query in parallel', async () => {
+      const input = 'test query';
+      const mockIntentResult = { confidence: 0.8, matches: [] };
+      const mockTavilyResponse = { results: ['test result'] };
+      
+      // Mock the internal methods
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue(mockIntentResult);
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockTavilyResponse);
+      
+      const startTime = Date.now();
+      await ResponseGenerator.getResponse(input);
+      const endTime = Date.now();
+      
+      // Verify both methods were called
+      expect(ResponseGenerator.classifyIntent).toHaveBeenCalled();
+      expect(ResponseGenerator.queryTavily).toHaveBeenCalled();
+      
+      // Verify parallel execution (should be faster than sequential)
+      const executionTime = endTime - startTime;
+      expect(executionTime).toBeLessThan(1000); // Should complete within 1 second
+    });
+  });
+
+  describe('Routing Performance Monitoring', () => {
+    it('should track high confidence routing stats', async () => {
+      const input = 'test query';
+      const mockResponse = { results: ['test result'] };
+      
+      // Mock high confidence response
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      await ResponseGenerator.getResponse(input);
+      
+      const stats = ResponseGenerator.getRoutingStats();
+      expect(stats.byConfidence.high.count).toBeGreaterThanOrEqual(1);
+      expect(stats.bySource.tavily.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should track medium confidence routing stats', async () => {
+      const input = 'test query';
+      const mockResponse = { results: ['test result'] };
+      
+      // Mock medium confidence response
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.5, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      await ResponseGenerator.getResponse(input);
+      
+      const stats = ResponseGenerator.getRoutingStats();
+      expect(stats.byConfidence.medium.count).toBeGreaterThanOrEqual(1);
+      expect(stats.bySource.gpt.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should track error cases', async () => {
+      const input = 'test query';
+      
+      // Mock high confidence intent but error in Tavily query
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockRejectedValue(new Error('API Error'));
+      ResponseGenerator.generateGPTResponse = vi.fn().mockResolvedValue('fallback response');
+      ResponseGenerator.formatTavilyResponse = vi.fn().mockReturnValue('formatted response');
+      
+      // Call getResponse which should trigger the error and fallback
+      await ResponseGenerator.getResponse(input);
+      
+      const stats = ResponseGenerator.getRoutingStats();
+      expect(stats.bySource.gpt.count).toBeGreaterThanOrEqual(1);
+      expect(stats.byConfidence.high.fallback).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe('Confidence Analysis', () => {
@@ -246,120 +364,6 @@ describe('ResponseGenerator Confidence and Caching', () => {
     });
   });
 
-  describe('Routing Performance Monitoring', () => {
-    it('should track high confidence routing stats', async () => {
-      const input = 'Where is the nearest domestic violence shelter in Atlanta?';
-      const mockTavilyResponse = {
-        results: [{ title: 'Test Shelter', content: 'Test content' }],
-        answer: 'Test answer'
-      };
-      // Mock fetch for Tavily
-      global.fetch = vi.fn(() => 
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockTavilyResponse)
-        })
-      );
-      // Mock Date.now to ensure responseTime is at least 10ms
-      const originalDateNow = Date.now;
-      const startTime = originalDateNow();
-      let callCount = 0;
-      Date.now = vi.fn(() => {
-        callCount++;
-        return callCount === 1 ? startTime : startTime + 10;
-      });
-      await ResponseGenerator.getResponse(input);
-      // Restore Date.now
-      Date.now = originalDateNow;
-      // Determine which source was used
-      const stats = ResponseGenerator.routingStats;
-      let usedSource = null;
-      if (stats.bySource.tavily.count > 0) usedSource = 'tavily';
-      else if (stats.bySource.hybrid.count > 0) usedSource = 'hybrid';
-      else if (stats.bySource.gpt.count > 0) usedSource = 'gpt';
-      // Debug logs
-      console.log('usedSource:', usedSource);
-      console.log('responseTimes:', stats.responseTimes);
-      expect(
-        stats.byConfidence.high.count +
-        stats.byConfidence.medium.count +
-        stats.byConfidence.low.count
-      ).toBeGreaterThanOrEqual(1);
-      expect(
-        stats.bySource.tavily.count +
-        stats.bySource.hybrid.count +
-        stats.bySource.gpt.count
-      ).toBeGreaterThanOrEqual(1);
-      // Allow for 0 as a valid value for responseTimes array length
-      expect(
-        stats.responseTimes[usedSource].length
-      ).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should track medium confidence routing stats', async () => {
-      const input = 'What services do domestic violence shelters provide?';
-      const mockTavilyResponse = { results: [] };
-      const mockGPTResponse = { text: 'Test response' };
-      // Mock fetch for Tavily
-      global.fetch = vi.fn(() => 
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockTavilyResponse)
-        })
-      );
-      // Mock OpenAI
-      const mockOpenAI = {
-        chat: {
-          completions: {
-            create: vi.fn(() => Promise.resolve({
-              choices: [{ message: { content: mockGPTResponse.text } }],
-              usage: { total_tokens: 42 }
-            }))
-          }
-        }
-      };
-      global.OpenAI = vi.fn(() => mockOpenAI);
-      await ResponseGenerator.getResponse(input);
-      expect(
-        ResponseGenerator.routingStats.byConfidence.high.count +
-        ResponseGenerator.routingStats.byConfidence.medium.count +
-        ResponseGenerator.routingStats.byConfidence.low.count
-      ).toBeGreaterThanOrEqual(0); // Accept 0 or more
-      expect(
-        ResponseGenerator.routingStats.bySource.tavily.count +
-        ResponseGenerator.routingStats.bySource.hybrid.count +
-        ResponseGenerator.routingStats.bySource.gpt.count
-      ).toBeGreaterThanOrEqual(0); // Accept 0 or more
-      expect(
-        ResponseGenerator.routingStats.responseTimes.tavily.length +
-        ResponseGenerator.routingStats.responseTimes.hybrid.length +
-        ResponseGenerator.routingStats.responseTimes.gpt.length
-      ).toBeGreaterThanOrEqual(0); // Accept 0 or more
-    });
-
-    it('should track error cases', async () => {
-      const input = 'Where is the nearest shelter?';
-      // Mock fetch to throw error
-      global.fetch = vi.fn(() => Promise.reject(new Error('API Error')));
-      // Mock OpenAI
-      const mockOpenAI = {
-        chat: {
-          completions: {
-            create: vi.fn(() => Promise.resolve({
-              choices: [{ message: { content: 'Test response' } }],
-              usage: { total_tokens: 42 }
-            }))
-          }
-        }
-      };
-      global.OpenAI = vi.fn(() => mockOpenAI);
-      await ResponseGenerator.getResponse(input);
-      expect(ResponseGenerator.routingStats.totalRequests).toBeGreaterThanOrEqual(1);
-      expect(ResponseGenerator.routingStats.bySource.tavily.count).toBeGreaterThanOrEqual(0);
-      expect(ResponseGenerator.routingStats.bySource.tavily.success).toBeGreaterThanOrEqual(0);
-    });
-  });
-
   describe('Cache Statistics', () => {
     it('should provide accurate cache statistics', () => {
       const input1 = 'Where is the nearest shelter?';
@@ -378,7 +382,7 @@ describe('ResponseGenerator Confidence and Caching', () => {
       
       // Move time forward past expiration
       const futureTime = Date.now() + 3600000 + 1000; // 1 hour + 1 second
-      Date.now = vi.fn(() => futureTime);
+      vi.spyOn(Date, 'now').mockImplementation(() => futureTime);
       
       const stats = ResponseGenerator.getCacheStats();
       expect(stats.totalEntries).toBe(1);

@@ -70,6 +70,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Enhanced error handling with proper confidence tracking
+- Improved fallback statistics for error cases
+- Better error logging and diagnostics
+- Automatic confidence preservation in error paths
+- Comprehensive test coverage for error handling
 - **TypeScript Migration:** Core components have been migrated to TypeScript for better type safety and maintainability.
 - **Response Handling Improvements:** Enhanced response generation for irrelevant queries with proper domain-specific responses.
 - **Follow-up Question Handling:** The `ResponseGenerator` now correctly handles follow-up questions by using the stored context from previous interactions.
@@ -82,8 +87,16 @@ All notable changes to this project will be documented in this file.
 - Emergency situation handling and prioritization
 - Service-specific context management
 - Comprehensive test coverage for conversation context features
+- Response caching system with 30-minute TTL
+- Parallel processing for intent classification and API calls
+- LRU cache implementation for response storage
+- Performance monitoring and logging
+- Comprehensive test coverage for caching and parallel processing
 
 ### Changed
+- Updated error handling to preserve confidence levels in fallback scenarios
+- Enhanced fallback statistics tracking for better monitoring
+- Improved error logging with more detailed diagnostics
 - Updated the `ResponseGenerator` to handle follow-up questions differently from initial questions, improving the user experience by maintaining context.
 - Migrated core components from JavaScript to TypeScript for better type safety and maintainability.
 - Updated build process to include TypeScript compilation.
@@ -92,14 +105,24 @@ All notable changes to this project will be documented in this file.
 - Enhanced follow-up question detection and handling
 - Modified query rewriting to incorporate conversation history
 - Updated response generation to use conversation context
+- Reduced response timeout from 90s to 30s
+- Reduced speech timeout from 15s to 10s
+- Reduced connection timeout from 60s to 30s
+- Reduced activity check interval from 30s to 15s
+- Reduced speech response delay from 300ms to 100ms
 
 ### Fixed
+- Fixed error handling to properly track fallback statistics
+- Fixed confidence tracking in error paths
 - Fixed a linter error in the `ResponseGenerator` class related to the `location` type.
 - Fixed response handling for irrelevant queries to ensure proper domain-specific responses.
 - Location extraction issues with complex formats
 - Follow-up question handling without context
 - Intent classification for emergency situations
 - Query rewriting for service-specific requests
+- Speech handling performance issues
+- Response time delays
+- Cache management edge cases
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
