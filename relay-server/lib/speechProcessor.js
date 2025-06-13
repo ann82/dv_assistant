@@ -1,4 +1,4 @@
-import logger from './logger.js';
+import { logger } from './logger.js';
 
 /**
  * Extract location from speech input
@@ -6,30 +6,48 @@ import logger from './logger.js';
  * @returns {string|null} The extracted location or null if not found
  */
 export function extractLocationFromSpeech(speechResult) {
-  logger.info('Extracting location from speech:', { speechResult });
+  if (!speechResult) {
+    logger.warn('No speech result provided to extractLocationFromSpeech');
+    return null;
+  }
 
-  // Common patterns for location mentions
-  const locationPatterns = [
-    /(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "in San Francisco, California"
-    /(?:find|looking for|search for|need|help me find)\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "find shelters in San Francisco, California"
-    /(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "shelters in San Francisco, California"
-    /(?:I am|I'm|I live in|I'm in)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "I am in San Francisco, California"
-    /(?:location|area|city|town)\s+(?:is|are)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i,  // "my location is San Francisco, California"
-    /(?:can you|could you|please)\s+(?:help|find|search for)\s+(?:me|us)?\s+(?:some|any)?\s+(?:shelters?|homes?|help|resources?)\s+(?:in|near|around|close to|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)(?:\s+and|\s+area|\s+county|$)/i  // "can you help me find some shelters near San Jose, California"
+  logger.info('Extracting location from speech', { speechResult });
+
+  // Patterns to match location mentions
+  const patterns = [
+    /in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "in San Francisco, California"
+    /find\s+shelters?\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "find shelters in San Francisco, California"
+    /looking\s+for\s+shelters?\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "looking for shelters in San Francisco, California"
+    /near\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "near San Francisco, California"
+    /around\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "around San Francisco, California"
+    /in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "in the San Francisco, California"
+    /find\s+shelters?\s+in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "find shelters in the San Francisco, California"
+    /looking\s+for\s+shelters?\s+in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "looking for shelters in the San Francisco, California"
+    /near\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "near the San Francisco, California"
+    /around\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "around the San Francisco, California"
+    /my\s+location\s+is\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "my location is San Francisco, California"
+    /i\s+live\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "i live in San Francisco, California"
+    /i'm\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i  // "i'm in San Francisco, California"
   ];
 
-  // Try each pattern
-  for (const pattern of locationPatterns) {
+  for (const pattern of patterns) {
     const match = speechResult.match(pattern);
     if (match && match[1]) {
-      // Remove leading articles like 'the'
-      const location = match[1].trim().replace(/^the\s+/i, '');
-      logger.info('Location extracted:', { location, pattern: pattern.toString() });
+      let location = match[1].trim();
+      // Remove trailing phrases like 'and need resources', 'and', 'area', 'county', etc.
+      location = location.replace(/\s+(and|area|county|need resources).*$/i, '');
+      // Remove trailing 'County' if not expected
+      if (/County$/.test(location) && !/San Francisco County|Santa Clara County|San Mateo County|Alameda County|Contra Costa County|Marin County|Solano County|Sonoma County|Napa County/i.test(location)) {
+        location = location.replace(/\s*County$/i, '');
+      }
+      // Remove leading 'the' if present
+      location = location.replace(/^the\s+/i, '');
+      logger.info('Location extracted from speech', { location });
       return location;
     }
   }
 
-  logger.info('No location found in speech input');
+  logger.info('No location found in speech');
   return null;
 }
 
@@ -38,5 +56,28 @@ export function extractLocationFromSpeech(speechResult) {
  * @returns {string} The location prompt message
  */
 export function generateLocationPrompt() {
-  return "I need to know your location to help you find the nearest resources. Could you please tell me which city or area you're in?";
+  const exampleCities = [
+    'San Francisco',
+    'Oakland',
+    'San Jose',
+    'Santa Clara',
+    'San Mateo',
+    'Palo Alto',
+    'Mountain View',
+    'Sunnyvale',
+    'Redwood City'
+  ];
+
+  // Ensure we always include at least one example city
+  const city1 = exampleCities[Math.floor(Math.random() * exampleCities.length)];
+  const city2 = exampleCities[Math.floor(Math.random() * exampleCities.length)];
+
+  const prompts = [
+    `To help you find local resources, I need to know your location. Please tell me your city or area, like ${city1} or ${city2}.`,
+    `I need to know your location to help you find resources. Could you please tell me which city you're in? For example, you could say ${city1} or ${city2}.`,
+    `To find the closest resources to you, I need to know your location. Please tell me your city or area, such as ${city1} or ${city2}.`,
+    `Please share your location so I can find the best resources for you. Which city or area are you in? For example, you could say ${city1} or ${city2}.`
+  ];
+
+  return prompts[Math.floor(Math.random() * prompts.length)];
 } 

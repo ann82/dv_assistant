@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { formatTavilyResponse, extractLocationFromSpeech, generateLocationPrompt } from '../routes/twilio.js';
+import { formatTavilyResponse } from '../routes/twilio.js';
+import { extractLocationFromSpeech, generateLocationPrompt } from '../lib/speechProcessor.js';
+
+// Mock logger to prevent errors in tests
+vi.mock('../lib/logger.js', () => {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  return {
+    logger,
+    default: logger
+  };
+});
 
 describe('Tavily Response Formatting', () => {
   describe('formatTavilyResponse', () => {
@@ -267,9 +281,8 @@ describe('Tavily Response Formatting', () => {
 
     it('should include example locations in prompts', async () => {
       const prompt = await generateLocationPrompt();
-      
       // Check if the prompt contains at least one example city
-      const exampleCities = ['San Francisco', 'Santa Clara', 'San Jose', 'Oakland', 'San Mateo', 'Redwood City'];
+      const exampleCities = ['San Francisco', 'Santa Clara', 'San Jose', 'Oakland', 'San Mateo', 'Redwood City', 'Palo Alto', 'Mountain View', 'Sunnyvale'];
       const hasExampleCity = exampleCities.some(city => prompt.includes(city));
       expect(hasExampleCity).toBe(true);
     });
@@ -280,6 +293,52 @@ describe('Tavily Response Formatting', () => {
       expect(prompt).toBeDefined();
       expect(typeof prompt).toBe('string');
       expect(prompt.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('Speech Processing', () => {
+  describe('extractLocationFromSpeech', () => {
+    it('should extract location from speech with "in" pattern', () => {
+      const speech = 'I need help finding a shelter in San Francisco, California';
+      const location = extractLocationFromSpeech(speech);
+      expect(location).toBe('San Francisco, California');
+    });
+
+    it('should extract location from speech with "find shelters in" pattern', () => {
+      const speech = 'find shelters in Oakland, California';
+      const location = extractLocationFromSpeech(speech);
+      expect(location).toBe('Oakland, California');
+    });
+
+    it('should return null when no location is found', () => {
+      const speech = 'I need help finding a shelter';
+      const location = extractLocationFromSpeech(speech);
+      expect(location).toBeNull();
+    });
+  });
+
+  describe('generateLocationPrompt', () => {
+    it('should return a prompt asking for location', () => {
+      const prompt = generateLocationPrompt();
+      // Accept either 'city' or 'area' in the prompt
+      expect(prompt).toMatch(/city|area/);
+      expect(prompt).toContain('location');
+    });
+
+    it('should return different prompts on multiple calls (allowing for randomness)', () => {
+      // Run the check multiple times to reduce flakiness
+      let foundDifferent = false;
+      let lastPrompt = generateLocationPrompt();
+      for (let i = 0; i < 10; i++) {
+        const prompt = generateLocationPrompt();
+        if (prompt !== lastPrompt) {
+          foundDifferent = true;
+          break;
+        }
+        lastPrompt = prompt;
+      }
+      expect(foundDifferent).toBe(true);
     });
   });
 }); 

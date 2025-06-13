@@ -98,6 +98,9 @@ All notable changes to this project will be documented in this file.
 - Better fallback statistics
 - Comprehensive test coverage for response formatting
 - New response format tests for different scenarios
+- Improved location extraction to handle various speech patterns
+- Updated location prompts to include example cities
+- Comprehensive test coverage for speech processing and response formatting
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios
@@ -119,6 +122,7 @@ All notable changes to this project will be documented in this file.
 - Updated response formatting for better voice interaction
 - Optimized voice response format for better clarity
 - Updated response formatting based on request type
+- Updated README with recent changes and improvements
 
 ### Fixed
 - Fixed error handling to properly track fallback statistics

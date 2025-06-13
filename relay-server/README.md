@@ -46,13 +46,11 @@ A comprehensive system for providing support and resources to individuals affect
 - Entity extraction
 
 ## Recent Updates
-- Enhanced response formatting system
-- Voice-optimized responses for Twilio
-- Improved error handling
-- Better fallback statistics
-- Enhanced conversation context management
-- Updated EntityExtractor for better location extraction
-- Logging enhancements
+- Enhanced response formatting system with multi-format support
+- Improved location extraction to handle various speech patterns
+- Updated location prompts to include example cities
+- Enhanced error handling and logging
+- Comprehensive test coverage for speech processing and response formatting
 
 ## Installation
 
