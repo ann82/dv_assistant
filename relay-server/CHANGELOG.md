@@ -230,4 +230,24 @@ All notable changes to this project will be documented in this file.
 - Code formatting
 - Type definitions
 
+## [Unreleased]
+
+### Fixed
+- Fixed duplicate export of `formatTavilyResponse` in twilio.js
+- Fixed duplicate declaration of `generateLocationPrompt` in twilio.js
+- Improved error handling in speech processing
+- Enhanced response formatting system
+- Improved location extraction from speech input
+- Updated location prompts with better examples
+- Added comprehensive test coverage
+
+### Added
+- Enhanced response formatting system
+- Improved location extraction from speech input
+- Updated location prompts with better examples
+- Comprehensive test coverage
+
+### Changed
+- Updated README with recent changes and improvements
+
 // ... existing changelog entries ... 

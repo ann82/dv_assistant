@@ -52,6 +52,17 @@ A comprehensive system for providing support and resources to individuals affect
 - Enhanced error handling and logging
 - Comprehensive test coverage for speech processing and response formatting
 
+### Bug Fixes
+- Fixed duplicate export issues in twilio.js
+- Resolved duplicate function declarations
+- Improved error handling in speech processing
+
+### Improvements
+- Enhanced response formatting system for better user experience
+- Improved location extraction from speech input with more natural language patterns
+- Updated location prompts with better examples and more natural language
+- Added comprehensive test coverage for all new features
+
 ## Installation
 
 1. Clone the repository.
