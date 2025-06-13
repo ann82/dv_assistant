@@ -222,17 +222,6 @@ router.post('/web/process', async (req, res) => {
   }
 });
 
-// Generate a prompt asking for location
-function generateLocationPrompt() {
-  const prompts = [
-    "I need to know your location to find nearby resources. Could you please tell me your city or area? For example, you could say San Francisco, Oakland, or San Jose.",
-    "To help you find local resources, I need to know where you are. Please tell me your city or area, like San Mateo, Santa Clara, or any other city in the Bay Area.",
-    "I can help you find resources in your area. Could you please tell me which city you're in? For example, you could say San Francisco, San Jose, or any other city nearby.",
-    "To find the closest resources to you, I need to know your location. Please tell me your city or area, such as Oakland, San Mateo, or any other city in the region."
-  ];
-  return prompts[Math.floor(Math.random() * prompts.length)];
-}
-
 // Handler for Twilio voice calls
 async function processTwilioRequest(speechResult, requestId) {
   try {
@@ -249,7 +238,7 @@ async function processTwilioRequest(speechResult, requestId) {
         requestId,
         speechResult
       });
-      return await generateLocationPrompt();
+      return generateLocationPrompt();
     }
 
     // Call Tavily API with location-specific query
@@ -388,93 +377,34 @@ async function processSpeechResult(callSid, speechResult, requestId, requestType
   }
 }
 
-const formatTavilyResponse = (tavilyResponse, requestType) => {
-  logger.info('Starting Tavily response formatting:', {
-    requestType,
-    hasResponse: !!tavilyResponse,
-    hasResults: !!tavilyResponse?.results,
-    resultCount: tavilyResponse?.results?.length
+export function formatTavilyResponse(response) {
+  if (!response || !response.results || !Array.isArray(response.results) || response.results.length === 0) {
+    return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
+  }
+
+  let formattedResponse = "I found some resources that might help:\n\n";
+  response.results.forEach((result, index) => {
+    const title = result.title || 'Unknown Organization';
+    const content = result.content || 'No description available.';
+    const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
+    const phone = phoneMatch ? phoneMatch[1] : null;
+    const coverageMatch = content.match(/Coverage Area: ([^,.]+)/i);
+    const coverage = coverageMatch ? coverageMatch[1] : null;
+
+    formattedResponse += `${index + 1}. ${title}\n`;
+    formattedResponse += `   ${content}\n`;
+    if (phone) {
+      formattedResponse += `   Phone: ${phone}\n`;
+    }
+    if (coverage) {
+      formattedResponse += `   Coverage: ${coverage}\n`;
+    }
+    formattedResponse += '\n';
   });
 
-  try {
-    if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
-      logger.warn('No results found in Tavily response:', {
-        response: tavilyResponse,
-        requestType
-      });
-      return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
-    }
-
-    logger.info('Processing Tavily results:', {
-      requestType,
-      resultCount: tavilyResponse.results.length,
-      firstResultTitle: tavilyResponse.results[0]?.title,
-      firstResultUrl: tavilyResponse.results[0]?.url
-    });
-
-    const results = tavilyResponse.results.slice(0, 3); // Only use first 3 results
-    let formattedResponse = "I found some resources that might help:\n\n";
-
-    results.forEach((result, index) => {
-      logger.debug('Formatting result:', {
-        index,
-        title: result.title,
-        url: result.url,
-        contentLength: result.content?.length
-      });
-
-      // Extract organization name and location from title
-      const titleParts = result.title?.split('|') || result.title?.split('-') || [result.title];
-      const orgName = titleParts[0]?.trim() || 'Unknown Organization';
-      
-      // Extract phone number if present
-      const phoneMatch = result.content?.match(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/);
-      const phoneNumber = phoneMatch ? phoneMatch[0] : null;
-
-      // Extract coverage area if present
-      const coverageMatch = result.content?.match(/Coverage Area:?\s*([^.]+)/i);
-      const coverageArea = coverageMatch ? coverageMatch[1].trim() : null;
-
-      // Extract service description (first sentence)
-      const serviceMatch = result.content?.match(/^([^.]*)/);
-      const serviceDescription = serviceMatch ? serviceMatch[1].trim() : null;
-
-      formattedResponse += `${index + 1}. ${orgName}\n`;
-      
-      if (serviceDescription) {
-        formattedResponse += `   ${serviceDescription}\n`;
-      }
-      
-      if (phoneNumber) {
-        formattedResponse += `   Phone: ${phoneNumber}\n`;
-      }
-      
-      if (coverageArea) {
-        formattedResponse += `   Coverage: ${coverageArea}\n`;
-      }
-      
-      formattedResponse += '\n';
-    });
-
-    formattedResponse += "Would you like more information about any of these resources?";
-    
-    logger.info('Formatted response:', {
-      requestType,
-      responseLength: formattedResponse.length,
-      responsePreview: formattedResponse.substring(0, 100) + '...'
-    });
-
-    return formattedResponse;
-  } catch (error) {
-    logger.error('Error formatting Tavily response:', {
-      error: error.message,
-      stack: error.stack,
-      requestType,
-      response: tavilyResponse
-    });
-    return "I'm sorry, I'm having trouble formatting the search results. Please try asking your question again.";
-  }
-};
+  formattedResponse += "Would you like more information about any of these resources?";
+  return formattedResponse;
+}
 
 router.post('/status', async (req, res) => {
   try {
@@ -647,8 +577,7 @@ export async function handleIncomingCall(req, res) {
 // Export functions for testing
 export {
   formatTavilyResponse,
-  extractLocationFromSpeech,
-  generateLocationPrompt
+  extractLocationFromSpeech
 };
 
 // Handle incoming voice calls
