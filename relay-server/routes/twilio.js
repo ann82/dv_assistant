@@ -576,7 +576,6 @@ export async function handleIncomingCall(req, res) {
 
 // Export functions for testing
 export {
-  formatTavilyResponse,
   extractLocationFromSpeech
 };
 
