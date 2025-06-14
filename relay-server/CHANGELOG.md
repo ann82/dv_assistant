@@ -101,6 +101,10 @@ All notable changes to this project will be documented in this file.
 - Improved location extraction to handle various speech patterns
 - Updated location prompts to include example cities
 - Comprehensive test coverage for speech processing and response formatting
+- Railway deployment support
+- WebSocket configuration for cloud deployment
+- Enhanced environment variable handling
+- Procfile for Railway deployment
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios
@@ -139,6 +143,13 @@ All notable changes to this project will be documented in this file.
 - Response formatting issues in voice calls
 - Error handling in response generation
 - Phone number extraction in voice responses
+- Fixed duplicate export of `formatTavilyResponse` in twilio.js
+- Fixed duplicate declaration of `generateLocationPrompt` in twilio.js
+- Improved error handling in speech processing
+- Enhanced response formatting system
+- Improved location extraction from speech input
+- Updated location prompts with better examples
+- Added comprehensive test coverage
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
