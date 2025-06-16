@@ -15,12 +15,21 @@ const validateConfig = () => {
   
   if (missingVars.length > 0) {
     logger.error('Missing required environment variables:', {
-      missing: missingVars
+      missing: missingVars,
+      nodeEnv: process.env.NODE_ENV,
+      hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+      hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+      hasPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER
     });
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
 
-  logger.info('Environment variables validated successfully');
+  logger.info('Environment variables validated successfully:', {
+    nodeEnv: process.env.NODE_ENV,
+    hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+    hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+    hasPhoneNumber: !!process.env.TWILIO_PHONE_NUMBER
+  });
 };
 
 // Only validate in production

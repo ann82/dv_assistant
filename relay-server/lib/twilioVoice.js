@@ -57,26 +57,35 @@ export class TwilioVoiceHandler {
       req.setTimeout(30000); // 30 seconds timeout
       
       // Log request headers for debugging
-      logger.info('Twilio Request Headers:', req.headers);
+      logger.info('Twilio Request Headers:', {
+        headers: req.headers,
+        body: req.body,
+        url: req.originalUrl,
+        protocol: req.protocol,
+        host: req.get('host'),
+        method: req.method
+      });
 
       // Validate request
       if (!this.validateTwilioRequest(req)) {
-        logger.error('Invalid Twilio request');
+        logger.error('Invalid Twilio request:', {
+          headers: req.headers,
+          body: req.body,
+          url: req.originalUrl,
+          method: req.method
+        });
         return res.status(403).send('Invalid Twilio request');
       }
 
       const { CallSid, From } = req.body;
       logger.info(`Incoming call from ${From}`, { callSid: CallSid });
 
-      // Send initial TwiML response immediately
-      const initialTwiML = this.generateTwiML("Hello, I'm your domestic violence support assistant. How can I help you today?");
-      await this.sendTwiMLResponse(res, initialTwiML);
-
       // Create WebSocket connection with retry
       const ws = await this.createWebSocketConnection(CallSid, From);
       if (!ws) {
         logger.error('Failed to create WebSocket connection', { callSid: CallSid });
-        return;
+        const twiml = this.generateTwiML("I'm having trouble connecting. Please try again in a moment.", true);
+        return this.sendTwiMLResponse(res, twiml);
       }
 
       // Handle request abort
@@ -128,6 +137,10 @@ export class TwilioVoiceHandler {
         this.handleCallEnd(CallSid);
       });
 
+      // Send initial TwiML response
+      const twiml = this.generateTwiML("Hello, I'm your domestic violence support assistant. How can I help you today?");
+      return this.sendTwiMLResponse(res, twiml);
+
     } catch (error) {
       logger.error('Error handling incoming call:', {
         error: error.message,
@@ -137,7 +150,7 @@ export class TwilioVoiceHandler {
       
       // Send error response to Twilio
       const twiml = this.generateTwiML("I'm sorry, I encountered an error. Please try again in a moment.", true);
-      await this.sendTwiMLResponse(res, twiml);
+      return this.sendTwiMLResponse(res, twiml);
     }
   }
 
@@ -195,19 +208,88 @@ export class TwilioVoiceHandler {
   }
 
   validateTwilioRequest(req) {
-    const twilioSignature = req.headers['x-twilio-signature'];
-    const url = req.protocol + '://' + req.get('host') + req.originalUrl;
-    const params = req.body || {};
-    
-    if (!twilioSignature) return false;
-    
-    logger.debug('[REAL] validateTwilioRequest calling validateRequest:', {authToken: this.authToken, twilioSignature, url, params});
-    return this.validateRequest(
-      this.authToken,
-      twilioSignature,
-      url,
-      params
-    );
+    try {
+      // Log validation attempt with full details
+      logger.info('Validating Twilio request:', {
+        signature: req.headers['x-twilio-signature'],
+        url: req.protocol + '://' + req.get('host') + req.originalUrl,
+        body: req.body,
+        headers: req.headers,
+        method: req.method,
+        host: req.get('host'),
+        originalUrl: req.originalUrl
+      });
+
+      // Check if we have the required credentials
+      if (!this.accountSid || !this.authToken) {
+        logger.error('Missing Twilio credentials:', {
+          hasAccountSid: !!this.accountSid,
+          hasAuthToken: !!this.authToken,
+          accountSid: this.accountSid ? 'present' : 'missing',
+          authToken: this.authToken ? 'present' : 'missing'
+        });
+        return false;
+      }
+
+      // Check if we have the signature header
+      const signature = req.headers['x-twilio-signature'];
+      if (!signature) {
+        logger.error('Missing Twilio signature header:', {
+          headers: req.headers
+        });
+        return false;
+      }
+
+      // Get the full URL
+      const url = req.protocol + '://' + req.get('host') + req.originalUrl;
+      
+      // Log the exact values being used for validation
+      logger.info('Twilio validation parameters:', {
+        authToken: this.authToken ? 'present' : 'missing',
+        signature,
+        url,
+        body: req.body || {},
+        method: req.method
+      });
+
+      // Validate the request
+      const isValid = twilio.validateRequest(
+        this.authToken,
+        signature,
+        url,
+        req.body || {}
+      );
+
+      logger.info('Twilio request validation result:', {
+        isValid,
+        url,
+        signature,
+        hasBody: !!req.body,
+        method: req.method
+      });
+
+      if (!isValid) {
+        logger.error('Twilio request validation failed:', {
+          url,
+          signature,
+          hasBody: !!req.body,
+          method: req.method,
+          headers: req.headers
+        });
+      }
+
+      return isValid;
+    } catch (error) {
+      logger.error('Error validating Twilio request:', {
+        error: error.message,
+        stack: error.stack,
+        headers: req.headers,
+        body: req.body,
+        url: req.originalUrl,
+        method: req.method
+      });
+      return false;
+    }
   }
 
   async createWebSocketConnection(callSid, from, res) {
@@ -474,7 +556,7 @@ export class TwilioVoiceHandler {
   async sendTwiMLResponse(res, twiml) {
     try {
       res.set('Content-Type', 'text/xml');
-      await new Promise((resolve, reject) => {
+      return new Promise((resolve, reject) => {
         res.send(twiml, (err) => {
           if (err) {
             logger.error('Error sending TwiML response:', {
