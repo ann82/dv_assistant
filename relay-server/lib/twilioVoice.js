@@ -68,8 +68,12 @@ export class TwilioVoiceHandler {
       const { CallSid, From } = req.body;
       logger.info(`Incoming call from ${From}`, { callSid: CallSid });
 
+      // Send initial TwiML response immediately
+      const initialTwiML = this.generateTwiML("Hello, I'm your domestic violence support assistant. How can I help you today?");
+      await this.sendTwiMLResponse(res, initialTwiML);
+
       // Create WebSocket connection with retry
-      const ws = await this.createWebSocketConnection(CallSid, From, res);
+      const ws = await this.createWebSocketConnection(CallSid, From);
       if (!ws) {
         logger.error('Failed to create WebSocket connection', { callSid: CallSid });
         return;
@@ -124,10 +128,6 @@ export class TwilioVoiceHandler {
         this.handleCallEnd(CallSid);
       });
 
-      // Send initial TwiML response
-      const twiml = this.generateTwiML("Hello, I'm your domestic violence support assistant. How can I help you today?");
-      this.sendTwiMLResponse(res, twiml);
-
     } catch (error) {
       logger.error('Error handling incoming call:', {
         error: error.message,
@@ -137,7 +137,40 @@ export class TwilioVoiceHandler {
       
       // Send error response to Twilio
       const twiml = this.generateTwiML("I'm sorry, I encountered an error. Please try again in a moment.", true);
-      this.sendTwiMLResponse(res, twiml);
+      await this.sendTwiMLResponse(res, twiml);
+    }
+  }
+
+  async handleSpeechInput(req, res) {
+    try {
+      const { CallSid, From, SpeechResult } = req.body;
+      logger.info('Received speech input:', { 
+        callSid: CallSid,
+        from: From,
+        speechResult: SpeechResult
+      });
+
+      // Send immediate acknowledgment
+      const acknowledgmentTwiML = this.generateTwiML("I'm processing your request. Please hold on.");
+      await this.sendTwiMLResponse(res, acknowledgmentTwiML);
+
+      // Process the speech input
+      const response = await this.processSpeechInput(SpeechResult, CallSid);
+      
+      // Send the final response
+      const finalTwiML = this.generateTwiML(response);
+      await this.sendTwiMLResponse(res, finalTwiML);
+
+    } catch (error) {
+      logger.error('Error handling speech input:', {
+        error: error.message,
+        stack: error.stack,
+        body: req.body
+      });
+      
+      // Send error response to Twilio
+      const twiml = this.generateTwiML("I'm sorry, I encountered an error processing your request. Please try again.", true);
+      await this.sendTwiMLResponse(res, twiml);
     }
   }
 
@@ -443,12 +476,22 @@ export class TwilioVoiceHandler {
       res.set('Content-Type', 'text/xml');
       await new Promise((resolve, reject) => {
         res.send(twiml, (err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            logger.error('Error sending TwiML response:', {
+              error: err.message,
+              stack: err.stack
+            });
+            reject(err);
+          } else {
+            resolve();
+          }
         });
       });
     } catch (error) {
-      logger.error('Error sending TwiML response:', error);
+      logger.error('Error in sendTwiMLResponse:', {
+        error: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }

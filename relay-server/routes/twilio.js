@@ -125,94 +125,35 @@ router.use((req, res, next) => {
   next();
 });
 
+// Voice webhook route
 router.post('/voice', async (req, res) => {
-  logger.info('--- /twilio/voice endpoint hit ---');
-  logger.info('Request body:', req.body);
-  logger.info('Request headers:', req.headers);
-  
   try {
-    // Validate Twilio credentials
-    if (!accountSid || !authToken) {
-      logger.error('Missing Twilio credentials:', {
-        hasAccountSid: !!accountSid,
-        hasAuthToken: !!authToken
-      });
-      throw new Error('Twilio credentials not configured');
+    // Log the incoming request
+    logger.info('Received voice webhook:', {
+      method: req.method,
+      url: req.originalUrl,
+      headers: req.headers,
+      body: req.body
+    });
+
+    // Check if this is a speech input
+    if (req.body.SpeechResult) {
+      await twilioVoiceHandler.handleSpeechInput(req, res);
+      return;
     }
 
-    logger.info('Processing voice request:', {
-      body: req.body,
-      headers: req.headers,
-      url: req.originalUrl
-    });
-    
-    const twiml = new twilio.twiml.VoiceResponse();
-    
-    // Log TwiML creation
-    logger.info('Creating TwiML response');
-    
-    twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes, legal services, counseling, and other resources related to domestic violence. How can I help you today?');
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: SPEECH_TIMEOUT,
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
-    });
-
-    const twimlResponse = twiml.toString();
-    logger.info('Sending TwiML response:', {
-      response: twimlResponse,
-      contentType: 'text/xml'
-    });
-    
-    res.type('text/xml');
-    res.write(twimlResponse);
-    res.end();
-    logger.info('--- /twilio/voice endpoint response sent ---');
+    // Handle new call
+    await twilioVoiceHandler.handleIncomingCall(req, res);
   } catch (error) {
-    logger.error('Error processing voice request:', {
+    logger.error('Error in voice webhook:', {
       error: error.message,
       stack: error.stack,
-      body: req.body,
-      headers: req.headers,
-      url: req.originalUrl
+      body: req.body
     });
     
-    try {
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("I'm having trouble processing your request. Please try again.");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: SPEECH_TIMEOUT,
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        timeout: '30'
-      });
-      
-      const errorResponse = twiml.toString();
-      logger.info('Sending error TwiML response:', {
-        response: errorResponse,
-        contentType: 'text/xml'
-      });
-      
-      res.type('text/xml');
-      res.send(errorResponse);
-    } catch (fallbackError) {
-      logger.error('Error sending fallback response:', {
-        error: fallbackError.message,
-        stack: fallbackError.stack
-      });
-      res.status(500).send('Application Error');
-    }
-    
-    logger.info('--- /twilio/voice endpoint error response sent ---');
+    // Send error response to Twilio
+    const twiml = twilioVoiceHandler.generateTwiML("I'm sorry, I encountered an error. Please try again in a moment.", true);
+    await twilioVoiceHandler.sendTwiMLResponse(res, twiml);
   }
 });
 
