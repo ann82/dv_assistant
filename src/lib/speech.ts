@@ -1,33 +1,24 @@
 export class SpeechHandler {
+  private speechQueue: Array<{ text: string; resolve: Function; reject: Function }> = [];
+  private isSpeaking: boolean = false;
+  private synth: SpeechSynthesis;
+  private voice: SpeechSynthesisVoice;
+  private rate: number = 1.0;
+  private pitch: number = 1.0;
+  private volume: number = 1.0;
+  private readonly MIN_DELAY = 100; // Reduced from 300ms to 100ms
+
   constructor() {
     this.synth = window.speechSynthesis;
-    this.voice = null;
-    this.rate = 1.0;
-    this.pitch = 1.0;
-    this.volume = 1.0;
-    this.speechQueue = [];
-    this.isSpeaking = false;
+    this.voice = this.getDefaultVoice();
   }
 
-  async init() {
-    // Wait for voices to be loaded
-    if (this.synth.getVoices().length === 0) {
-      await new Promise(resolve => {
-        this.synth.addEventListener('voiceschanged', resolve, { once: true });
-      });
-    }
-
-    // Try to find a good voice
+  private getDefaultVoice(): SpeechSynthesisVoice {
     const voices = this.synth.getVoices();
-    this.voice = voices.find(voice => 
-      voice.lang === 'en-US' && 
-      voice.name.toLowerCase().includes('female')
-    ) || voices[0];
-
-    return this.voice !== null;
+    return voices.find(voice => voice.lang === 'en-US') || voices[0];
   }
 
-  async speak(text) {
+  async speak(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         // Add to queue
@@ -43,18 +34,24 @@ export class SpeechHandler {
     });
   }
 
-  async processQueue() {
+  private async processQueue() {
     if (this.speechQueue.length === 0) {
       this.isSpeaking = false;
       return;
     }
 
     this.isSpeaking = true;
-    const { text, resolve, reject } = this.speechQueue.shift();
+    const queueItem = this.speechQueue.shift();
+    if (!queueItem) {
+      this.isSpeaking = false;
+      return;
+    }
+
+    const { text, resolve, reject } = queueItem;
 
     try {
-      // Add a small delay between responses
-      await new Promise(r => setTimeout(r, 300));
+      // Add a minimal delay between responses
+      await new Promise(r => setTimeout(r, this.MIN_DELAY));
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = this.voice;
