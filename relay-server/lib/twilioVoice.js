@@ -568,26 +568,25 @@ export class TwilioVoiceHandler {
 
   async sendTwiMLResponse(res, twiml) {
     try {
+      // Ensure twiml is a string
+      const twimlString = typeof twiml === 'string' ? twiml : twiml.toString();
+      
+      // Set headers
       res.set('Content-Type', 'text/xml');
-      return new Promise((resolve, reject) => {
-        res.send(twiml, (err) => {
-          if (err) {
-            logger.error('Error sending TwiML response:', {
-              error: err.message,
-              stack: err.stack
-            });
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
+      
+      // Send response
+      return res.send(twimlString);
     } catch (error) {
-      logger.error('Error in sendTwiMLResponse:', {
+      logger.error('Error sending TwiML response:', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
+        twimlType: typeof twiml
       });
-      throw error;
+      
+      // Send error response
+      const errorTwiml = new twilio.twiml.VoiceResponse();
+      errorTwiml.say('We encountered an error. Please try again later.');
+      return res.status(500).send(errorTwiml.toString());
     }
   }
 

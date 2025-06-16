@@ -128,32 +128,34 @@ router.use((req, res, next) => {
 // Voice webhook route
 router.post('/voice', async (req, res) => {
   try {
-    // Log the incoming request
-    logger.info('Received voice webhook:', {
-      method: req.method,
-      url: req.originalUrl,
+    // Validate request
+    if (!twilioVoiceHandler.validateTwilioRequest(req)) {
+      logger.error('Invalid Twilio request:', {
+        headers: req.headers,
+        body: req.body,
+        url: req.originalUrl,
+        method: req.method
+      });
+      return res.status(403).send('Invalid Twilio request');
+    }
+
+    // Handle the call
+    const twiml = await twilioVoiceHandler.handleIncomingCall(req, res);
+    
+    // Send response
+    return twilioVoiceHandler.sendTwiMLResponse(res, twiml);
+  } catch (error) {
+    logger.error('Error handling Twilio voice request:', {
+      error: error.message,
+      stack: error.stack,
       headers: req.headers,
       body: req.body
     });
-
-    // Check if this is a speech input
-    if (req.body.SpeechResult) {
-      await twilioVoiceHandler.handleSpeechInput(req, res);
-      return;
-    }
-
-    // Handle new call
-    await twilioVoiceHandler.handleIncomingCall(req, res);
-  } catch (error) {
-    logger.error('Error in voice webhook:', {
-      error: error.message,
-      stack: error.stack,
-      body: req.body
-    });
     
-    // Send error response to Twilio
-    const twiml = twilioVoiceHandler.generateTwiML("I'm sorry, I encountered an error. Please try again in a moment.", true);
-    await twilioVoiceHandler.sendTwiMLResponse(res, twiml);
+    // Send error response
+    const errorTwiml = new twilio.twiml.VoiceResponse();
+    errorTwiml.say('We encountered an error. Please try again later.');
+    return res.status(500).send(errorTwiml.toString());
   }
 });
 
