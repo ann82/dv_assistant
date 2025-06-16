@@ -1,5 +1,32 @@
 import dotenv from 'dotenv';
+import logger from './logger.js';
+
 dotenv.config();
+
+// Validate required environment variables
+const validateConfig = () => {
+  const requiredVars = [
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN',
+    'TWILIO_PHONE_NUMBER'
+  ];
+
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    logger.error('Missing required environment variables:', {
+      missing: missingVars
+    });
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+
+  logger.info('Environment variables validated successfully');
+};
+
+// Only validate in production
+if (process.env.NODE_ENV === 'production') {
+  validateConfig();
+}
 
 export const config = {
   // API Keys
