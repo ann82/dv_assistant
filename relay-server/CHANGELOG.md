@@ -105,6 +105,10 @@ All notable changes to this project will be documented in this file.
 - WebSocket configuration for cloud deployment
 - Enhanced environment variable handling
 - Procfile for Railway deployment
+- Rate limiting for API endpoints
+- Request abort handling
+- Resource cleanup on call end
+- Comprehensive error logging
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios
@@ -127,6 +131,14 @@ All notable changes to this project will be documented in this file.
 - Optimized voice response format for better clarity
 - Updated response formatting based on request type
 - Updated README with recent changes and improvements
+- Updated WebSocket connection logic to support cloud deployment
+- Enhanced configuration system for different environments
+- Improved error handling in speech processing
+- Increased request timeouts for Twilio requests
+- Enhanced response formatting system
+- Improved location extraction from speech input
+- Updated location prompts with better examples
+- Added comprehensive test coverage
 
 ### Fixed
 - Fixed error handling to properly track fallback statistics
@@ -150,10 +162,18 @@ All notable changes to this project will be documented in this file.
 - Improved location extraction from speech input
 - Updated location prompts with better examples
 - Added comprehensive test coverage
+- Fixed request abort handling in Twilio voice calls
+- Fixed resource cleanup on call termination
+- Fixed WebSocket connection issues in cloud environment
+- Fixed package-lock.json synchronization issues
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
 - Attempted to update development dependencies to address vulnerabilities
+- Added rate limiting to prevent abuse
+- Enhanced request validation
+- Improved error handling for malformed requests
+- Added request timeout protection
 
 ## [1.0.0] - 2024-03-20
 

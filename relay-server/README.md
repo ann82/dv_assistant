@@ -1,6 +1,6 @@
-# Domestic Violence Support Assistant
+# Relay Server
 
-A comprehensive system for providing support and resources to individuals affected by domestic violence.
+A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
 ## Features
 
@@ -46,11 +46,14 @@ A comprehensive system for providing support and resources to individuals affect
 - Entity extraction
 
 ## Recent Updates
-- Enhanced response formatting system with multi-format support
-- Improved location extraction to handle various speech patterns
-- Updated location prompts to include example cities
+
+### Stability Improvements
+- Added rate limiting for API protection
 - Enhanced error handling and logging
-- Comprehensive test coverage for speech processing and response formatting
+- Improved request timeout handling
+- Added resource cleanup on call end
+- Fixed WebSocket connection issues
+- Added comprehensive request validation
 
 ### Deployment
 - Added Railway deployment support
@@ -59,15 +62,16 @@ A comprehensive system for providing support and resources to individuals affect
 - Added deployment documentation
 
 ### Bug Fixes
-- Fixed duplicate export issues in twilio.js
-- Resolved duplicate function declarations
-- Improved error handling in speech processing
+- Fixed request abort handling
+- Resolved resource cleanup issues
+- Fixed WebSocket connection problems
+- Fixed package-lock.json synchronization
 
 ### Improvements
-- Enhanced response formatting system for better user experience
-- Improved location extraction from speech input with more natural language patterns
-- Updated location prompts with better examples and more natural language
-- Added comprehensive test coverage for all new features
+- Enhanced response formatting system
+- Improved location extraction from speech input
+- Updated location prompts with better examples
+- Added comprehensive test coverage
 
 ## Deployment
 
@@ -124,6 +128,36 @@ A comprehensive system for providing support and resources to individuals affect
    ```bash
    npm start
    ```
+
+## Features
+- Voice call handling with Twilio integration
+- Speech-to-text processing
+- Location-based resource finding
+- Real-time response formatting
+- WebSocket support for real-time updates
+- Rate limiting for API protection
+- Comprehensive error handling
+- Resource cleanup on call end
+
+## Security Features
+- Rate limiting to prevent abuse
+- Request validation
+- Error handling for malformed requests
+- Request timeout protection
+- Secure WebSocket connections
+- Environment variable protection
+
+## Testing
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
 
 ## Installation
 
