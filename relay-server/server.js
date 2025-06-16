@@ -9,6 +9,7 @@ import twilioRoutes from './routes/twilio.js';
 import { TwilioWebSocketServer } from './websocketServer.js';
 import logger from './lib/logger.js';
 import { callTavilyAPI } from './lib/apis.js';
+import rateLimit from 'express-rate-limit';
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -43,14 +44,41 @@ const app = express();
 // Use Railway's PORT or fallback to 3000
 const port = process.env.PORT || 3000;
 
-// Enable CORS
-app.use(cors());
+// Configure Express
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ 
+  limit: '50mb',
+  extended: true,
+  parameterLimit: 50000
+}));
 
-// Parse JSON bodies
-app.use(express.json());
+// Increase timeout for Twilio requests
+app.use((req, res, next) => {
+  req.setTimeout(30000); // 30 seconds
+  res.setTimeout(30000); // 30 seconds
+  next();
+});
 
-// Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
+// Configure CORS
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Twilio-Signature'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+}));
+
+// Configure rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
 
 // Create audio directory if it doesn't exist
 const audioDir = path.join(__dirname, 'public', 'audio');

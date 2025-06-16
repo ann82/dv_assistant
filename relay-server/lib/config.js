@@ -11,7 +11,7 @@ export const config = {
   ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID || 'default_voice_id',
   
   // Response Settings
-  DEFAULT_MAX_TOKENS: 150, // Reduced from 1000 to minimize costs
+  DEFAULT_MAX_TOKENS: 150,
   CACHE_EXPIRY: 1000 * 60 * 60, // 1 hour in milliseconds
   
   // Audio Settings
@@ -26,8 +26,14 @@ export const config = {
   // Logging
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
 
+  // Server Configuration
   PORT: process.env.PORT || 3000,
   WS_PORT: process.env.WS_PORT || 3001,
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  
+  // Railway Configuration
+  RAILWAY_STATIC_URL: process.env.RAILWAY_STATIC_URL,
+  WS_HOST: process.env.WS_HOST,
   
   // Twilio Configuration
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,

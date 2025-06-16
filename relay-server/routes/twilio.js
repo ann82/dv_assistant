@@ -128,10 +128,29 @@ router.use((req, res, next) => {
 router.post('/voice', async (req, res) => {
   logger.info('--- /twilio/voice endpoint hit ---');
   logger.info('Request body:', req.body);
+  logger.info('Request headers:', req.headers);
+  
   try {
-    logger.info('Processing voice request:', req.body);
+    // Validate Twilio credentials
+    if (!accountSid || !authToken) {
+      logger.error('Missing Twilio credentials:', {
+        hasAccountSid: !!accountSid,
+        hasAuthToken: !!authToken
+      });
+      throw new Error('Twilio credentials not configured');
+    }
+
+    logger.info('Processing voice request:', {
+      body: req.body,
+      headers: req.headers,
+      url: req.originalUrl
+    });
     
     const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Log TwiML creation
+    logger.info('Creating TwiML response');
+    
     twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes, legal services, counseling, and other resources related to domestic violence. How can I help you today?');
     twiml.gather({
       input: 'speech',
@@ -144,27 +163,55 @@ router.post('/voice', async (req, res) => {
       timeout: '30'
     });
 
-    logger.info('Sending TwiML response:', twiml.toString());
+    const twimlResponse = twiml.toString();
+    logger.info('Sending TwiML response:', {
+      response: twimlResponse,
+      contentType: 'text/xml'
+    });
+    
     res.type('text/xml');
-    res.write(twiml.toString());
+    res.write(twimlResponse);
     res.end();
     logger.info('--- /twilio/voice endpoint response sent ---');
   } catch (error) {
-    logger.error('Error processing voice request:', error);
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm having trouble processing your request. Please try again.");
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: SPEECH_TIMEOUT,
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
+    logger.error('Error processing voice request:', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      headers: req.headers,
+      url: req.originalUrl
     });
-    res.type('text/xml');
-    res.send(twiml.toString());
+    
+    try {
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("I'm having trouble processing your request. Please try again.");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: SPEECH_TIMEOUT,
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US',
+        timeout: '30'
+      });
+      
+      const errorResponse = twiml.toString();
+      logger.info('Sending error TwiML response:', {
+        response: errorResponse,
+        contentType: 'text/xml'
+      });
+      
+      res.type('text/xml');
+      res.send(errorResponse);
+    } catch (fallbackError) {
+      logger.error('Error sending fallback response:', {
+        error: fallbackError.message,
+        stack: fallbackError.stack
+      });
+      res.status(500).send('Application Error');
+    }
+    
     logger.info('--- /twilio/voice endpoint error response sent ---');
   }
 });

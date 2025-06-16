@@ -53,52 +53,91 @@ export class TwilioVoiceHandler {
 
   async handleIncomingCall(req, res) {
     try {
+      // Set longer timeout for Twilio requests
+      req.setTimeout(30000); // 30 seconds timeout
+      
+      // Log request headers for debugging
+      logger.info('Twilio Request Headers:', req.headers);
+
+      // Validate request
       if (!this.validateTwilioRequest(req)) {
-        return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
+        logger.error('Invalid Twilio request');
+        return res.status(403).send('Invalid Twilio request');
       }
 
-      const { CallSid, From } = req.body || {};
-      if (!CallSid || !From) {
-        return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
-      }
+      const { CallSid, From } = req.body;
+      logger.info(`Incoming call from ${From}`, { callSid: CallSid });
 
-      // Check if we're already processing this call
-      if (this.processingRequests.has(CallSid)) {
-        logger.info(`Duplicate request for call ${CallSid}, ignoring`);
-        return this.sendSuccessResponse(res);
-      }
-
-      logger.info(`📞 Incoming call from ${From} (CallSid: ${CallSid})`);
-
-      // Mark call as being processed
-      this.processingRequests.set(CallSid, true);
-
+      // Create WebSocket connection with retry
       const ws = await this.createWebSocketConnection(CallSid, From, res);
       if (!ws) {
-        this.processingRequests.delete(CallSid);
-        return this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
+        logger.error('Failed to create WebSocket connection', { callSid: CallSid });
+        return;
       }
 
-      this.setupWebSocketHandlers(ws, CallSid, res);
-      
-      // Initial TwiML response with consent request
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Amy">Welcome to the Domestic Violence Support Assistant. I'm here to help you today.</Say>
-  <Pause length="1"/>
-  <Say voice="Polly.Amy">Would you like to receive a summary of our conversation and follow-up resources via text message after the call? Please say yes or no.</Say>
-  <Gather input="speech" action="/twilio/consent" method="POST" 
-          speechTimeout="auto" 
-          speechModel="phone_call"
-          enhanced="true"
-          language="en-US"/>
-</Response>`;
+      // Handle request abort
+      req.on('aborted', () => {
+        logger.warn('Request aborted', { 
+          callSid: CallSid,
+          from: From,
+          headers: req.headers
+        });
+        this.handleCallEnd(CallSid);
+      });
 
-      await this.sendTwiMLResponse(res, twiml);
+      // Handle request close
+      req.on('close', () => {
+        logger.info('Request closed', { 
+          callSid: CallSid,
+          from: From
+        });
+        this.handleCallEnd(CallSid);
+      });
+
+      // Handle request error
+      req.on('error', (error) => {
+        logger.error('Request error:', {
+          error: error.message,
+          callSid: CallSid,
+          from: From,
+          headers: req.headers
+        });
+        this.handleCallEnd(CallSid);
+      });
+
+      // Set up WebSocket error handling
+      ws.on('error', (error) => {
+        logger.error('WebSocket error:', {
+          error: error.message,
+          callSid: CallSid,
+          from: From
+        });
+        this.handleCallEnd(CallSid);
+      });
+
+      // Set up WebSocket close handling
+      ws.on('close', () => {
+        logger.info('WebSocket closed', {
+          callSid: CallSid,
+          from: From
+        });
+        this.handleCallEnd(CallSid);
+      });
+
+      // Send initial TwiML response
+      const twiml = this.generateTwiML("Hello, I'm your domestic violence support assistant. How can I help you today?");
+      this.sendTwiMLResponse(res, twiml);
 
     } catch (error) {
-      logger.error('Error handling incoming call:', error);
-      this.sendErrorResponse(res, HTTP_STATUS.FORBIDDEN, ERROR_MESSAGES.INVALID_REQUEST);
+      logger.error('Error handling incoming call:', {
+        error: error.message,
+        stack: error.stack,
+        headers: req.headers
+      });
+      
+      // Send error response to Twilio
+      const twiml = this.generateTwiML("I'm sorry, I encountered an error. Please try again in a moment.", true);
+      this.sendTwiMLResponse(res, twiml);
     }
   }
 
@@ -140,27 +179,47 @@ export class TwilioVoiceHandler {
 
   async createWebSocketConnection(callSid, from, res) {
     try {
-      const ws = new this.WebSocketClass(`ws://localhost:${config.WS_PORT}?type=phone`);
+      // Get the WebSocket URL from environment variable or construct it
+      const wsProtocol = process.env.NODE_ENV === 'production' ? 'wss' : 'ws';
+      const wsHost = process.env.RAILWAY_STATIC_URL || process.env.WS_HOST || 'localhost';
+      const wsPort = process.env.WS_PORT || config.WS_PORT;
+      const wsUrl = `${wsProtocol}://${wsHost}${wsPort ? ':' + wsPort : ''}?type=phone`;
+      
+      logger.info('Creating WebSocket connection:', {
+        url: wsUrl,
+        callSid,
+        from
+      });
+
+      const ws = new this.WebSocketClass(wsUrl);
       
       // Set a connection timeout
       const connectionTimeout = setTimeout(() => {
         if (ws.readyState !== RealWebSocket.OPEN) {
-          logger.error(`WebSocket connection timeout for call ${callSid}`);
+          logger.error(`WebSocket connection timeout for call ${callSid}`, {
+            url: wsUrl,
+            readyState: ws.readyState
+          });
           ws.terminate();
           if (res) {
             const twiml = this.generateTwiML("I'm having trouble connecting. Please try again in a moment.", true);
             this.sendTwiMLResponse(res, twiml);
           }
         }
-      }, 60000); // Increased to 60 seconds
+      }, 60000);
 
       ws.on('open', () => {
-        logger.info(`WebSocket connected for call ${callSid}`);
+        logger.info(`WebSocket connected for call ${callSid}`, {
+          url: wsUrl
+        });
         clearTimeout(connectionTimeout);
       });
 
       ws.on('error', (error) => {
-        logger.error(`WebSocket error for call ${callSid}:`, error);
+        logger.error(`WebSocket error for call ${callSid}:`, {
+          error: error.message,
+          url: wsUrl
+        });
         clearTimeout(connectionTimeout);
         if (res) {
           const twiml = this.generateTwiML("I encountered an error. Please try again.", true);
@@ -179,7 +238,12 @@ export class TwilioVoiceHandler {
 
       return ws;
     } catch (error) {
-      logger.error('Error creating WebSocket connection:', error);
+      logger.error('Error creating WebSocket connection:', {
+        error: error.message,
+        stack: error.stack,
+        callSid,
+        from
+      });
       if (res) {
         const twiml = this.generateTwiML("I'm having trouble connecting. Please try again.", true);
         this.sendTwiMLResponse(res, twiml);
@@ -194,10 +258,10 @@ export class TwilioVoiceHandler {
     let lastRequestId = null;
     let retryCount = 0;
     const MAX_RETRIES = 3;
-    const RESPONSE_TIMEOUT = 90000; // Increased to 90 seconds for response generation
-    const SPEECH_TIMEOUT = 15000; // Increased to 15 seconds for speech input
-    const CONNECTION_TIMEOUT = 60000; // Increased to 60 seconds for WebSocket connection
-    const ACTIVITY_CHECK_INTERVAL = 30000; // Check for activity every 30 seconds
+    const RESPONSE_TIMEOUT = 30000; // Reduced from 90s to 30s
+    const SPEECH_TIMEOUT = 10000; // Reduced from 15s to 10s
+    const CONNECTION_TIMEOUT = 30000; // Reduced from 60s to 30s
+    const ACTIVITY_CHECK_INTERVAL = 15000; // Reduced from 30s to 15s
 
     // Set up activity monitoring
     const activityCheck = setInterval(() => {
@@ -448,6 +512,22 @@ export class TwilioVoiceHandler {
           duration: Date.now() - call.startTime,
         });
 
+        // Ask for consent before ending the call
+        if (!call.hasConsent) {
+          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Amy">Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.</Say>
+  <Gather input="speech" action="/twilio/consent" method="POST" 
+          speechTimeout="auto" 
+          speechModel="phone_call"
+          enhanced="true"
+          language="en-US"/>
+</Response>`;
+
+          await this.sendTwiMLResponse(res, twiml);
+          return; // Wait for consent response before proceeding
+        }
+
         // Send SMS if consent was given
         if (call.hasConsent) {
           const summary = await this.generateCallSummary(callSid, call);
@@ -535,6 +615,31 @@ export class TwilioVoiceHandler {
     } catch (error) {
       logger.error(`[Call ${callSid}] Error generating call summary:`, error);
       return 'Unable to generate call summary. Please contact support for assistance.';
+    }
+  }
+
+  handleCallEnd(callSid) {
+    try {
+      const call = this.activeCalls.get(callSid);
+      if (call) {
+        logger.info('Handling call end', { callSid });
+        
+        // Clear all timeouts
+        call.timeouts.forEach(timeout => clearTimeout(timeout));
+        
+        // Close WebSocket if it's still open
+        if (call.ws && call.ws.readyState === RealWebSocket.OPEN) {
+          call.ws.close();
+        }
+        
+        // Remove from active calls
+        this.activeCalls.delete(callSid);
+      }
+    } catch (error) {
+      logger.error('Error handling call end:', {
+        error: error.message,
+        callSid
+      });
     }
   }
 }
