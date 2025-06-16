@@ -217,7 +217,9 @@ export class TwilioVoiceHandler {
         headers: req.headers,
         method: req.method,
         host: req.get('host'),
-        originalUrl: req.originalUrl
+        originalUrl: req.originalUrl,
+        clientUa: req.headers['user-agent'],
+        srcIp: req.ip
       });
 
       // Check if we have the required credentials
@@ -240,8 +242,10 @@ export class TwilioVoiceHandler {
         return false;
       }
 
-      // Get the full URL
-      const url = req.protocol + '://' + req.get('host') + req.originalUrl;
+      // Get the full URL - handle Railway's proxy setup
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.get('host');
+      const url = `${protocol}://${host}${req.originalUrl}`;
       
       // Log the exact values being used for validation
       logger.info('Twilio validation parameters:', {
@@ -249,7 +253,10 @@ export class TwilioVoiceHandler {
         signature,
         url,
         body: req.body || {},
-        method: req.method
+        method: req.method,
+        protocol,
+        host,
+        originalUrl: req.originalUrl
       });
 
       // Validate the request
@@ -265,7 +272,9 @@ export class TwilioVoiceHandler {
         url,
         signature,
         hasBody: !!req.body,
-        method: req.method
+        method: req.method,
+        protocol,
+        host
       });
 
       if (!isValid) {
@@ -274,7 +283,9 @@ export class TwilioVoiceHandler {
           signature,
           hasBody: !!req.body,
           method: req.method,
-          headers: req.headers
+          headers: req.headers,
+          protocol,
+          host
         });
       }
 
@@ -286,7 +297,9 @@ export class TwilioVoiceHandler {
         headers: req.headers,
         body: req.body,
         url: req.originalUrl,
-        method: req.method
+        method: req.method,
+        protocol: req.protocol,
+        host: req.get('host')
       });
       return false;
     }
