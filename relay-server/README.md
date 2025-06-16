@@ -66,6 +66,8 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - Resolved resource cleanup issues
 - Fixed WebSocket connection problems
 - Fixed package-lock.json synchronization
+- Fixed logger import in configuration
+- Fixed environment validation in test environment
 
 ### Improvements
 - Enhanced response formatting system

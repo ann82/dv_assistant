@@ -166,6 +166,8 @@ All notable changes to this project will be documented in this file.
 - Fixed resource cleanup on call termination
 - Fixed WebSocket connection issues in cloud environment
 - Fixed package-lock.json synchronization issues
+- Fixed logger import in config.js
+- Fixed environment validation in test environment
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.
