@@ -379,11 +379,37 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
   }
 }
 
-export function formatTavilyResponse(response) {
+export function formatTavilyResponse(response, requestType = 'web') {
   if (!response || !response.results || !Array.isArray(response.results) || response.results.length === 0) {
     return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
   }
 
+  // Voice-optimized response for Twilio calls
+  if (requestType === 'twilio') {
+    let voiceResponse = `I found ${response.results.length} resource${response.results.length > 1 ? 's' : ''} that might help. `;
+    
+    // Limit to first 3 results for voice
+    const resultsToShow = response.results.slice(0, 3);
+    
+    resultsToShow.forEach((result, index) => {
+      const title = result.title || 'Unknown Organization';
+      const content = result.content || '';
+      
+      // Extract phone number
+      const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
+      const phone = phoneMatch ? phoneMatch[1] : null;
+      
+      voiceResponse += `Number ${index + 1}: ${title}. `;
+      if (phone) {
+        voiceResponse += `Phone number: ${phone}. `;
+      }
+    });
+    
+    voiceResponse += "Would you like me to provide more details about any of these resources?";
+    return voiceResponse;
+  }
+
+  // Web response (original format)
   let formattedResponse = "I found some resources that might help:\n\n";
   response.results.forEach((result, index) => {
     const title = result.title || 'Unknown Organization';
