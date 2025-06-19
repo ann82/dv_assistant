@@ -155,13 +155,105 @@ export class TwilioVoiceHandler {
       const requestId = Math.random().toString(36).substring(7);
       const callSid = null; // For voice calls, we don't have a callSid in this context
       
-      // Import the processSpeechResult function from the routes file
-      const { processSpeechResult } = await import('../routes/twilio.js');
+      logger.info('Processing speech input:', {
+        requestId,
+        callSid,
+        speechResult,
+        requestType: 'twilio',
+        timestamp: new Date().toISOString()
+      });
+
+      // Import required functions
+      const { getIntent, getConversationContext, rewriteQuery, callTavilyAPI, updateConversationContext } = await import('../lib/intentClassifier.js');
+      const { extractLocationFromSpeech, generateLocationPrompt } = await import('../lib/speechProcessor.js');
+      const { formatTavilyResponse } = await import('../routes/twilio.js');
       
-      // Process the speech result
-      const response = await processSpeechResult(callSid, speechResult, requestId, 'twilio');
-      
-      return response;
+      // Get intent classification
+      const intent = await getIntent(speechResult);
+      logger.info('Classified intent:', {
+        requestId,
+        callSid,
+        intent,
+        speechResult
+      });
+
+      // Get conversation context
+      const context = callSid ? getConversationContext(callSid) : null;
+      logger.info('Retrieved conversation context:', {
+        requestId,
+        callSid,
+        hasContext: !!context,
+        lastIntent: context?.lastIntent
+      });
+
+      // Extract location from speech
+      const location = extractLocationFromSpeech(speechResult);
+      logger.info('Extracted location:', {
+        requestId,
+        callSid,
+        location,
+        originalSpeech: speechResult
+      });
+
+      if (!location) {
+        logger.info('No location found in speech, generating prompt:', {
+          requestId,
+          callSid,
+          speechResult
+        });
+        return generateLocationPrompt();
+      }
+
+      // Rewrite query with context
+      const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+      logger.info('Rewritten query:', {
+        requestId,
+        callSid,
+        originalQuery: speechResult,
+        rewrittenQuery,
+        intent
+      });
+
+      // Call Tavily API with rewritten query
+      logger.info('Calling Tavily API:', {
+        requestId,
+        callSid,
+        query: rewrittenQuery
+      });
+      const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+
+      logger.info('Received Tavily API response:', {
+        requestId,
+        callSid,
+        responseLength: tavilyResponse?.length,
+        hasResults: !!tavilyResponse?.results,
+        resultCount: tavilyResponse?.results?.length,
+        firstResultTitle: tavilyResponse?.results?.[0]?.title,
+        firstResultUrl: tavilyResponse?.results?.[0]?.url
+      });
+
+      // Format response for voice
+      const formattedResponse = formatTavilyResponse(tavilyResponse, 'twilio');
+      logger.info('Formatted response:', {
+        requestId,
+        callSid,
+        responseLength: formattedResponse.length,
+        responsePreview: formattedResponse.substring(0, 100) + '...'
+      });
+
+      // Update conversation context
+      if (callSid) {
+        updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
+        logger.info('Updated conversation context:', {
+          requestId,
+          callSid,
+          intent,
+          queryLength: rewrittenQuery.length,
+          responseLength: formattedResponse.length
+        });
+      }
+
+      return formattedResponse;
     } catch (error) {
       logger.error('Error processing speech input:', {
         error: error.message,
