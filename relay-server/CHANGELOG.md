@@ -139,6 +139,17 @@ All notable changes to this project will be documented in this file.
 - Improved location extraction from speech input
 - Updated location prompts with better examples
 - Added comprehensive test coverage
+- Fixed request abort handling in Twilio voice calls
+- Fixed resource cleanup on call termination
+- Fixed WebSocket connection issues in cloud environment
+- Fixed package-lock.json synchronization issues
+- Fixed logger import in config.js
+- Fixed environment validation in test environment
+- Refactored test suite to use a global mock for TwilioVoiceHandler via setupTests.js
+- Removed all direct vi.mock calls for TwilioVoiceHandler from individual test files
+- Updated vitest.config.js to use setupTests.js for global test setup
+- Removed /twilio/speech route tests as the route does not exist
+- Stabilized and cleaned up all Twilio route tests
 
 ### Fixed
 - Fixed error handling to properly track fallback statistics
@@ -162,12 +173,8 @@ All notable changes to this project will be documented in this file.
 - Improved location extraction from speech input
 - Updated location prompts with better examples
 - Added comprehensive test coverage
-- Fixed request abort handling in Twilio voice calls
-- Fixed resource cleanup on call termination
-- Fixed WebSocket connection issues in cloud environment
-- Fixed package-lock.json synchronization issues
-- Fixed logger import in config.js
-- Fixed environment validation in test environment
+- Resolved persistent ReferenceError in test suite due to ESM hoisting and mocking order
+- Ensured all tests pass and are isolated from initialization order issues
 
 ### Security
 - Attempted to update dev dependencies (esbuild, vite, vitest) to address moderate vulnerabilities. Some advisories remain due to upstream issues in the testing toolchain. These do not affect production code.

@@ -47,6 +47,13 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Recent Updates
 
+### Test Suite Improvements
+- Test suite now uses a global mock for TwilioVoiceHandler via `setupTests.js` for reliable and isolated tests
+- All direct `vi.mock` calls for TwilioVoiceHandler have been removed from individual test files
+- `/twilio/speech` route tests were removed as the route does not exist
+- All tests now pass and are stable, with no initialization order issues
+- See `CHANGELOG.md` for more details
+
 ### Stability Improvements
 - Added rate limiting for API protection
 - Enhanced error handling and logging
@@ -75,6 +82,24 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - Updated location prompts with better examples
 - Added comprehensive test coverage
 
+## Testing
+
+The test suite uses [Vitest](https://vitest.dev/) and is configured for reliability and isolation:
+
+- All global mocks are set up in `tests/setupTests.js`
+- No direct `vi.mock` calls for TwilioVoiceHandler in individual test files
+- To run all tests:
+
+```bash
+npm test
+```
+
+- To run a specific test file:
+
+```bash
+npx vitest run tests/twilio.routes.test.js
+```
+
 ## Deployment
 
 ### Railway Deployment
@@ -91,7 +116,6 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
    TWILIO_AUTH_TOKEN=your_auth_token
    TWILIO_PHONE_NUMBER=your_twilio_phone_number
    NODE_ENV=production
-   LOG_LEVEL=info
    ```
 
 3. **Deployment Steps**
@@ -148,18 +172,6 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - Request timeout protection
 - Secure WebSocket connections
 - Environment variable protection
-
-## Testing
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-```
 
 ## Installation
 
