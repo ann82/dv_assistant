@@ -47,6 +47,19 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Recent Updates
 
+### Follow-up Question Support (v1.0.4)
+- **Enhanced Conversation Flow** - Added intelligent follow-up question detection and handling
+  - Automatically detects when users ask for more details about specific resources
+  - Recognizes patterns like "Can you let me know more about...", "Tell me more about...", "What about..."
+  - Uses conversation context to understand which resource the user is referring to
+  - Processes follow-up questions without requiring location input again
+  - Maintains conversation continuity for better user experience
+- **Improved Context Awareness** - Enhanced conversation context management
+  - Better tracking of previous interactions and mentioned resources
+  - Smarter query rewriting for follow-up questions
+  - Contextual response generation based on conversation history
+  - Seamless transition between initial searches and follow-up questions
+
 ### Voice Response Optimization (v1.0.3)
 - **Enhanced Text-to-Speech Compatibility** - Optimized responses for Twilio voice calls
   - Voice-optimized response formatting that works better with TTS

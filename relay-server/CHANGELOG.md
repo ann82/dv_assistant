@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2024-12-19
+
+### Added
+- **Follow-up Question Support** - Enhanced conversation flow with intelligent follow-up detection
+  - Added automatic detection of follow-up questions about specific resources
+  - Recognizes patterns like "Can you let me know more about...", "Tell me more about...", "What about..."
+  - Uses conversation context to understand which resource the user is referring to
+  - Processes follow-up questions without requiring location input again
+  - Maintains conversation continuity for better user experience
+- **Improved Context Awareness** - Enhanced conversation context management
+  - Better tracking of previous interactions and mentioned resources
+  - Smarter query rewriting for follow-up questions using conversation history
+  - Contextual response generation based on conversation context
+  - Seamless transition between initial searches and follow-up questions
+
+### Fixed
+- **CallSid Handling** - Fixed missing callSid in speech processing
+  - Added proper callSid extraction from request body in `handleSpeechInput`
+  - Fixed `processSpeechInput` method to accept callSid parameter
+  - Removed non-existent `getCallSidFromContext()` method call
+  - Ensured conversation context is properly maintained across interactions
+
+### Changed
+- Updated speech processing logic to prioritize follow-up question detection over location extraction
+- Enhanced conversation flow to handle follow-up questions more intelligently
+- Improved user experience by maintaining context across conversation turns
+
 ## [1.0.3] - 2024-12-19
 
 ### Added

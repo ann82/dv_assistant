@@ -126,10 +126,11 @@ export class TwilioVoiceHandler {
   async handleSpeechInput(req) {
     try {
       const speechResult = req.body.SpeechResult;
-      logger.info('Received speech input:', { speechResult });
+      const callSid = req.body.CallSid;
+      logger.info('Received speech input:', { speechResult, callSid });
 
       // Process the speech input
-      const response = await this.processSpeechInput(speechResult);
+      const response = await this.processSpeechInput(speechResult, callSid);
       
       // Generate TwiML response with gather to continue conversation
       const twiml = new twilio.twiml.VoiceResponse();
@@ -173,11 +174,10 @@ export class TwilioVoiceHandler {
     }
   }
 
-  async processSpeechInput(speechResult) {
+  async processSpeechInput(speechResult, callSid = null) {
+    const requestId = Math.random().toString(36).substring(7);
+
     try {
-      const requestId = Math.random().toString(36).substring(7);
-      const callSid = null; // For voice calls, we don't have a callSid in this context
-      
       logger.info('Processing speech input:', {
         requestId,
         callSid,
@@ -209,6 +209,86 @@ export class TwilioVoiceHandler {
         hasContext: !!context,
         lastIntent: context?.lastIntent
       });
+
+      // Check if this is a follow-up question about a specific resource
+      const isFollowUpQuestion = context && context.lastIntent && (
+        speechResult.toLowerCase().includes('more about') ||
+        speechResult.toLowerCase().includes('tell me more') ||
+        speechResult.toLowerCase().includes('details about') ||
+        speechResult.toLowerCase().includes('information about') ||
+        speechResult.toLowerCase().includes('what about') ||
+        speechResult.toLowerCase().includes('how about') ||
+        /(?:can|could)\s+(?:you)?\s+(?:let|tell)\s+(?:me)?\s+(?:know)?\s+(?:more)?\s+(?:about)/i.test(speechResult)
+      );
+
+      logger.info('Follow-up question check:', {
+        requestId,
+        callSid,
+        isFollowUpQuestion,
+        speechResult,
+        lastIntent: context?.lastIntent
+      });
+
+      // If this is a follow-up question, process it directly without requiring location
+      if (isFollowUpQuestion) {
+        logger.info('Processing follow-up question:', {
+          requestId,
+          callSid,
+          speechResult,
+          lastIntent: context.lastIntent
+        });
+
+        // Rewrite query with context
+        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+        logger.info('Rewritten follow-up query:', {
+          requestId,
+          callSid,
+          originalQuery: speechResult,
+          rewrittenQuery,
+          intent
+        });
+
+        // Call Tavily API with rewritten query
+        logger.info('Calling Tavily API for follow-up:', {
+          requestId,
+          callSid,
+          query: rewrittenQuery
+        });
+        const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+
+        logger.info('Received Tavily API response for follow-up:', {
+          requestId,
+          callSid,
+          responseLength: tavilyResponse?.length,
+          hasResults: !!tavilyResponse?.results,
+          resultCount: tavilyResponse?.results?.length,
+          firstResultTitle: tavilyResponse?.results?.[0]?.title,
+          firstResultUrl: tavilyResponse?.results?.[0]?.url
+        });
+
+        // Format response for voice
+        const formattedResponse = formatTavilyResponse(tavilyResponse, 'twilio');
+        logger.info('Formatted follow-up response:', {
+          requestId,
+          callSid,
+          responseLength: formattedResponse.length,
+          responsePreview: formattedResponse.substring(0, 100) + '...'
+        });
+
+        // Update conversation context
+        if (callSid) {
+          updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
+          logger.info('Updated conversation context for follow-up:', {
+            requestId,
+            callSid,
+            intent,
+            queryLength: rewrittenQuery.length,
+            responseLength: formattedResponse.length
+          });
+        }
+
+        return formattedResponse;
+      }
 
       // Extract location from speech
       const location = extractLocationFromSpeech(speechResult);
