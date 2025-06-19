@@ -47,6 +47,17 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Recent Updates
 
+### Voice Response Optimization (v1.0.3)
+- **Enhanced Text-to-Speech Compatibility** - Optimized responses for Twilio voice calls
+  - Voice-optimized response formatting that works better with TTS
+  - Limited to 3 results for voice clarity and better comprehension
+  - Removed formatting that interferes with text-to-speech
+  - Fixed response count accuracy (shows actual number of results listed)
+- **Improved Conversation Flow** - Fixed call disconnection issues
+  - Added proper conversation continuation after responses
+  - Fallback prompts if no speech is detected
+  - Better user experience with continuous conversation
+
 ### Critical Bug Fixes (v1.0.2)
 - **Fixed Double Response Error** - Resolved critical "Cannot set headers after they are sent to the client" error in Twilio voice route handler
   - Route handler was calling `sendTwiMLResponse` internally while also trying to send response manually

@@ -131,9 +131,22 @@ export class TwilioVoiceHandler {
       // Process the speech input
       const response = await this.processSpeechInput(speechResult);
       
-      // Generate TwiML response
+      // Generate TwiML response with gather to continue conversation
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say(response);
+      
+      // Add gather to continue the conversation
+      const gather = twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice',
+        method: 'POST',
+        speechTimeout: 'auto',
+        language: 'en-US'
+      });
+      
+      // If no speech is detected, repeat the prompt
+      twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
+      twiml.redirect('/twilio/voice');
       
       return twiml;
     } catch (error) {
@@ -146,6 +159,16 @@ export class TwilioVoiceHandler {
       // Return error TwiML
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say('I encountered an error processing your speech. Please try again.');
+      
+      // Add gather to continue after error
+      const gather = twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice',
+        method: 'POST',
+        speechTimeout: 'auto',
+        language: 'en-US'
+      });
+      
       return twiml;
     }
   }

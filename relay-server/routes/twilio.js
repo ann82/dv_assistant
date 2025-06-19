@@ -386,10 +386,10 @@ export function formatTavilyResponse(response, requestType = 'web') {
 
   // Voice-optimized response for Twilio calls
   if (requestType === 'twilio') {
-    let voiceResponse = `I found ${response.results.length} resource${response.results.length > 1 ? 's' : ''} that might help. `;
-    
     // Limit to first 3 results for voice
     const resultsToShow = response.results.slice(0, 3);
+    
+    let voiceResponse = `I found ${resultsToShow.length} resource${resultsToShow.length > 1 ? 's' : ''} that might help. `;
     
     resultsToShow.forEach((result, index) => {
       const title = result.title || 'Unknown Organization';

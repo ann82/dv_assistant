@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2024-12-19
+
+### Added
+- **Voice Response Optimization** - Enhanced text-to-speech compatibility for Twilio calls
+  - Added voice-optimized `formatTavilyResponse` for Twilio calls
+  - Limited responses to 3 results for voice clarity
+  - Removed newlines and complex formatting that interfere with TTS
+  - Focus on organization names and phone numbers for voice responses
+  - Fixed response count to show actual number of results listed
+
+### Fixed
+- **Conversation Flow** - Resolved call disconnection after speech responses
+  - Added `<Gather>` element after speech responses to continue conversation
+  - Added fallback message if no speech is detected
+  - Improved conversation flow and user experience
+  - Fixed issue where calls would disconnect after providing resource information
+
+### Changed
+- Updated response formatting to be more concise and TTS-friendly
+- Enhanced error handling with proper conversation continuation
+- Improved user experience with better conversation flow
+
 ## [1.0.2] - 2024-12-19
 
 ### Fixed

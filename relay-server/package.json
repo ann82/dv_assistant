@@ -1,6 +1,6 @@
 {
   "name": "relay-server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Relay server for the Domestic Violence Support Assistant",
   "type": "module",
   "main": "server.js",
