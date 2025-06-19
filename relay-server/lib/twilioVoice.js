@@ -164,8 +164,9 @@ export class TwilioVoiceHandler {
       });
 
       // Import required functions
-      const { getIntent, getConversationContext, rewriteQuery, callTavilyAPI, updateConversationContext } = await import('../lib/intentClassifier.js');
+      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext } = await import('../lib/intentClassifier.js');
       const { extractLocationFromSpeech, generateLocationPrompt } = await import('../lib/speechProcessor.js');
+      const { callTavilyAPI } = await import('../lib/apis.js');
       const { formatTavilyResponse } = await import('../routes/twilio.js');
       
       // Get intent classification
