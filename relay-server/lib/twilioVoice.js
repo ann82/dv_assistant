@@ -96,7 +96,7 @@ export class TwilioVoiceHandler {
 
       // Generate welcome message
       const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say('Welcome to the Domestic Violence Support Assistant. How can I help you today?');
+      twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
       
       // Add gather for speech input
       const gather = twiml.gather({
