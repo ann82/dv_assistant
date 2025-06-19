@@ -47,6 +47,17 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Recent Updates
 
+### Critical Bug Fixes (v1.0.2)
+- **Fixed Double Response Error** - Resolved critical "Cannot set headers after they are sent to the client" error in Twilio voice route handler
+  - Route handler was calling `sendTwiMLResponse` internally while also trying to send response manually
+  - Updated handler methods to only return TwiML objects, not send responses directly
+  - Added proper `processSpeechInput` method to TwilioVoiceHandler class
+- **Fixed TwilioVoiceHandler Constructor** - Resolved "Cannot read properties of undefined (reading 'startsWith')" error
+  - Fixed instantiation without required parameters
+  - Added proper environment variable handling for Twilio credentials
+  - Enhanced constructor to handle test environment gracefully
+  - Added comprehensive validation for production environment
+
 ### Test Suite Improvements
 - Test suite now uses a global mock for TwilioVoiceHandler via `setupTests.js` for reliable and isolated tests
 - All direct `vi.mock` calls for TwilioVoiceHandler have been removed from individual test files

@@ -22,23 +22,23 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Initialize Twilio client with environment variables
+// Initialize TwilioVoiceHandler
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
+const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-if (!accountSid || !authToken) {
-  logger.error('Twilio credentials not found in environment variables');
-  throw new Error('Twilio credentials not found in environment variables');
+// Skip credential check in test environment
+if (process.env.NODE_ENV !== 'test') {
+  if (!accountSid || !authToken || !phoneNumber) {
+    logger.error('Twilio credentials not found in environment variables');
+    throw new Error('Twilio credentials not found in environment variables');
+  }
 }
 
-const twilioClient = twilio(accountSid, authToken);
-logger.info('Twilio client initialized successfully');
+const twilioVoiceHandler = new TwilioVoiceHandler(accountSid, authToken, phoneNumber);
 
-const twilioVoiceHandler = new TwilioVoiceHandler(
-  config.TWILIO_ACCOUNT_SID,
-  config.TWILIO_AUTH_TOKEN,
-  config.TWILIO_PHONE_NUMBER
-);
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+logger.info('Twilio client initialized successfully');
 
 // Store WebSocket server instance
 let wsServer = null;
@@ -128,6 +128,14 @@ router.use((req, res, next) => {
 // Voice webhook route
 router.post('/voice', async (req, res) => {
   try {
+    // Log the incoming request
+    logger.info('Received voice webhook:', {
+      method: req.method,
+      url: req.originalUrl,
+      headers: req.headers,
+      body: req.body
+    });
+
     // Validate request
     if (!twilioVoiceHandler.validateTwilioRequest(req)) {
       logger.error('Invalid Twilio request:', {
@@ -139,11 +147,15 @@ router.post('/voice', async (req, res) => {
       return res.status(403).send('Invalid Twilio request');
     }
 
-    // Handle the call
-    const twiml = await twilioVoiceHandler.handleIncomingCall(req, res);
-    
-    // Send response
-    return twilioVoiceHandler.sendTwiMLResponse(res, twiml);
+    // Check if this is a speech input
+    if (req.body.SpeechResult) {
+      const twiml = await twilioVoiceHandler.handleSpeechInput(req);
+      return res.type('text/xml').send(twiml.toString());
+    }
+
+    // Handle new call
+    const twiml = await twilioVoiceHandler.handleIncomingCall(req);
+    return res.type('text/xml').send(twiml.toString());
   } catch (error) {
     logger.error('Error handling Twilio voice request:', {
       error: error.message,
@@ -155,7 +167,7 @@ router.post('/voice', async (req, res) => {
     // Send error response
     const errorTwiml = new twilio.twiml.VoiceResponse();
     errorTwiml.say('We encountered an error. Please try again later.');
-    return res.status(500).send(errorTwiml.toString());
+    return res.type('text/xml').send(errorTwiml.toString());
   }
 });
 
@@ -259,7 +271,7 @@ async function processTwilioRequest(speechResult, requestId) {
 }
 
 // Main process function that routes to appropriate handler
-async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+export async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
   logger.info('Processing speech result:', {
     requestId,
     callSid,

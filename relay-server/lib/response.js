@@ -525,19 +525,27 @@ export class ResponseGenerator {
   }
 
   static formatTavilyResponse(tavilyResponse, requestType = 'web') {
+    if (!tavilyResponse || !tavilyResponse.results) {
+      return {
+        summary: "I'm sorry, I couldn't find any specific resources.",
+        fullDetails: "No results available.",
+        shelters: []
+      };
+    }
+
     // Extract shelter information from results
     const shelters = tavilyResponse.results
       .filter(result => 
-        result.title.toLowerCase().includes('shelter') || 
-        result.content.toLowerCase().includes('shelter') ||
-        result.raw_content?.toLowerCase().includes('shelter')
+        (result.title && result.title.toLowerCase().includes('shelter')) || 
+        (result.content && result.content.toLowerCase().includes('shelter')) ||
+        (result.raw_content && result.raw_content.toLowerCase().includes('shelter'))
       )
       .map(result => ({
         name: result.title,
         address: result.url,
-        phone: this.extractPhone(result.raw_content || result.content),
+        phone: extractPhone(result.raw_content || result.content),
         description: result.content,
-        services: this.extractServices(result.raw_content || result.content)
+        services: extractServices(result.raw_content || result.content)
       }));
 
     if (shelters.length === 0) {
@@ -550,7 +558,7 @@ export class ResponseGenerator {
 
     // Cache the full shelter details
     const cacheKey = `shelter_search_${Date.now()}`;
-    this.setCachedAnalysis(cacheKey, {
+    ResponseGenerator.setCachedAnalysis(cacheKey, {
       shelters,
       timestamp: Date.now()
     });
@@ -1053,4 +1061,82 @@ export class ResponseGenerator {
 }
 
 // Export the pattern categories and keywords
-export { patternCategories, shelterKeywords }; 
+export { patternCategories, shelterKeywords };
+
+export function formatTavilyResponse(tavilyResponse, requestType = 'web') {
+  if (!tavilyResponse || !tavilyResponse.results) {
+    return {
+      summary: "I'm sorry, I couldn't find any specific resources.",
+      fullDetails: "No results available.",
+      shelters: []
+    };
+  }
+
+  // Extract shelter information from results
+  const shelters = tavilyResponse.results
+    .filter(result => 
+      (result.title && result.title.toLowerCase().includes('shelter')) || 
+      (result.content && result.content.toLowerCase().includes('shelter')) ||
+      (result.raw_content && result.raw_content.toLowerCase().includes('shelter'))
+    )
+    .map(result => ({
+      name: result.title,
+      address: result.url,
+      phone: extractPhone(result.raw_content || result.content),
+      description: result.content,
+      services: extractServices(result.raw_content || result.content)
+    }));
+
+  if (shelters.length === 0) {
+    return {
+      summary: "I couldn't find specific shelter information. Would you like me to search for domestic violence resources in your area instead?",
+      fullDetails: "No specific shelters found. Please try a different search query.",
+      shelters: []
+    };
+  }
+
+  // Cache the full shelter details
+  const cacheKey = `shelter_search_${Date.now()}`;
+  ResponseGenerator.setCachedAnalysis(cacheKey, {
+    shelters,
+    timestamp: Date.now()
+  });
+
+  // Format based on request type
+  if (requestType === 'phone') {
+    const summary = `I found ${shelters.length} shelters. Here are their names:\n\n` + 
+      shelters.map((s, i) => 
+        `${i + 1}. ${s.name}`
+      ).join('\n');
+
+    return {
+      summary,
+      cacheKey,
+      shelters
+    };
+  } else {
+    const summary = `I found ${shelters.length} shelters:\n\n` + 
+      shelters.map((s, i) => 
+        `${i + 1}. ${s.name}`
+      ).join('\n');
+
+    return {
+      summary,
+      cacheKey,
+      shelters
+    };
+  }
+}
+
+// Helper functions
+function extractPhone(content) {
+  if (!content) return 'Not available';
+  const phoneMatch = content.match(/(?:phone|tel|telephone|call)[:\s]+([\d-()]+)/i);
+  return phoneMatch ? phoneMatch[1] : 'Not available';
+}
+
+function extractServices(content) {
+  if (!content) return 'Not specified';
+  const servicesMatch = content.match(/(?:services|offers|provides)[:\s]+([^.]+)/i);
+  return servicesMatch ? servicesMatch[1].trim() : 'Not specified';
+} 

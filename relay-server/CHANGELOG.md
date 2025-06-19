@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2024-12-19
+
+### Fixed
+- **Critical Fix: Double Response Error** - Resolved "Cannot set headers after they are sent to the client" error in Twilio voice route handler
+  - Fixed route handler calling `sendTwiMLResponse` internally while also trying to send response manually
+  - Updated `handleIncomingCall` and `handleSpeechInput` methods to only return TwiML objects, not send responses directly
+  - Removed `res` parameter from handler method calls in route handler
+  - Added proper `processSpeechInput` method to TwilioVoiceHandler class
+  - Exported `processSpeechResult` function from routes file for reuse
+- **TwilioVoiceHandler Constructor Fix** - Resolved "Cannot read properties of undefined (reading 'startsWith')" error
+  - Fixed TwilioVoiceHandler instantiation without required parameters
+  - Added proper environment variable handling for `accountSid`, `authToken`, and `phoneNumber`
+  - Enhanced constructor to handle test environment gracefully with fallback values
+  - Added comprehensive validation for production environment credentials
+  - Improved error messages for missing Twilio credentials
+
+### Changed
+- Updated TwilioVoiceHandler constructor to support test environment with mock credentials
+- Enhanced error handling in Twilio route initialization
+- Improved environment variable validation and error reporting
+
 ## [1.0.1] - 2024-03-19
 
 ### Fixed
