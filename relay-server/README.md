@@ -215,3 +215,39 @@ npx vitest run tests/twilio.routes.test.js
    ```bash
    npm install
    ```
+
+## Tavily Response Formatting
+
+The codebase now uses a single, unified function for formatting Tavily search results: `ResponseGenerator.formatTavilyResponse`.
+
+### Usage
+
+```js
+import { ResponseGenerator } from './lib/response.js';
+
+const tavilyResponse = await callTavilyAPI(query); // Tavily API response
+const userQuery = 'find shelter homes in South Lake Tahoe';
+const result = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'voice', userQuery, 3);
+
+console.log(result.voiceResponse); // For voice agent
+console.log(result.smsResponse);   // For SMS
+console.log(result.summary);       // For web summary
+console.log(result.shelters);      // Array of shelter objects
+```
+
+### Parameters
+- `tavilyResponse`: The raw response from the Tavily API (must have a `results` array).
+- `requestType`: One of `'voice'`, `'sms'`, or `'web'` (default: `'web'`).
+- `userQuery`: The original user query (for location extraction, optional but recommended).
+- `maxResults`: Maximum number of results to include (default: 3).
+
+### Output
+Returns an object with:
+- `voiceResponse`: A short, voice-friendly summary for agents like Twilio.
+- `smsResponse`: A string with clickable links for SMS.
+- `summary`: A web-friendly summary string.
+- `shelters`: Array of shelter objects with name, address, phone, description, and score.
+
+### Notes
+- All previous formatter functions are deprecated. Use only `ResponseGenerator.formatTavilyResponse` for all Tavily result formatting.
+- The function is fully tested and supports all output types (voice, SMS, web).

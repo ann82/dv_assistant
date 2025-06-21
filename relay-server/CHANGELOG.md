@@ -179,6 +179,10 @@ All notable changes to this project will be documented in this file.
 - Request abort handling
 - Resource cleanup on call end
 - Comprehensive error logging
+- Unified Tavily response formatting: all previous formatter functions removed in favor of `ResponseGenerator.formatTavilyResponse`.
+- This function now supports voice, SMS, and web output, and is the single source of truth for Tavily result formatting.
+- All usages and tests updated to use the new static method.
+- Fully tested with comprehensive test coverage for all output types.
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios

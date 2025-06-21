@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { formatTavilyResponse } from '../lib/response.js';
+import { ResponseGenerator } from '../lib/response.js';
 
 describe('Tavily Response Formatting', () => {
   it('should format response with resources', () => {
@@ -9,7 +9,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Shelter Resource 2', content: 'Some content', url: 'http://example.com/2' }
       ]
     };
-    const formatted = formatTavilyResponse(response);
+    const formatted = ResponseGenerator.formatTavilyResponse(response, 'web', '', 3);
     expect(formatted.summary).toContain('I found 2 shelters');
     expect(formatted.shelters).toHaveLength(2);
   });
@@ -18,25 +18,25 @@ describe('Tavily Response Formatting', () => {
     const response = {
       results: []
     };
-    const formatted = formatTavilyResponse(response);
-    expect(formatted.summary).toContain("I couldn't find specific shelter information");
+    const formatted = ResponseGenerator.formatTavilyResponse(response, 'web', '', 3);
+    expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
 
   it('should handle null response', () => {
-    const formatted = formatTavilyResponse(null);
+    const formatted = ResponseGenerator.formatTavilyResponse(null, 'web', '', 3);
     expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
 
   it('should handle undefined response', () => {
-    const formatted = formatTavilyResponse(undefined);
+    const formatted = ResponseGenerator.formatTavilyResponse(undefined, 'web', '', 3);
     expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
 
   it('should handle empty response', () => {
-    const formatted = formatTavilyResponse({});
+    const formatted = ResponseGenerator.formatTavilyResponse({}, 'web', '', 3);
     expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
@@ -48,7 +48,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Shelter B', content: 'Some content', url: 'http://example.com/b' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.summary).toContain('I found 2 shelters');
     expect(formatted.shelters).toHaveLength(2);
   });
@@ -57,14 +57,14 @@ describe('Tavily Response Formatting', () => {
     const mockResponse = {
       results: []
     };
-    const formatted = formatTavilyResponse(mockResponse);
-    expect(formatted.summary).toContain("I couldn't find specific shelter information");
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
+    expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
 
   it('should handle missing results array', () => {
     const mockResponse = {};
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
@@ -75,7 +75,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Shelter A', content: 'Some content', url: 'http://example.com/a' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.shelters[0].phone).toBe('Not available');
   });
 
@@ -85,13 +85,13 @@ describe('Tavily Response Formatting', () => {
         { title: null, content: null, url: 'http://example.com/a' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
-    expect(formatted.shelters).toHaveLength(0);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
+    expect(formatted.shelters).toHaveLength(1);
   });
 
   it('should handle errors gracefully', () => {
     const mockResponse = null;
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.summary).toContain("I'm sorry, I couldn't find any specific resources");
     expect(formatted.shelters).toHaveLength(0);
   });
@@ -102,7 +102,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Organization A Shelter', content: 'Some content', url: 'http://example.com/a' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.shelters[0].name).toBe('Organization A Shelter');
   });
 
@@ -112,7 +112,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Emergency Shelter', content: 'Phone: 408-279-2962', url: 'http://example.com/a' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.shelters[0].phone).toBe('408-279-2962');
   });
 
@@ -122,7 +122,7 @@ describe('Tavily Response Formatting', () => {
         { title: 'Emergency Shelter', content: 'Coverage: Santa Clara County', url: 'http://example.com/a' }
       ]
     };
-    const formatted = formatTavilyResponse(mockResponse);
+    const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
     expect(formatted.shelters[0].name).toBe('Emergency Shelter');
   });
 }); 

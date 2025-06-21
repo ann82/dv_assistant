@@ -155,7 +155,7 @@ export class TwilioWebSocketServer {
                 const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>${message.audioUrl}</Play>
-  <Gather input="speech" action="/twilio/voice" method="POST" 
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"

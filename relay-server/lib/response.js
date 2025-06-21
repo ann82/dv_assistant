@@ -524,81 +524,141 @@ export class ResponseGenerator {
            (tavilyResponse?.answer && tavilyResponse.answer.length > 0);
   }
 
-  static formatTavilyResponse(tavilyResponse, requestType = 'web') {
-    if (!tavilyResponse || !tavilyResponse.results) {
+  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3) {
+    // Handle missing or empty results
+    if (!tavilyResponse || !tavilyResponse.results || !Array.isArray(tavilyResponse.results) || tavilyResponse.results.length === 0) {
       return {
+        voiceResponse: "I'm sorry, I couldn't find any shelters in that area. Would you like me to search for resources in a different location?",
+        smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
         summary: "I'm sorry, I couldn't find any specific resources.",
-        fullDetails: "No results available.",
         shelters: []
       };
     }
 
-    // Extract shelter information from results
-    const shelters = tavilyResponse.results
-      .filter(result => 
-        (result.title && result.title.toLowerCase().includes('shelter')) || 
-        (result.content && result.content.toLowerCase().includes('shelter')) ||
-        (result.raw_content && result.raw_content.toLowerCase().includes('shelter'))
-      )
-      .map(result => ({
-        name: result.title,
-        address: result.url,
-        phone: extractPhone(result.raw_content || result.content),
-        description: result.content,
-        services: extractServices(result.raw_content || result.content)
-      }));
+    // Sort results by score (highest first) and take top results
+    const sortedResults = [...tavilyResponse.results]
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, maxResults);
 
-    if (shelters.length === 0) {
-      return {
-        summary: "I couldn't find specific shelter information. Would you like me to search for domestic violence resources in your area instead?",
-        fullDetails: "No specific shelters found. Please try a different search query.",
-        shelters: []
-      };
+    // Extract location from user query for context
+    const location = this.extractLocationFromQuery(userQuery);
+
+    // Create voice response
+    const voiceResponse = this.createVoiceResponse(sortedResults, location);
+    // Create SMS response with clickable links
+    const smsResponse = this.createSMSResponse(sortedResults, location);
+
+    // Extract shelter info for web/summary
+    const shelters = sortedResults.map(result => ({
+      name: this.cleanTitleForSMS(result.title),
+      address: result.url,
+      phone: this.extractPhone(result.content),
+      description: result.content,
+      score: result.score
+    }));
+
+    // Compose summary for web
+    const summary = `I found ${shelters.length} shelters${location ? ' in ' + location : ''}:
+\n` +
+      shelters.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+
+    return {
+      voiceResponse,
+      smsResponse,
+      summary,
+      shelters
+    };
+  }
+
+  static extractLocationFromQuery(query) {
+    if (!query) return '';
+    const locationPatterns = [
+      /in\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+      /near\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+      /around\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+      /at\s+([^,.]+(?:,\s*[^,.]+)?)/i
+    ];
+    for (const pattern of locationPatterns) {
+      const match = query.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
     }
+    return '';
+  }
 
-    // Cache the full shelter details
-    const cacheKey = `shelter_search_${Date.now()}`;
-    ResponseGenerator.setCachedAnalysis(cacheKey, {
-      shelters,
-      timestamp: Date.now()
-    });
-
-    // Format based on request type
-    if (requestType === 'phone') {
-      const summary = `I found ${shelters.length} shelters. Here are their names:\n\n` + 
-        shelters.map((s, i) => 
-          `${i + 1}. ${s.name}`
-        ).join('\n');
-
-      return {
-        summary,
-        cacheKey,
-        shelters
-      };
+  static createVoiceResponse(results, location) {
+    const locationText = location ? ` in ${location}` : '';
+    if (results.length === 1) {
+      const result = results[0];
+      const title = this.cleanTitleForVoice(result.title);
+      return `I found a shelter${locationText}: ${title}. Would you like me to send you the details?`;
+    }
+    const organizationNames = results.map(result => this.cleanTitleForVoice(result.title));
+    let response = `I found ${results.length} shelters${locationText}`;
+    if (organizationNames.length === 2) {
+      response += `: ${organizationNames[0]} and ${organizationNames[1]}`;
+    } else if (organizationNames.length === 3) {
+      response += `: ${organizationNames[0]}, ${organizationNames[1]}, and ${organizationNames[2]}`;
     } else {
-      const summary = `I found ${shelters.length} shelters:\n\n` + 
-        shelters.map((s, i) => 
-          `${i + 1}. ${s.name}`
-        ).join('\n');
-
-      return {
-        summary,
-        cacheKey,
-        shelters
-      };
+      response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
     }
+    response += '. Would you like me to send you the details?';
+    return response;
+  }
+
+  static createSMSResponse(results, location) {
+    const locationText = location ? ` in ${location}` : '';
+    let smsResponse = `Shelters${locationText}:\n\n`;
+    results.forEach((result, index) => {
+      const title = this.cleanTitleForSMS(result.title);
+      const url = result.url;
+      smsResponse += `${index + 1}. ${title}\n`;
+      smsResponse += `   ${url}\n\n`;
+    });
+    smsResponse += "For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233";
+    return smsResponse;
+  }
+
+  static cleanTitleForVoice(title) {
+    if (!title) return 'Unknown Organization';
+    let cleanTitle = title
+      .replace(/^\[.*?\]\s*/, '')
+      .replace(/^THE BEST \d+ /i, '')
+      .replace(/^Best \d+ /i, '')
+      .replace(/^Best /i, '')
+      .replace(/\s*-\s*Yelp$/i, '')
+      .replace(/\s*-\s*The Real Yellow.*$/i, '')
+      .replace(/\s*-\s*.*$/i, '')
+      .replace(/\s*,\s*[A-Z]{2}$/i, '')
+      .replace(/\s*in\s+[^,]+(?:,\s*[A-Z]{2})?$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (cleanTitle.length > 50) {
+      cleanTitle = cleanTitle.substring(0, 47) + '...';
+    }
+    return cleanTitle || 'Unknown Organization';
+  }
+
+  static cleanTitleForSMS(title) {
+    if (!title) return 'Unknown Organization';
+    let cleanTitle = title
+      .replace(/^\[.*?\]\s*/, '')
+      .replace(/^THE BEST \d+ /i, '')
+      .replace(/^Best \d+ /i, '')
+      .replace(/^Best /i, '')
+      .replace(/\s*-\s*Yelp$/i, '')
+      .replace(/\s*-\s*The Real Yellow.*$/i, '')
+      .replace(/\s*-\s*.*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleanTitle || 'Unknown Organization';
   }
 
   static extractPhone(content) {
     if (!content) return 'Not available';
-    const phoneMatch = content.match(/(?:phone|tel|telephone|call)[:\s]+([\d-()]+)/i);
+    const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
     return phoneMatch ? phoneMatch[1] : 'Not available';
-  }
-
-  static extractServices(content) {
-    if (!content) return 'Not specified';
-    const servicesMatch = content.match(/(?:services|offers|provides)[:\s]+([^.]+)/i);
-    return servicesMatch ? servicesMatch[1].trim() : 'Not specified';
   }
 
   static shouldUseGPT4(input, context) {
@@ -1061,82 +1121,4 @@ export class ResponseGenerator {
 }
 
 // Export the pattern categories and keywords
-export { patternCategories, shelterKeywords };
-
-export function formatTavilyResponse(tavilyResponse, requestType = 'web') {
-  if (!tavilyResponse || !tavilyResponse.results) {
-    return {
-      summary: "I'm sorry, I couldn't find any specific resources.",
-      fullDetails: "No results available.",
-      shelters: []
-    };
-  }
-
-  // Extract shelter information from results
-  const shelters = tavilyResponse.results
-    .filter(result => 
-      (result.title && result.title.toLowerCase().includes('shelter')) || 
-      (result.content && result.content.toLowerCase().includes('shelter')) ||
-      (result.raw_content && result.raw_content.toLowerCase().includes('shelter'))
-    )
-    .map(result => ({
-      name: result.title,
-      address: result.url,
-      phone: extractPhone(result.raw_content || result.content),
-      description: result.content,
-      services: extractServices(result.raw_content || result.content)
-    }));
-
-  if (shelters.length === 0) {
-    return {
-      summary: "I couldn't find specific shelter information. Would you like me to search for domestic violence resources in your area instead?",
-      fullDetails: "No specific shelters found. Please try a different search query.",
-      shelters: []
-    };
-  }
-
-  // Cache the full shelter details
-  const cacheKey = `shelter_search_${Date.now()}`;
-  ResponseGenerator.setCachedAnalysis(cacheKey, {
-    shelters,
-    timestamp: Date.now()
-  });
-
-  // Format based on request type
-  if (requestType === 'phone') {
-    const summary = `I found ${shelters.length} shelters. Here are their names:\n\n` + 
-      shelters.map((s, i) => 
-        `${i + 1}. ${s.name}`
-      ).join('\n');
-
-    return {
-      summary,
-      cacheKey,
-      shelters
-    };
-  } else {
-    const summary = `I found ${shelters.length} shelters:\n\n` + 
-      shelters.map((s, i) => 
-        `${i + 1}. ${s.name}`
-      ).join('\n');
-
-    return {
-      summary,
-      cacheKey,
-      shelters
-    };
-  }
-}
-
-// Helper functions
-function extractPhone(content) {
-  if (!content) return 'Not available';
-  const phoneMatch = content.match(/(?:phone|tel|telephone|call)[:\s]+([\d-()]+)/i);
-  return phoneMatch ? phoneMatch[1] : 'Not available';
-}
-
-function extractServices(content) {
-  if (!content) return 'Not specified';
-  const servicesMatch = content.match(/(?:services|offers|provides)[:\s]+([^.]+)/i);
-  return servicesMatch ? servicesMatch[1].trim() : 'Not specified';
-} 
+export { patternCategories, shelterKeywords }; 

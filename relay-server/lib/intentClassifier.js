@@ -134,6 +134,12 @@ export function rewriteQuery(query, intent, callSid = null) {
       if (!lowerQuery.includes('shelter') && !lowerQuery.includes('safe housing')) {
         rewrittenQuery = `${rewrittenQuery} emergency shelter safe housing`;
       }
+      // Add specific terms to target actual shelter organizations
+      if (!lowerQuery.includes('organization') && !lowerQuery.includes('center') && !lowerQuery.includes('services')) {
+        rewrittenQuery = `${rewrittenQuery} shelter organization center services`;
+      }
+      // Exclude general information and focus on specific shelters
+      rewrittenQuery = `${rewrittenQuery} -site:wikipedia.org -site:gov -filetype:pdf`;
       break;
 
     case 'legal_services':

@@ -5,6 +5,7 @@ import { rerankByRelevance } from './relevanceScorer.js';
 import { fallbackResponse } from './fallbackResponder.js';
 import { logQueryHandling } from './queryLogger.js';
 import logger from './logger.js';
+import { ResponseGenerator } from './response.js';
 
 // Minimum confidence score for considering Tavily results
 const MIN_CONFIDENCE_SCORE = 0.7;
@@ -91,7 +92,7 @@ export async function handleUserQuery(query) {
     }
 
     // Step 5: Format Tavily response
-    const formattedResponse = formatTavilyResponse(rerankedResults);
+    const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', query, 3);
     
     // Log query handling
     await logQueryHandling({
@@ -119,24 +120,4 @@ export async function handleUserQuery(query) {
     
     return { response: gptResponse, source: 'gpt' };
   }
-}
-
-/**
- * Format Tavily results into a readable response
- * @param {Array} results - Reranked search results
- * @returns {string} Formatted response
- */
-function formatTavilyResponse(results) {
-  if (!results || results.length === 0) {
-    return "I couldn't find any specific resources matching your query. Please try rephrasing your question or call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance.";
-  }
-
-  const formattedResults = results.map((result, index) => {
-    const relevanceInfo = result.relevanceScore ? 
-      ` (Relevance: ${(result.relevanceScore * 100).toFixed(1)}%)` : '';
-    
-    return `${index + 1}. ${result.title}${relevanceInfo}\n   ${result.summary}\n   ${result.url}`;
-  }).join('\n\n');
-
-  return `Here are some resources that might help:\n\n${formattedResults}\n\nIf you need immediate assistance, please call the National Domestic Violence Hotline at 1-800-799-7233. They are available 24/7 and can help connect you with local resources.`;
 } 
