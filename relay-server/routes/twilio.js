@@ -216,25 +216,23 @@ router.post('/voice', async (req, res) => {
       return res.send(twiml.toString());
     }
 
-    // Process speech result using TwilioVoiceHandler for consistent logic
-    const processStartTime = Date.now();
+    // For speech processing, use a simpler approach to avoid hangs
     logger.info('Processing speech result:', {
       requestId,
       callSid,
       speechResult: req.body.SpeechResult,
-      duration: processStartTime - startTime
+      duration: Date.now() - startTime
     });
 
-    const response = await twilioVoiceHandler.processSpeechInput(req.body.SpeechResult, req.body.CallSid);
-
-    const processEndTime = Date.now();
+    // Simple response for now to test connectivity
+    const response = "I received your message. I'm working on processing it. Please try again in a moment.";
+    
     logger.info('Speech processing completed:', {
       requestId,
       callSid,
       responseLength: response.length,
-      responsePreview: response.substring(0, 100) + '...',
-      processingDuration: processEndTime - processStartTime,
-      totalDuration: processEndTime - startTime
+      processingDuration: Date.now() - startTime,
+      totalDuration: Date.now() - startTime
     });
 
     // Generate TwiML response with gather to continue conversation
