@@ -260,76 +260,126 @@ export class TwilioVoiceHandler {
         return followUpResponse.response;
       }
 
-      // Extract location from speech
-      const location = extractLocationFromSpeech(speechResult);
-      logger.info('Extracted location:', {
+      // Handle different intents appropriately
+      logger.info('Processing intent:', {
         requestId,
         callSid,
-        location,
-        originalSpeech: speechResult
+        intent,
+        speechResult
       });
 
-      if (!location) {
-        logger.info('No location found in speech, generating prompt:', {
+      // For general information requests, don't require location
+      if (intent === 'general_information') {
+        // Rewrite query for general information search
+        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+        logger.info('Rewritten query for general information:', {
           requestId,
           callSid,
-          speechResult
+          originalQuery: speechResult,
+          rewrittenQuery,
+          intent
         });
-        return generateLocationPrompt();
+
+        // Call Tavily API for general information
+        logger.info('Calling Tavily API for general information:', {
+          requestId,
+          callSid,
+          query: rewrittenQuery
+        });
+        const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+
+        // Format response for voice
+        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
+        
+        // Update conversation context
+        if (callSid) {
+          updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
+        }
+
+        return formattedResponse.voiceResponse;
       }
 
-      // Rewrite query with context
-      const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
-      logger.info('Rewritten query:', {
-        requestId,
-        callSid,
-        originalQuery: speechResult,
-        rewrittenQuery,
-        intent
-      });
-
-      // Call Tavily API with rewritten query
-      logger.info('Calling Tavily API:', {
-        requestId,
-        callSid,
-        query: rewrittenQuery
-      });
-      const tavilyResponse = await callTavilyAPI(rewrittenQuery);
-
-      logger.info('Received Tavily API response:', {
-        requestId,
-        callSid,
-        responseLength: tavilyResponse?.length,
-        hasResults: !!tavilyResponse?.results,
-        resultCount: tavilyResponse?.results?.length,
-        firstResultTitle: tavilyResponse?.results?.[0]?.title,
-        firstResultUrl: tavilyResponse?.results?.[0]?.url
-      });
-
-      // Format response for voice
-      const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
-      logger.info('Formatted response:', {
-        requestId,
-        callSid,
-        responseLength: formattedResponse.voiceResponse.length,
-        responsePreview: formattedResponse.voiceResponse.substring(0, 100) + '...'
-      });
-
-      // Update conversation context
-      if (callSid) {
-        updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
-        logger.info('Updated conversation context:', {
+      // For resource-related intents (shelter, legal, counseling), extract location
+      if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
+        // Extract location from speech
+        const location = extractLocationFromSpeech(speechResult);
+        logger.info('Extracted location:', {
           requestId,
           callSid,
-          intent,
-          queryLength: rewrittenQuery.length,
+          location,
+          originalSpeech: speechResult
+        });
+
+        if (!location) {
+          logger.info('No location found in speech, generating prompt:', {
+            requestId,
+            callSid,
+            speechResult
+          });
+          return generateLocationPrompt();
+        }
+
+        // Rewrite query with context
+        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+        logger.info('Rewritten query:', {
+          requestId,
+          callSid,
+          originalQuery: speechResult,
+          rewrittenQuery,
+          intent
+        });
+
+        // Call Tavily API with rewritten query
+        logger.info('Calling Tavily API:', {
+          requestId,
+          callSid,
+          query: rewrittenQuery
+        });
+        const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+
+        logger.info('Received Tavily API response:', {
+          requestId,
+          callSid,
+          responseLength: tavilyResponse?.length,
+          hasResults: !!tavilyResponse?.results,
+          resultCount: tavilyResponse?.results?.length,
+          firstResultTitle: tavilyResponse?.results?.[0]?.title,
+          firstResultUrl: tavilyResponse?.results?.[0]?.url
+        });
+
+        // Format response for voice
+        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
+        logger.info('Formatted response:', {
+          requestId,
+          callSid,
           responseLength: formattedResponse.voiceResponse.length,
-          hasTavilyResults: !!tavilyResponse?.results,
-          resultCount: tavilyResponse?.results?.length || 0
+          responsePreview: formattedResponse.voiceResponse.substring(0, 100) + '...'
         });
+
+        // Update conversation context
+        if (callSid) {
+          updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
+          logger.info('Updated conversation context:', {
+            requestId,
+            callSid,
+            intent,
+            queryLength: rewrittenQuery.length,
+            responseLength: formattedResponse.voiceResponse.length,
+            hasTavilyResults: !!tavilyResponse?.results,
+            resultCount: tavilyResponse?.results?.length || 0
+          });
+        }
+
+        return formattedResponse.voiceResponse;
       }
 
-      return formattedResponse.voiceResponse;
+      // For emergency help, provide immediate assistance
+      if (intent === 'emergency_help') {
+        return "This is an emergency situation. Please call 911 immediately. You can also call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance. They are available 24/7 and can help you with safety planning and emergency resources.";
+      }
+
+      // Default fallback for unknown intents
+      return "I'm sorry, I didn't understand your request. Could you please rephrase that or ask for help finding shelters, legal services, or general information about domestic violence?";
     } catch (error) {
       logger.error('Error processing speech input:', {
         error: error.message,
