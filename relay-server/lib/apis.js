@@ -58,7 +58,7 @@ export async function callTavilyAPI(query) {
   }
 }
 
-export async function callGPT(prompt) {
+export async function callGPT(prompt, model = 'gpt-4') {
   try {
     logger.info('Calling GPT with prompt:', prompt);
     
@@ -76,7 +76,7 @@ export async function callGPT(prompt) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: model,
         messages: [
           {
             role: 'system',

@@ -432,7 +432,19 @@ Consider if the user is:
 Respond with only "yes" or "no".`;
 
     const response = await callGPT(prompt, 'gpt-3.5-turbo');
-    const isFollowUp = response.toLowerCase().includes('yes');
+    
+    // Handle the response properly - callGPT returns an object with a text property
+    let responseText;
+    if (typeof response === 'string') {
+      responseText = response;
+    } else if (response && typeof response === 'object' && response.text) {
+      responseText = response.text;
+    } else {
+      logger.error('Unexpected response format from callGPT:', { response, type: typeof response });
+      return false;
+    }
+    
+    const isFollowUp = responseText.toLowerCase().includes('yes');
     
     return isFollowUp;
   } catch (error) {

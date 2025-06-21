@@ -44,9 +44,17 @@ function extractLocationByPattern(speechInput) {
   
   // Common location patterns
   const locationPatterns = [
+    // Standard patterns
     /(?:in|at|near|around|to|from)\s+([a-zA-Z\s]+?)(?:\s+(?:area|region|county|city|town|state))?/i,
     /(?:shelter|help|services)\s+(?:in|at|near|around)\s+([a-zA-Z\s]+)/i,
-    /([a-zA-Z\s]+?)\s+(?:area|region|county|city|town|state)/i
+    /([a-zA-Z\s]+?)\s+(?:area|region|county|city|town|state)/i,
+    
+    // Handle speech recognition errors and informal speech
+    /(?:hold|help|find|need|want)\s+(?:me|a|the)?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+    /(?:homeless|me|a)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+    
+    // Catch any capitalized word that might be a location (fallback)
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g
   ];
   
   for (const pattern of locationPatterns) {
@@ -54,7 +62,7 @@ function extractLocationByPattern(speechInput) {
     if (match && match[1]) {
       const location = match[1].trim();
       // Filter out common words that aren't locations
-      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services'];
+      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services', 'hold', 'find', 'homeless'];
       const words = location.split(' ').filter(word => !commonWords.includes(word.toLowerCase()));
       
       if (words.length > 0) {
@@ -89,7 +97,19 @@ Examples:
 - "I need assistance" → "none"`;
 
     const response = await callGPT(prompt, 'gpt-3.5-turbo');
-    const location = response.trim().toLowerCase();
+    
+    // Handle the response properly - callGPT returns an object with a text property
+    let responseText;
+    if (typeof response === 'string') {
+      responseText = response;
+    } else if (response && typeof response === 'object' && response.text) {
+      responseText = response.text;
+    } else {
+      logger.error('Unexpected response format from callGPT:', { response, type: typeof response });
+      return null;
+    }
+    
+    const location = responseText.trim().toLowerCase();
     
     if (location === 'none' || location === 'no location' || location === '') {
       return null;
