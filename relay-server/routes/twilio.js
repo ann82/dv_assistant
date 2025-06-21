@@ -111,7 +111,7 @@ async function cleanupAudioFile(audioPath) {
 }
 
 // Apply validation to all Twilio routes - moved after twilioVoiceHandler initialization
-router.use(twilioVoiceHandler.validateTwilioRequest.bind(twilioVoiceHandler));
+// router.use(twilioVoiceHandler.validateTwilioRequest.bind(twilioVoiceHandler));
 
 // Log when the router is initialized
 logger.info('Initializing Twilio routes');
