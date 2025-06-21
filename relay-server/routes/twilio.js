@@ -226,9 +226,12 @@ router.post('/voice/process', async (req, res) => {
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
     
-    // Simple response for now to avoid timeouts
+    // Process the speech input using the TwilioVoiceHandler
+    const response = await twilioVoiceHandler.processSpeechInput(SpeechResult, CallSid);
+    
+    // Generate TwiML response
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(`I heard you say: ${SpeechResult}. I'm processing your request.`);
+    twiml.say(response);
     twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
