@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2024-12-19
+
+### Fixed
+- **Speech Recognition Timeout Issues** - Standardized speech recognition settings across all gather elements
+  - Fixed inconsistent `speechTimeout` values that caused responses to come back before listening to full user requests
+  - Standardized all `speechTimeout` values to 10 seconds for consistent behavior
+  - Removed conflicting `timeout` parameters that interfered with speech recognition
+  - Ensured consistent speech recognition parameters (`speechModel` and `enhanced`) across all gather elements
+  - Improved user experience with proper speech recognition timing and conversation flow
+- **Import Statement Fixes** - Resolved `formatTavilyResponse is not a function` runtime error
+  - Fixed incorrect import of `formatTavilyResponse` from `../routes/twilio.js` instead of `../lib/response.js`
+  - Updated all usages to use `ResponseGenerator.formatTavilyResponse` static method correctly
+  - Ensured consistent import patterns across the codebase
+
+### Changed
+- **Code Cleanup and Maintenance** - Removed unused code and improved organization
+  - Deleted unused `lib/twilio.js` file containing old `TwilioHandler` class with "Welcome to Harbor AI" message
+  - Removed entire unused `src/` directory containing legacy web interface code
+  - Added comprehensive comments for web-based and Twilio voice call functionality
+  - Updated tests to use current `TwilioVoiceHandler` implementation
+  - Improved code organization and maintainability
+  - Enhanced documentation for consent handling and core processing functions
+
 ## [1.0.4] - 2024-12-19
 
 ### Added
@@ -183,6 +206,9 @@ All notable changes to this project will be documented in this file.
 - This function now supports voice, SMS, and web output, and is the single source of truth for Tavily result formatting.
 - All usages and tests updated to use the new static method.
 - Fully tested with comprehensive test coverage for all output types.
+- Updated `esbuild` and `@types/node` to the latest versions (June 2024)
+  - Resolves version mismatch warnings
+  - Keeps build and type system up to date
 
 ### Changed
 - Updated error handling to preserve confidence levels in fallback scenarios
@@ -363,11 +389,6 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Updated README with recent changes and improvements
-
-## [1.0.5] - 2024-06-19
-
-### Fixed
-- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
 
 ## [1.0.6] - 2024-12-19
 

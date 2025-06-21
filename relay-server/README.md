@@ -47,6 +47,21 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Recent Updates
 
+### Speech Recognition Optimization (v1.0.5)
+- **Standardized Speech Timeouts** - Fixed inconsistent speech recognition settings
+  - Standardized all `speechTimeout` values to 10 seconds across all gather elements
+  - Removed conflicting `timeout` parameters that interfered with speech recognition
+  - Ensured consistent speech recognition parameters (`speechModel` and `enhanced`) across all gather elements
+  - Fixed issue where responses were coming back before listening to full user requests
+  - Improved user experience with proper speech recognition timing
+- **Code Cleanup and Maintenance** - Removed unused code and improved organization
+  - Deleted unused `lib/twilio.js` file containing old `TwilioHandler` class
+  - Removed entire unused `src/` directory containing legacy web interface code
+  - Fixed import statements to use correct `ResponseGenerator.formatTavilyResponse` static method
+  - Added comprehensive comments for web-based and Twilio voice call functionality
+  - Updated tests to use current `TwilioVoiceHandler` implementation
+  - Improved code organization and maintainability
+
 ### Follow-up Question Support (v1.0.4)
 - **Enhanced Conversation Flow** - Added intelligent follow-up question detection and handling
   - Automatically detects when users ask for more details about specific resources
@@ -251,3 +266,12 @@ Returns an object with:
 ### Notes
 - All previous formatter functions are deprecated. Use only `ResponseGenerator.formatTavilyResponse` for all Tavily result formatting.
 - The function is fully tested and supports all output types (voice, SMS, web).
+
+## Maintenance
+
+- As of June 2024, `esbuild` and `@types/node` have been updated to their latest versions. This keeps the build and type system up to date and resolves previous version mismatch warnings.
+
+## Changelog
+
+- Updated `esbuild` and `@types/node` to the latest versions (June 2024)
+- No breaking changes expected; all tests pass after update.
