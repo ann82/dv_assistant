@@ -166,7 +166,7 @@ router.post('/voice', async (req, res) => {
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
       
-      // Add gather for speech input
+      // Add gather for speech input with improved speech recognition
       twiml.gather({
         input: 'speech',
         action: '/twilio/voice/process',
@@ -174,7 +174,19 @@ router.post('/voice', async (req, res) => {
         speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
-        language: 'en-US'
+        language: 'en-US',
+        speechRecognitionLanguage: 'en-US',
+        profanityFilter: 'false',
+        speechContexts: JSON.stringify([{
+          phrases: [
+            'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
+            'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
+            'hotline', 'crisis', 'safe', 'protection', 'resources',
+            'women', 'children', 'family', 'support', 'counseling',
+            'yes', 'no', 'more', 'details', 'information', 'location'
+          ],
+          boost: 20
+        }])
       });
       
       res.type('text/xml');
@@ -218,7 +230,19 @@ router.post('/voice/process', async (req, res) => {
         speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
-        language: 'en-US'
+        language: 'en-US',
+        speechRecognitionLanguage: 'en-US',
+        profanityFilter: 'false',
+        speechContexts: JSON.stringify([{
+          phrases: [
+            'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
+            'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
+            'hotline', 'crisis', 'safe', 'protection', 'resources',
+            'women', 'children', 'family', 'support', 'counseling',
+            'yes', 'no', 'more', 'details', 'information', 'location'
+          ],
+          boost: 20
+        }])
       });
       res.type('text/xml');
       return res.send(twiml.toString());
@@ -239,7 +263,19 @@ router.post('/voice/process', async (req, res) => {
       speechTimeout: 'auto',
       speechModel: 'phone_call',
       enhanced: 'true',
-      language: 'en-US'
+      language: 'en-US',
+      speechRecognitionLanguage: 'en-US',
+      profanityFilter: 'false',
+      speechContexts: JSON.stringify([{
+        phrases: [
+          'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
+          'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
+          'hotline', 'crisis', 'safe', 'protection', 'resources',
+          'women', 'children', 'family', 'support', 'counseling',
+          'yes', 'no', 'more', 'details', 'information', 'location'
+        ],
+        boost: 20
+      }])
     });
     
     res.type('text/xml');
@@ -258,7 +294,19 @@ router.post('/voice/process', async (req, res) => {
       speechTimeout: 'auto',
       speechModel: 'phone_call',
       enhanced: 'true',
-      language: 'en-US'
+      language: 'en-US',
+      speechRecognitionLanguage: 'en-US',
+      profanityFilter: 'false',
+      speechContexts: JSON.stringify([{
+        phrases: [
+          'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
+          'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
+          'hotline', 'crisis', 'safe', 'protection', 'resources',
+          'women', 'children', 'family', 'support', 'counseling',
+          'yes', 'no', 'more', 'details', 'information', 'location'
+        ],
+        boost: 20
+      }])
     });
     res.type('text/xml');
     res.send(twiml.toString());
