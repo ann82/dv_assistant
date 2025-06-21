@@ -16,6 +16,7 @@ import { getIntent, intentHandlers, rewriteQuery, updateConversationContext, get
 import { generateSpeechHash } from '../lib/utils.js';
 import { v4 as uuidv4 } from 'uuid';
 import { extractLocationFromSpeech, generateLocationPrompt } from '../lib/speechProcessor.js';
+import { filterConfig, matchesPattern, cleanTitle } from '../lib/filterConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -384,42 +385,73 @@ export function formatTavilyResponse(response, requestType = 'web') {
     return "I'm sorry, I couldn't find any specific resources for that location. Would you like me to search for resources in a different location?";
   }
 
+  // Filter out unwanted results using configuration
+  const filteredResults = response.results.filter(result => {
+    const title = (result.title || '').toLowerCase();
+    const content = (result.content || '').toLowerCase();
+    const url = (result.url || '').toLowerCase();
+    
+    // Check if any unwanted pattern matches
+    const hasUnwantedPattern = matchesPattern(title, filterConfig.unwantedPatterns) ||
+                               matchesPattern(content, filterConfig.unwantedPatterns) ||
+                               matchesPattern(url, filterConfig.unwantedPatterns);
+    
+    // Check for positive indicators of actual shelters/organizations
+    const hasPositivePattern = matchesPattern(title, filterConfig.positivePatterns) ||
+                               matchesPattern(content, filterConfig.positivePatterns);
+    
+    // Include if it has positive patterns and no unwanted patterns
+    return hasPositivePattern && !hasUnwantedPattern;
+  });
+
+  // If no filtered results, return a helpful message
+  if (filteredResults.length === 0) {
+    return "I found some resources, but they appear to be general information rather than specific shelters. Let me search for more targeted shelter information in your area.";
+  }
+
   // Voice-optimized response for Twilio calls
   if (requestType === 'twilio') {
-    // Limit to first 3 results for voice
-    const resultsToShow = response.results.slice(0, 3);
+    // Limit to first 3 filtered results for voice
+    const resultsToShow = filteredResults.slice(0, 3);
     
-    let voiceResponse = `I found ${resultsToShow.length} resource${resultsToShow.length > 1 ? 's' : ''} that might help. `;
+    let voiceResponse = `I found ${resultsToShow.length} shelter${resultsToShow.length > 1 ? 's' : ''} that might help. `;
     
     resultsToShow.forEach((result, index) => {
       const title = result.title || 'Unknown Organization';
       const content = result.content || '';
       
+      // Clean up the title using configuration
+      const cleanTitleText = cleanTitle(title);
+      
       // Extract phone number
       const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
       const phone = phoneMatch ? phoneMatch[1] : null;
       
-      voiceResponse += `Number ${index + 1}: ${title}. `;
+      voiceResponse += `Number ${index + 1}: ${cleanTitleText}. `;
       if (phone) {
         voiceResponse += `Phone number: ${phone}. `;
       }
     });
     
-    voiceResponse += "Would you like me to provide more details about any of these resources?";
+    voiceResponse += "Would you like me to provide more details about any of these shelters?";
     return voiceResponse;
   }
 
   // Web response (original format)
-  let formattedResponse = "I found some resources that might help:\n\n";
-  response.results.forEach((result, index) => {
+  let formattedResponse = "I found some shelters that might help:\n\n";
+  filteredResults.forEach((result, index) => {
     const title = result.title || 'Unknown Organization';
     const content = result.content || 'No description available.';
+    
+    // Clean up the title using configuration
+    const cleanTitleText = cleanTitle(title);
+    
     const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
     const phone = phoneMatch ? phoneMatch[1] : null;
     const coverageMatch = content.match(/Coverage Area: ([^,.]+)/i);
     const coverage = coverageMatch ? coverageMatch[1] : null;
 
-    formattedResponse += `${index + 1}. ${title}\n`;
+    formattedResponse += `${index + 1}. ${cleanTitleText}\n`;
     formattedResponse += `   ${content}\n`;
     if (phone) {
       formattedResponse += `   Phone: ${phone}\n`;
@@ -430,7 +462,7 @@ export function formatTavilyResponse(response, requestType = 'web') {
     formattedResponse += '\n';
   });
 
-  formattedResponse += "Would you like more information about any of these resources?";
+  formattedResponse += "Would you like more information about any of these shelters?";
   return formattedResponse;
 }
 
@@ -580,7 +612,7 @@ export async function handleIncomingCall(req, res) {
     
     const gather = twiml.gather({
       input: 'speech',
-      action: `/twilio/speech/${callSid}`,
+      action: `/twilio/voice/process`,
       method: 'POST',
       speechTimeout: 'auto',
       enhanced: true,
@@ -589,7 +621,7 @@ export async function handleIncomingCall(req, res) {
 
     gather.say('Hello, I can help you find domestic violence shelters and resources. What would you like to know?');
 
-    twiml.redirect(`/twilio/speech/${callSid}`);
+    twiml.redirect(`/twilio/voice/process`);
 
     res.type('text/xml');
     res.send(twiml.toString());
@@ -679,7 +711,7 @@ router.post('/voice/process', async (req, res) => {
       return res.send(twiml.toString());
     }
 
-    // Process speech result
+    // Process speech result using TwilioVoiceHandler for consistent logic
     const processStartTime = Date.now();
     logger.info('Processing speech result:', {
       requestId,
@@ -688,12 +720,7 @@ router.post('/voice/process', async (req, res) => {
       duration: processStartTime - startTime
     });
 
-    const response = await processSpeechResult(
-      req.body.CallSid,
-      req.body.SpeechResult,
-      requestId,
-      'twilio'
-    );
+    const response = await twilioVoiceHandler.processSpeechInput(req.body.SpeechResult, req.body.CallSid);
 
     const processEndTime = Date.now();
     logger.info('Speech processing completed:', {
@@ -705,9 +732,12 @@ router.post('/voice/process', async (req, res) => {
       totalDuration: processEndTime - startTime
     });
 
+    // Generate TwiML response with gather to continue conversation
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
-    twiml.gather({
+    
+    // Add gather to continue the conversation
+    const gather = twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
       method: 'POST',
@@ -717,6 +747,11 @@ router.post('/voice/process', async (req, res) => {
       language: 'en-US',
       timeout: '30'
     });
+    
+    // If no speech is detected, provide a helpful message
+    twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
+    twiml.redirect('/twilio/voice/process');
+    
     res.type('text/xml');
     res.send(twiml.toString());
 

@@ -44,6 +44,8 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **Major Fix: Twilio Routing Conflicts** - Resolved duplicate responses and routing conflicts by standardizing all routes to use `/twilio/voice/process` consistently across the application.
 - **Follow-up Question Support** - Fixed follow-up question detection and processing. The system now properly maintains conversation context and processes follow-up questions without requiring location input again.
 - **Route Standardization** - Updated all Twilio handlers, WebSocket server, and route configurations to use consistent routing paths.
+- **Enhanced Tavily Response Filtering** - Implemented configuration-based filtering system to exclude PDFs, government documents, and other non-shelter resources. Results now focus on actual shelter organizations with clean, readable titles.
+- **Configuration-Based Architecture** - Replaced hardcoded filtering patterns with maintainable configuration files that can be easily updated without code changes.
 - Enhanced error handling in Twilio routes
 - Improved WebSocket server initialization
 - Updated deployment configuration
@@ -95,6 +97,17 @@ The application requires the following environment variables:
 - `PORT`: Server port (default: 3000)
 - `WS_PORT`: WebSocket server port (default: 3001)
 - `LOG_LEVEL`: Logging level (default: info)
+
+### Filtering Configuration
+
+The system uses a configuration-based approach for filtering Tavily search results. Filtering patterns are defined in `relay-server/lib/filterConfig.js` and can be easily updated without code changes:
+
+- **Unwanted Patterns**: Filters out PDFs, government documents, research papers, and other non-shelter resources
+- **Positive Patterns**: Identifies actual shelter organizations, domestic violence centers, and support services
+- **Domain Exclusions**: Excludes specific domains like Wikipedia, government sites, and research platforms
+- **Title Cleanup**: Removes common prefixes/suffixes to provide cleaner organization names
+
+This configuration can be extended to support different types of resources or modified for specific geographic regions.
 
 ## Usage
 

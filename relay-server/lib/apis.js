@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { filterConfig } from './filterConfig.js';
 
 export async function callTavilyAPI(query) {
   try {
@@ -29,7 +30,11 @@ export async function callTavilyAPI(query) {
         query: query,
         search_depth: 'advanced',
         include_domains: [],
-        exclude_domains: []
+        exclude_domains: filterConfig.excludeDomains,
+        include_answer: false,
+        include_raw_content: false,
+        include_images: false,
+        max_results: 10
       })
     });
 

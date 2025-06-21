@@ -389,9 +389,35 @@ All notable changes to this project will be documented in this file.
 - Improved user experience by maintaining context across conversation turns
 - Standardized speech timeout and model configurations across all routes
 
-## [1.0.5] - 2024-06-19
+## [1.0.7] - 2024-12-19
+
+### Added
+- **Configuration-Based Filtering System** - Replaced hardcoded filtering patterns with maintainable configuration architecture
+  - Created `filterConfig.js` with centralized filtering patterns and rules
+  - Added helper functions for pattern matching and title cleanup
+  - Implemented easy-to-update configuration without code changes
+  - Added support for domain exclusions and title cleanup patterns
+- **Enhanced Tavily Response Filtering** - Improved search result quality and relevance
+  - Filters out PDFs, government documents, research papers, and other non-shelter resources
+  - Focuses on actual shelter organizations, domestic violence centers, and support services
+  - Cleans up organization titles by removing common prefixes/suffixes
+  - Provides cleaner, more readable responses for voice interactions
+- **AI-Powered Filtering Option** - Added intelligent result classification system
+  - Created `aiFilter.js` with GPT-powered result classification
+  - Includes caching system for performance optimization
+  - Provides fallback to basic filtering when AI is unavailable
+  - Can be used as an alternative or complement to configuration-based filtering
+
+### Changed
+- Updated `formatTavilyResponse` function to use configuration-based filtering
+- Enhanced Tavily API calls with domain exclusions from configuration
+- Improved query rewriting to target actual shelter organizations
+- Updated response formatting to focus on shelters rather than general resources
+- Changed terminology from "resources" to "shelters" in user-facing messages
 
 ### Fixed
-- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
+- **Tavily Response Quality** - Eliminated PDFs and non-shelter resources from search results
+- **Title Cleanup** - Removed "[PDF]", "- Domestic Shelters", and other unwanted suffixes
+- **Search Relevance** - Improved targeting of actual shelter organizations vs. general information
 
-// ... existing changelog entries ... 
+## [1.0.6] - 2024-12-19 
