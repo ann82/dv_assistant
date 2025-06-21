@@ -103,7 +103,7 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: '30',
+        speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
         language: 'en-US'
@@ -143,7 +143,7 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: '30',
+        speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
         language: 'en-US'
@@ -170,7 +170,7 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: '30',
+        speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
         language: 'en-US'
@@ -620,7 +620,7 @@ export class TwilioVoiceHandler {
   <Say voice="Polly.Amy">${response}</Say>
   <Pause length="1"/>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="30" 
+          speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>
@@ -698,7 +698,7 @@ export class TwilioVoiceHandler {
     if (shouldGather) {
       twiml += `
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="30" 
+          speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>`;
@@ -808,7 +808,7 @@ export class TwilioVoiceHandler {
 <Response>
   <Say voice="Polly.Amy">Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.</Say>
   <Gather input="speech" action="/twilio/consent" method="POST" 
-          speechTimeout="30" 
+          speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>

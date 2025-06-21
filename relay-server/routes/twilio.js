@@ -71,7 +71,7 @@ const MAX_CACHE_SIZE = 1000; // Maximum number of cached responses
 
 // Speech recognition configuration constants
 const SPEECH_CONFIG = {
-  TIMEOUT: '30', // Increased from 10s to 30s for more user response time
+  TIMEOUT: 'auto', // Let Twilio handle timeout automatically
   MODEL: 'phone_call',
   ENHANCED: 'true',
   LANGUAGE: 'en-US'
