@@ -311,8 +311,8 @@ export class TwilioVoiceHandler {
       logger.info('Formatted response:', {
         requestId,
         callSid,
-        responseLength: formattedResponse.length,
-        responsePreview: formattedResponse.substring(0, 100) + '...'
+        responseLength: formattedResponse.voiceResponse.length,
+        responsePreview: formattedResponse.voiceResponse.substring(0, 100) + '...'
       });
 
       // Update conversation context
@@ -323,13 +323,13 @@ export class TwilioVoiceHandler {
           callSid,
           intent,
           queryLength: rewrittenQuery.length,
-          responseLength: formattedResponse.length,
+          responseLength: formattedResponse.voiceResponse.length,
           hasTavilyResults: !!tavilyResponse?.results,
           resultCount: tavilyResponse?.results?.length || 0
         });
       }
 
-      return formattedResponse;
+      return formattedResponse.voiceResponse;
     } catch (error) {
       logger.error('Error processing speech input:', {
         error: error.message,
