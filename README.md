@@ -51,6 +51,7 @@ The system includes comprehensive logging throughout the request-response lifecy
 - Simplified module imports using index.js
 - Updated package.json with proper module exports
 - Removed unnecessary build step from deployment
+- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
 
 ## Installation
 
@@ -178,6 +179,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
    - Review TwiML response logs
    - Check processing time logs
    - Verify response formatting
+   - If you see a 502 error from Twilio, ensure the welcome prompt is hardcoded and not calling an undefined function.
 
 3. **Timeout Issues**
    - Monitor processing time logs

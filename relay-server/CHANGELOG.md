@@ -55,7 +55,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Critical Fix: Double Response Error** - Resolved "Cannot set headers after they are sent to the client" error in Twilio voice route handler
-  - Fixed route handler calling `sendTwiMLResponse` internally while also trying to send response manually
+  - Fixed route handler calling `sendTwMLResponse` internally while also trying to send response manually
   - Updated `handleIncomingCall` and `handleSpeechInput` methods to only return TwiML objects, not send responses directly
   - Removed `res` parameter from handler method calls in route handler
   - Added proper `processSpeechInput` method to TwilioVoiceHandler class
@@ -359,5 +359,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Updated README with recent changes and improvements
+
+## [1.0.5] - 2024-06-19
+
+### Fixed
+- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
 
 // ... existing changelog entries ... 

@@ -664,7 +664,7 @@ router.post('/voice/process', async (req, res) => {
         duration: Date.now() - startTime
       });
       const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say(generateWelcomePrompt());
+      twiml.say("Hello, I can help you find domestic violence shelters and resources. What would you like to know?");
       twiml.gather({
         input: 'speech',
         action: '/twilio/voice/process',
