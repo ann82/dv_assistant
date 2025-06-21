@@ -365,4 +365,33 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
 
+## [1.0.6] - 2024-12-19
+
+### Fixed
+- **Critical Fix: Twilio Routing Conflicts** - Resolved duplicate responses and routing conflicts that were causing multiple TwiML responses
+  - Standardized all routes to use `/twilio/voice/process` consistently across the application
+  - Fixed non-existent `/twilio/speech/${callSid}` route in `handleIncomingCall` function
+  - Updated TwilioVoiceHandler, WebSocket server, and all route configurations to use consistent routing paths
+  - Eliminated route conflicts between `/twilio/voice` and `/twilio/voice/process`
+- **Follow-up Question Support** - Fixed follow-up question detection and processing
+  - Updated `/twilio/voice/process` route to use `TwilioVoiceHandler.processSpeechInput()` which includes proper follow-up detection
+  - Follow-up questions are now processed without requiring location input again
+  - Conversation context is properly maintained across interactions
+  - Enhanced follow-up detection patterns for better user experience
+- **TwiML Response Consistency** - Improved TwiML response generation across all routes
+  - Consistent gather configuration with proper speech timeout and model settings
+  - Proper fallback messages when no speech is detected
+  - Unified error handling and response formatting
+
+### Changed
+- Updated all Twilio route handlers to use consistent routing paths
+- Enhanced conversation flow to handle follow-up questions more intelligently
+- Improved user experience by maintaining context across conversation turns
+- Standardized speech timeout and model configurations across all routes
+
+## [1.0.5] - 2024-06-19
+
+### Fixed
+- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
+
 // ... existing changelog entries ... 

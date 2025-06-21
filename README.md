@@ -40,6 +40,10 @@ The system includes comprehensive logging throughout the request-response lifecy
 
 ## Recent Changes
 
+- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
+- **Major Fix: Twilio Routing Conflicts** - Resolved duplicate responses and routing conflicts by standardizing all routes to use `/twilio/voice/process` consistently across the application.
+- **Follow-up Question Support** - Fixed follow-up question detection and processing. The system now properly maintains conversation context and processes follow-up questions without requiring location input again.
+- **Route Standardization** - Updated all Twilio handlers, WebSocket server, and route configurations to use consistent routing paths.
 - Enhanced error handling in Twilio routes
 - Improved WebSocket server initialization
 - Updated deployment configuration
@@ -51,7 +55,6 @@ The system includes comprehensive logging throughout the request-response lifecy
 - Simplified module imports using index.js
 - Updated package.json with proper module exports
 - Removed unnecessary build step from deployment
-- Fixed a bug where a missing function (`generateWelcomePrompt`) for the Twilio welcome prompt caused 502 errors. The welcome prompt is now hardcoded for reliability.
 
 ## Installation
 
@@ -180,8 +183,14 @@ This project is licensed under the MIT License - see the LICENSE file for detail
    - Check processing time logs
    - Verify response formatting
    - If you see a 502 error from Twilio, ensure the welcome prompt is hardcoded and not calling an undefined function.
+   - If you see duplicate responses, check that all routes are using `/twilio/voice/process` consistently.
 
-3. **Timeout Issues**
+3. **Follow-up Questions Not Working**
+   - Ensure conversation context is being maintained properly
+   - Check that the `TwilioVoiceHandler.processSpeechInput()` method is being used
+   - Verify that follow-up detection patterns are working correctly
+
+4. **Timeout Issues**
    - Monitor processing time logs
    - Check for long-running operations
    - Review timeout configurations
