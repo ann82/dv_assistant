@@ -148,141 +148,90 @@ router.use((req, res, next) => {
  * @returns {string} TwiML response for Twilio
  */
 router.post('/voice', async (req, res) => {
-  const startTime = Date.now();
-  const requestId = uuidv4();
-  const callSid = req.body.CallSid;
+  logger.info('Received voice call request');
   
-  logger.info('Received voice call request:', {
-    requestId,
-    callSid,
-    body: req.body,
-    timestamp: new Date().toISOString()
-  });
-
-  // Handle request abort (client disconnected)
-  req.on('aborted', () => {
-    logger.warn('Request aborted by client:', {
-      requestId,
-      callSid,
-      timestamp: new Date().toISOString(),
-      duration: Date.now() - startTime
-    });
-  });
-
   try {
-    // Validate request has required Twilio fields
-    if (!req.body || !req.body.CallSid) {
-      logger.error('Invalid request body:', {
-        requestId,
-        body: req.body,
-        duration: Date.now() - startTime
-      });
+    // Check if this is a new call or speech input
+    const { CallSid, SpeechResult } = req.body;
+    
+    if (SpeechResult) {
+      // This is speech input from an existing call
+      logger.info('Processing speech input:', { CallSid, SpeechResult });
+      await twilioVoiceHandler.handleSpeechInput(req);
+    } else {
+      // This is a new call
+      logger.info('Processing new call:', { CallSid });
+      await twilioVoiceHandler.handleIncomingCall(req);
+    }
+  } catch (error) {
+    logger.error('Error in voice endpoint:', error);
+    
+    // Fallback response
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm sorry, there was an error. Please try again.");
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+/**
+ * Endpoint for processing speech input from Twilio
+ * This is called when Twilio sends transcribed speech back to the server
+ * 
+ * @route POST /twilio/voice/process
+ * @param {Object} req.body.CallSid - Twilio call SID
+ * @param {Object} req.body.SpeechResult - Transcribed speech text
+ * @returns {string} TwiML response for Twilio
+ */
+router.post('/voice/process', async (req, res) => {
+  logger.info('Received speech processing request');
+  
+  try {
+    const { CallSid, SpeechResult } = req.body;
+    
+    if (!CallSid || !SpeechResult) {
+      logger.error('Missing required parameters:', { CallSid, SpeechResult });
       const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("I'm having trouble processing your request. Please try again.");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice',
-        method: 'POST',
-        speechTimeout: SPEECH_CONFIG.TIMEOUT,
-        speechModel: SPEECH_CONFIG.MODEL,
-        enhanced: SPEECH_CONFIG.ENHANCED,
-        language: SPEECH_CONFIG.LANGUAGE
-      });
+      twiml.say("I didn't catch that. Could you please repeat?");
       res.type('text/xml');
       return res.send(twiml.toString());
     }
-
-    // Check if this is a new call (no speech result yet)
-    const isNewCall = !req.body.SpeechResult;
     
-    if (isNewCall) {
-      logger.info('New call received, generating welcome prompt:', {
-        requestId,
-        callSid,
-        duration: Date.now() - startTime
-      });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Hello, I can help you find domestic violence shelters and resources. What would you like to know?");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice',
-        method: 'POST',
-        speechTimeout: SPEECH_CONFIG.TIMEOUT,
-        speechModel: SPEECH_CONFIG.MODEL,
-        enhanced: SPEECH_CONFIG.ENHANCED,
-        language: SPEECH_CONFIG.LANGUAGE
-      });
-      res.type('text/xml');
-      return res.send(twiml.toString());
-    }
-
-    // For speech processing, use a simpler approach to avoid hangs
-    logger.info('Processing speech result:', {
-      requestId,
-      callSid,
-      speechResult: req.body.SpeechResult,
-      duration: Date.now() - startTime
-    });
-
-    // Simple response for now to test connectivity
-    const response = "I received your message. I'm working on processing it. Please try again in a moment.";
+    logger.info('Processing speech:', { CallSid, SpeechResult });
     
-    logger.info('Speech processing completed:', {
-      requestId,
-      callSid,
-      responseLength: response.length,
-      processingDuration: Date.now() - startTime,
-      totalDuration: Date.now() - startTime
-    });
-
-    // Generate TwiML response with gather to continue conversation
+    // Process the speech input
+    const response = await twilioVoiceHandler.processSpeechInput(SpeechResult, CallSid);
+    
+    // Generate TwiML response
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(response);
-    
-    // Add gather to continue the conversation
-    const gather = twiml.gather({
+    twiml.gather({
       input: 'speech',
-      action: '/twilio/voice',
+      action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: SPEECH_CONFIG.TIMEOUT,
-      speechModel: SPEECH_CONFIG.MODEL,
-      enhanced: SPEECH_CONFIG.ENHANCED,
-      language: SPEECH_CONFIG.LANGUAGE
+      speechTimeout: 'auto',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US'
     });
-    
-    // If no speech is detected, provide a helpful message
-    twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
-    twiml.redirect('/twilio/voice');
     
     res.type('text/xml');
     res.send(twiml.toString());
-
-    logger.info('Response sent to client:', {
-      requestId,
-      callSid,
-      totalDuration: Date.now() - startTime
-    });
+    
   } catch (error) {
-    logger.error('Error processing voice call:', {
-      requestId,
-      callSid,
-      error: error.message,
-      stack: error.stack,
-      body: req.body,
-      duration: Date.now() - startTime
-    });
-
-    // Send a user-friendly error response
+    logger.error('Error processing speech:', error);
+    
+    // Fallback response
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm sorry, I'm having trouble processing your request. Please try again.");
+    twiml.say("I'm sorry, I encountered an error. Please try again.");
     twiml.gather({
       input: 'speech',
-      action: '/twilio/voice',
+      action: '/twilio/voice/process',
       method: 'POST',
-      speechTimeout: SPEECH_CONFIG.TIMEOUT,
-      speechModel: SPEECH_CONFIG.MODEL,
-      enhanced: SPEECH_CONFIG.ENHANCED,
-      language: SPEECH_CONFIG.LANGUAGE
+      speechTimeout: 'auto',
+      speechModel: 'phone_call',
+      enhanced: 'true',
+      language: 'en-US'
     });
     res.type('text/xml');
     res.send(twiml.toString());
