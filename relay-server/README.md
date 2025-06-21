@@ -183,6 +183,13 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - Updated location prompts with better examples
 - Added comprehensive test coverage
 
+### Context-Aware Follow-Up & Fuzzy Matching (v1.0.8)
+- **Contextual Follow-Up Handling** - The system now tracks which specific result a user is referencing in follow-up questions (e.g., "South Lake Tahoe") and stores `focusResultTitle` in the conversation context.
+- **Fuzzy/Partial Matching** - Follow-up queries are matched to previous Tavily search results using fuzzy/partial matching, so users can refer to results by location, title, or ordinal (e.g., "the third one").
+- **Natural Voice Summaries** - Voice responses for follow-ups now use the full content/snippet of the matched result and generate smooth, conversational summaries (e.g., "Here's what I found about South Lake Tahoe: ...").
+- **Comprehensive `generateFollowUpResponse()`** - New function generates a context-aware, natural voice response, SMS (if requested), and includes the matched result for further actions.
+- **Timeout Handling** - If the last context is older than 5 minutes, the system asks the user to repeat their location or query for accuracy.
+
 ## Testing
 
 The test suite uses [Vitest](https://vitest.dev/) and is configured for reliability and isolation:

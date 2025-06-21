@@ -528,8 +528,18 @@ All notable changes to this project will be documented in this file.
 - **Title Cleanup** - Removed "[PDF]", "- Domestic Shelters", and other unwanted suffixes
 - **Search Relevance** - Improved targeting of actual shelter organizations vs. general information
 
-## [1.0.6] - 2024-12-19
+## [1.0.8] - 2024-06-21
+
+### Added
+- **Context-Aware Follow-Up Handling**: Tracks which specific result a user is referencing in follow-up questions (e.g., "South Lake Tahoe") and stores `focusResultTitle` in the conversation context.
+- **Fuzzy/Partial Matching for Follow-Ups**: Matches follow-up queries to previous Tavily search results using fuzzy/partial matching, allowing users to refer to results by location, title, or ordinal (e.g., "the third one").
+- **Natural Voice Summaries**: Voice responses for follow-ups now use the full content/snippet of the matched result and generate smooth, conversational summaries (e.g., "Here's what I found about South Lake Tahoe: ...").
+- **Comprehensive `generateFollowUpResponse()` Function**: Generates a context-aware, natural voice response, SMS (if requested), and includes the matched result for further actions.
+- **Timeout Handling for Context**: If the last context is older than 5 minutes, the system asks the user to repeat their location or query for accuracy.
+
+### Changed
+- Improved the conversation context structure to support focus tracking and result matching for follow-ups.
+- Enhanced the voice response formatting for follow-up questions to be more natural and user-friendly.
 
 ### Fixed
-- Fixed package-lock.json sync issue that was preventing `npm ci` from working properly.
-- Resolved dependency version mismatch between package.json and package-lock.json. 
+- Fixed edge cases where follow-up queries did not match any previous results, providing a graceful fallback message. 
