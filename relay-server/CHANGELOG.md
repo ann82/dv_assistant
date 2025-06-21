@@ -448,4 +448,8 @@ All notable changes to this project will be documented in this file.
 - **Title Cleanup** - Removed "[PDF]", "- Domestic Shelters", and other unwanted suffixes
 - **Search Relevance** - Improved targeting of actual shelter organizations vs. general information
 
-## [1.0.6] - 2024-12-19 
+## [1.0.6] - 2024-12-19
+
+### Fixed
+- Fixed package-lock.json sync issue that was preventing `npm ci` from working properly.
+- Resolved dependency version mismatch between package.json and package-lock.json. 
