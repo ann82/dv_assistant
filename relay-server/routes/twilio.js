@@ -111,16 +111,10 @@ async function cleanupAudioFile(audioPath) {
 }
 
 // Apply validation to all Twilio routes - moved after twilioVoiceHandler initialization
-// router.use(twilioVoiceHandler.validateTwilioRequest.bind(twilioVoiceHandler));
+router.use(twilioVoiceHandler.validateTwilioRequest.bind(twilioVoiceHandler));
 
 // Log when the router is initialized
 logger.info('Initializing Twilio routes');
-
-// Test route to verify logging
-router.get('/test', (req, res) => {
-  logger.info('Test route hit');
-  res.json({ message: 'Test route working' });
-});
 
 // Log all incoming requests
 router.use((req, res, next) => {
@@ -154,15 +148,21 @@ router.post('/voice', async (req, res) => {
     // Check if this is a new call or speech input
     const { CallSid, SpeechResult } = req.body;
     
+    let twiml;
     if (SpeechResult) {
       // This is speech input from an existing call
       logger.info('Processing speech input:', { CallSid, SpeechResult });
-      await twilioVoiceHandler.handleSpeechInput(req);
+      twiml = await twilioVoiceHandler.handleSpeechInput(req);
     } else {
       // This is a new call
       logger.info('Processing new call:', { CallSid });
-      await twilioVoiceHandler.handleIncomingCall(req);
+      twiml = await twilioVoiceHandler.handleIncomingCall(req);
     }
+    
+    // Send the TwiML response
+    res.type('text/xml');
+    res.send(twiml.toString());
+    
   } catch (error) {
     logger.error('Error in voice endpoint:', error);
     
