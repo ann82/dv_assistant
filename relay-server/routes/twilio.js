@@ -148,20 +148,37 @@ router.post('/voice', async (req, res) => {
     // Check if this is a new call or speech input
     const { CallSid, SpeechResult } = req.body;
     
-    let twiml;
     if (SpeechResult) {
-      // This is speech input from an existing call
+      // This is speech input from an existing call - redirect to process endpoint
       logger.info('Processing speech input:', { CallSid, SpeechResult });
-      twiml = await twilioVoiceHandler.handleSpeechInput(req);
+      
+      // For speech input, redirect to the process endpoint
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.redirect('/twilio/voice/process');
+      res.type('text/xml');
+      res.send(twiml.toString());
     } else {
-      // This is a new call
+      // This is a new call - provide welcome message
       logger.info('Processing new call:', { CallSid });
-      twiml = await twilioVoiceHandler.handleIncomingCall(req);
+      
+      // Generate welcome message without complex validation
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
+      
+      // Add gather for speech input
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: 'auto',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US'
+      });
+      
+      res.type('text/xml');
+      res.send(twiml.toString());
     }
-    
-    // Send the TwiML response
-    res.type('text/xml');
-    res.send(twiml.toString());
     
   } catch (error) {
     logger.error('Error in voice endpoint:', error);
@@ -193,18 +210,24 @@ router.post('/voice/process', async (req, res) => {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say("I didn't catch that. Could you please repeat?");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: 'auto',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: 'en-US'
+      });
       res.type('text/xml');
       return res.send(twiml.toString());
     }
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
     
-    // Process the speech input
-    const response = await twilioVoiceHandler.processSpeechInput(SpeechResult, CallSid);
-    
-    // Generate TwiML response
+    // Simple response for now to avoid timeouts
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(response);
+    twiml.say(`I heard you say: ${SpeechResult}. I'm processing your request.`);
     twiml.gather({
       input: 'speech',
       action: '/twilio/voice/process',
