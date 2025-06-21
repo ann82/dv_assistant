@@ -101,7 +101,7 @@ export class TwilioVoiceHandler {
       // Add gather for speech input
       const gather = twiml.gather({
         input: 'speech',
-        action: '/twilio/voice',
+        action: '/twilio/voice/process',
         method: 'POST',
         speechTimeout: 'auto',
         language: 'en-US'
@@ -139,7 +139,7 @@ export class TwilioVoiceHandler {
       // Add gather to continue the conversation
       const gather = twiml.gather({
         input: 'speech',
-        action: '/twilio/voice',
+        action: '/twilio/voice/process',
         method: 'POST',
         speechTimeout: 'auto',
         language: 'en-US'
@@ -147,7 +147,7 @@ export class TwilioVoiceHandler {
       
       // If no speech is detected, repeat the prompt
       twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
-      twiml.redirect('/twilio/voice');
+      twiml.redirect('/twilio/voice/process');
       
       return twiml;
     } catch (error) {
@@ -164,7 +164,7 @@ export class TwilioVoiceHandler {
       // Add gather to continue after error
       const gather = twiml.gather({
         input: 'speech',
-        action: '/twilio/voice',
+        action: '/twilio/voice/process',
         method: 'POST',
         speechTimeout: 'auto',
         language: 'en-US'
@@ -207,26 +207,68 @@ export class TwilioVoiceHandler {
         requestId,
         callSid,
         hasContext: !!context,
-        lastIntent: context?.lastIntent
+        lastIntent: context?.lastIntent,
+        lastQuery: context?.lastQuery,
+        historyLength: context?.history?.length,
+        fullContext: context
       });
 
       // Check if this is a follow-up question about a specific resource
-      const isFollowUpQuestion = context && context.lastIntent && (
-        speechResult.toLowerCase().includes('more about') ||
-        speechResult.toLowerCase().includes('tell me more') ||
-        speechResult.toLowerCase().includes('details about') ||
-        speechResult.toLowerCase().includes('information about') ||
-        speechResult.toLowerCase().includes('what about') ||
-        speechResult.toLowerCase().includes('how about') ||
-        /(?:can|could)\s+(?:you)?\s+(?:let|tell)\s+(?:me)?\s+(?:know)?\s+(?:more)?\s+(?:about)/i.test(speechResult)
-      );
+      const followUpPatterns = [
+        'more about',
+        'tell me more',
+        'details about',
+        'information about',
+        'what about',
+        'how about',
+        'can you tell me',
+        'could you tell me',
+        'tell me about',
+        'give me more',
+        'additional information',
+        'more details',
+        'more info',
+        'what is',
+        'what are',
+        'how do',
+        'where is',
+        'where are'
+      ];
+      
+      const regexPatterns = [
+        /(?:can|could)\s+(?:you)?\s+(?:let|tell)\s+(?:me)?\s+(?:know)?\s+(?:more)?\s+(?:about)/i,
+        /(?:what|where|how|can|could)\s+(?:about|is|are|do|does)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?|resources?|services?)/i,
+        /(?:tell|give)\s+(?:me)?\s+(?:more|additional)\s+(?:information|details|about)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?|resources?|services?)/i
+      ];
+      
+      const matchedPatterns = [];
+      const lowerSpeech = speechResult.toLowerCase();
+      
+      // Check string patterns
+      for (const pattern of followUpPatterns) {
+        if (lowerSpeech.includes(pattern)) {
+          matchedPatterns.push(`string: ${pattern}`);
+        }
+      }
+      
+      // Check regex patterns
+      for (let i = 0; i < regexPatterns.length; i++) {
+        if (regexPatterns[i].test(speechResult)) {
+          matchedPatterns.push(`regex: ${regexPatterns[i].toString()}`);
+        }
+      }
+      
+      const isFollowUpQuestion = context && context.lastIntent && matchedPatterns.length > 0;
 
       logger.info('Follow-up question check:', {
         requestId,
         callSid,
         isFollowUpQuestion,
         speechResult,
-        lastIntent: context?.lastIntent
+        lastIntent: context?.lastIntent,
+        matchedPatterns,
+        hasContext: !!context,
+        contextLastIntent: context?.lastIntent
       });
 
       // If this is a follow-up question, process it directly without requiring location
@@ -647,7 +689,7 @@ export class TwilioVoiceHandler {
 <Response>
   <Say voice="Polly.Amy">${response}</Say>
   <Pause length="1"/>
-  <Gather input="speech" action="/twilio/voice" method="POST" 
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
           speechTimeout="${SPEECH_TIMEOUT}" 
           speechModel="phone_call"
           enhanced="true"
@@ -725,7 +767,7 @@ export class TwilioVoiceHandler {
     // Only add Gather if we expect a response
     if (shouldGather) {
       twiml += `
-  <Gather input="speech" action="/twilio/voice" method="POST" 
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
