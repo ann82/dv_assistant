@@ -46,10 +46,6 @@ vi.mock('../lib/twilioVoice.js', () => ({
   TwilioVoiceHandler: vi.fn(() => global.mockTwilioVoiceHandler)
 }));
 
-vi.mock('../lib/twilio.js', () => ({
-  validateTwilioRequest: (req, res, next) => next()
-}));
-
 vi.mock('dotenv', () => ({
   config: vi.fn(),
   default: {

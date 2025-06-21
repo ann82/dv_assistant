@@ -1,7 +1,6 @@
 import express from 'express';
 import { config } from '../lib/config.js';
 import twilio from 'twilio';
-import { validateTwilioRequest } from '../lib/twilio.js';
 import path from 'path';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -70,7 +69,13 @@ const tavilyCache = new Map();
 const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached responses
 
-const SPEECH_TIMEOUT = '30'; // Standardized speech timeout in seconds
+// Speech recognition configuration constants
+const SPEECH_CONFIG = {
+  TIMEOUT: '30', // Increased from 10s to 30s for more user response time
+  MODEL: 'phone_call',
+  ENHANCED: 'true',
+  LANGUAGE: 'en-US'
+};
 
 // Function to fetch and log Twilio call details
 async function fetchCallDetails(callSid) {
@@ -105,8 +110,8 @@ async function cleanupAudioFile(audioPath) {
   }
 }
 
-// Apply validation to all Twilio routes
-router.use(validateTwilioRequest);
+// Apply validation to all Twilio routes - moved after twilioVoiceHandler initialization
+router.use(twilioVoiceHandler.validateTwilioRequest.bind(twilioVoiceHandler));
 
 // Log when the router is initialized
 logger.info('Initializing Twilio routes');
@@ -127,258 +132,180 @@ router.use((req, res, next) => {
   next();
 });
 
-// Voice webhook route
+// ============================================================================
+// TWILIO VOICE PROCESSING ENDPOINT
+// ============================================================================
+// This is the main endpoint that processes voice calls from Twilio
+// Handles both new calls and speech input from existing calls
+
+/**
+ * Main endpoint for processing voice calls from Twilio
+ * Handles both new calls and speech input from existing calls
+ * 
+ * @route POST /twilio/voice
+ * @param {Object} req.body.CallSid - Twilio call SID
+ * @param {Object} req.body.SpeechResult - Transcribed speech (if available)
+ * @returns {string} TwiML response for Twilio
+ */
 router.post('/voice', async (req, res) => {
+  const startTime = Date.now();
+  const requestId = uuidv4();
+  const callSid = req.body.CallSid;
+  
+  logger.info('Received voice call request:', {
+    requestId,
+    callSid,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+
+  // Handle request abort (client disconnected)
+  req.on('aborted', () => {
+    logger.warn('Request aborted by client:', {
+      requestId,
+      callSid,
+      timestamp: new Date().toISOString(),
+      duration: Date.now() - startTime
+    });
+  });
+
   try {
-    // Log the incoming request
-    logger.info('Received voice webhook:', {
-      method: req.method,
-      url: req.originalUrl,
-      headers: req.headers,
-      body: req.body
+    // Validate request has required Twilio fields
+    if (!req.body || !req.body.CallSid) {
+      logger.error('Invalid request body:', {
+        requestId,
+        body: req.body,
+        duration: Date.now() - startTime
+      });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("I'm having trouble processing your request. Please try again.");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice',
+        method: 'POST',
+        speechTimeout: SPEECH_CONFIG.TIMEOUT,
+        speechModel: SPEECH_CONFIG.MODEL,
+        enhanced: SPEECH_CONFIG.ENHANCED,
+        language: SPEECH_CONFIG.LANGUAGE
+      });
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    // Check if this is a new call (no speech result yet)
+    const isNewCall = !req.body.SpeechResult;
+    
+    if (isNewCall) {
+      logger.info('New call received, generating welcome prompt:', {
+        requestId,
+        callSid,
+        duration: Date.now() - startTime
+      });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Hello, I can help you find domestic violence shelters and resources. What would you like to know?");
+      twiml.gather({
+        input: 'speech',
+        action: '/twilio/voice',
+        method: 'POST',
+        speechTimeout: SPEECH_CONFIG.TIMEOUT,
+        speechModel: SPEECH_CONFIG.MODEL,
+        enhanced: SPEECH_CONFIG.ENHANCED,
+        language: SPEECH_CONFIG.LANGUAGE
+      });
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    // Process speech result using TwilioVoiceHandler for consistent logic
+    const processStartTime = Date.now();
+    logger.info('Processing speech result:', {
+      requestId,
+      callSid,
+      speechResult: req.body.SpeechResult,
+      duration: processStartTime - startTime
     });
 
-    // Validate request
-    if (!twilioVoiceHandler.validateTwilioRequest(req)) {
-      logger.error('Invalid Twilio request:', {
-        headers: req.headers,
-        body: req.body,
-        url: req.originalUrl,
-        method: req.method
-      });
-      return res.status(403).send('Invalid Twilio request');
-    }
+    const response = await twilioVoiceHandler.processSpeechInput(req.body.SpeechResult, req.body.CallSid);
 
-    // Check if this is a speech input
-    if (req.body.SpeechResult) {
-      const twiml = await twilioVoiceHandler.handleSpeechInput(req);
-      return res.type('text/xml').send(twiml.toString());
-    }
+    const processEndTime = Date.now();
+    logger.info('Speech processing completed:', {
+      requestId,
+      callSid,
+      responseLength: response.length,
+      responsePreview: response.substring(0, 100) + '...',
+      processingDuration: processEndTime - processStartTime,
+      totalDuration: processEndTime - startTime
+    });
 
-    // Handle new call
-    const twiml = await twilioVoiceHandler.handleIncomingCall(req);
-    return res.type('text/xml').send(twiml.toString());
-  } catch (error) {
-    logger.error('Error handling Twilio voice request:', {
-      error: error.message,
-      stack: error.stack,
-      headers: req.headers,
-      body: req.body
+    // Generate TwiML response with gather to continue conversation
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say(response);
+    
+    // Add gather to continue the conversation
+    const gather = twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice',
+      method: 'POST',
+      speechTimeout: SPEECH_CONFIG.TIMEOUT,
+      speechModel: SPEECH_CONFIG.MODEL,
+      enhanced: SPEECH_CONFIG.ENHANCED,
+      language: SPEECH_CONFIG.LANGUAGE
     });
     
-    // Send error response
-    const errorTwiml = new twilio.twiml.VoiceResponse();
-    errorTwiml.say('We encountered an error. Please try again later.');
-    return res.type('text/xml').send(errorTwiml.toString());
+    // If no speech is detected, provide a helpful message
+    twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
+    twiml.redirect('/twilio/voice');
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+    logger.info('Response sent to client:', {
+      requestId,
+      callSid,
+      totalDuration: Date.now() - startTime
+    });
+  } catch (error) {
+    logger.error('Error processing voice call:', {
+      requestId,
+      callSid,
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      duration: Date.now() - startTime
+    });
+
+    // Send a user-friendly error response
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm sorry, I'm having trouble processing your request. Please try again.");
+    twiml.gather({
+      input: 'speech',
+      action: '/twilio/voice',
+      method: 'POST',
+      speechTimeout: SPEECH_CONFIG.TIMEOUT,
+      speechModel: SPEECH_CONFIG.MODEL,
+      enhanced: SPEECH_CONFIG.ENHANCED,
+      language: SPEECH_CONFIG.LANGUAGE
+    });
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
-// Helper function to determine request type
+// Helper function to determine request type (web vs Twilio)
+// This helps route requests to appropriate handlers based on their source
 function getRequestType(req) {
-  // Check if it's a Twilio request
+  // Check if it's a Twilio request (has Twilio-specific headers or body fields)
   if (req.body.CallSid || req.body.From || req.headers['x-twilio-signature']) {
     return 'twilio';
   }
   
-  // Check if it's a web request
+  // Check if it's a web request (has user-agent but no Twilio signature)
   if (req.headers['user-agent'] && !req.headers['x-twilio-signature']) {
     return 'web';
   }
 
-  // Default to web if we can't determine
+  // Default to web if we can't determine the source
   return 'web';
-}
-
-// Web route handler
-router.post('/web/process', async (req, res) => {
-  const startTime = Date.now();
-  const requestId = Math.random().toString(36).substring(7);
-
-  logger.info('=== Starting new web process request ===', {
-    requestId,
-    timestamp: new Date().toISOString(),
-    url: req.originalUrl,
-    method: req.method
-  });
-
-  try {
-    const { speechResult } = req.body;
-
-    if (!speechResult) {
-      logger.error('Missing speech result:', { 
-        requestId,
-        body: req.body
-      });
-      return res.status(400).json({ error: 'Missing speech result' });
-    }
-
-    // Process the speech result as web request
-    const response = await processSpeechResult(null, speechResult, requestId, 'web');
-    
-    res.json({ response });
-  } catch (error) {
-    logger.error('Error processing web request:', {
-      requestId,
-      error: error.message,
-      stack: error.stack
-    });
-    res.status(500).json({ error: 'Error processing request' });
-  }
-});
-
-// Handler for Twilio voice calls
-async function processTwilioRequest(speechResult, requestId) {
-  try {
-    logger.info('Processing Twilio request:', {
-      requestId,
-      speechResult
-    });
-
-    // Extract location from speech input
-    const location = extractLocationFromSpeech(speechResult);
-
-    if (!location) {
-      logger.info('No location specified in speech input:', {
-        requestId,
-        speechResult
-      });
-      return generateLocationPrompt();
-    }
-
-    // Call Tavily API with location-specific query
-    const query = `domestic violence shelters and resources in ${location}`;
-    const tavilyResponse = await callTavilyAPI(query);
-    logger.info('Tavily API response:', {
-      requestId,
-      location,
-      response: tavilyResponse
-    });
-
-    // Format the response
-    const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', query, 3);
-    logger.info('Formatted response:', {
-      requestId,
-      response: formattedResponse
-    });
-
-    return formattedResponse;
-  } catch (error) {
-    logger.error('Error processing Twilio request:', {
-      requestId,
-      error: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
-}
-
-// Main process function that routes to appropriate handler
-export async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
-  logger.info('Processing speech result:', {
-    requestId,
-    callSid,
-    speechResult,
-    requestType,
-    timestamp: new Date().toISOString()
-  });
-
-  try {
-    // Get intent classification
-    const intent = await getIntent(speechResult);
-    logger.info('Classified intent:', {
-      requestId,
-      callSid,
-      intent,
-      speechResult
-    });
-
-    // Get conversation context
-    const context = callSid ? getConversationContext(callSid) : null;
-    logger.info('Retrieved conversation context:', {
-      requestId,
-      callSid,
-      hasContext: !!context,
-      lastIntent: context?.lastIntent
-    });
-
-    // Extract location from speech
-    const location = extractLocationFromSpeech(speechResult);
-    logger.info('Extracted location:', {
-      requestId,
-      callSid,
-      location,
-      originalSpeech: speechResult
-    });
-
-    if (!location) {
-      logger.info('No location found in speech, generating prompt:', {
-        requestId,
-        callSid,
-        speechResult
-      });
-      return generateLocationPrompt();
-    }
-
-    // Rewrite query with context
-    const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
-    logger.info('Rewritten query:', {
-      requestId,
-      callSid,
-      originalQuery: speechResult,
-      rewrittenQuery,
-      intent
-    });
-
-    // Call Tavily API with rewritten query
-    logger.info('Calling Tavily API:', {
-      requestId,
-      callSid,
-      query: rewrittenQuery
-    });
-    const tavilyResponse = await callTavilyAPI(rewrittenQuery);
-
-    logger.info('Received Tavily API response:', {
-      requestId,
-      callSid,
-      responseLength: tavilyResponse?.length,
-      hasResults: !!tavilyResponse?.results,
-      resultCount: tavilyResponse?.results?.length,
-      firstResultTitle: tavilyResponse?.results?.[0]?.title,
-      firstResultUrl: tavilyResponse?.results?.[0]?.url
-    });
-
-    // Format response based on request type
-    const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, requestType, rewrittenQuery, 3);
-    logger.info('Formatted response:', {
-      requestId,
-      callSid,
-      responseLength: formattedResponse.length,
-      responsePreview: formattedResponse.substring(0, 100) + '...'
-    });
-
-    // Update conversation context
-    if (callSid) {
-      updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
-      logger.info('Updated conversation context:', {
-        requestId,
-        callSid,
-        intent,
-        queryLength: rewrittenQuery.length,
-        responseLength: formattedResponse.length
-      });
-    }
-
-    return formattedResponse;
-  } catch (error) {
-    logger.error('Error processing speech result:', {
-      requestId,
-      callSid,
-      error: error.message,
-      stack: error.stack,
-      speechResult
-    });
-    throw error;
-  }
 }
 
 router.post('/status', async (req, res) => {
@@ -463,6 +390,20 @@ router.post('/sms', async (req, res) => {
   }
 });
 
+// ============================================================================
+// CONSENT AND SMS FUNCTIONALITY
+// ============================================================================
+// These endpoints handle user consent for SMS follow-up messages
+
+/**
+ * Handles user consent for receiving SMS follow-up messages
+ * This endpoint is called when the system asks if the user wants a summary via text
+ * 
+ * @route POST /twilio/consent
+ * @param {Object} req.body.CallSid - Twilio call SID
+ * @param {Object} req.body.SpeechResult - User's consent response (yes/no)
+ * @returns {string} TwiML response confirming consent and ending call
+ */
 router.post('/consent', async (req, res) => {
   try {
     const { CallSid, SpeechResult } = req.body;
@@ -479,7 +420,7 @@ router.post('/consent', async (req, res) => {
       return res.status(404).send('Call not found');
     }
 
-    // Process consent response
+    // Process consent response (check if user said "yes")
     const hasConsent = SpeechResult.toLowerCase().includes('yes');
     call.hasConsent = hasConsent;
     twilioVoiceHandler.activeCalls.set(CallSid, call);
@@ -490,7 +431,7 @@ router.post('/consent', async (req, res) => {
       await twilioVoiceHandler.sendSMSWithRetry(CallSid, call, summary);
     }
 
-    // End the call
+    // End the call with appropriate message
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(hasConsent ? 
       "Thank you. You will receive a text message with the summary and resources shortly." :
@@ -512,195 +453,181 @@ router.post('/consent', async (req, res) => {
   }
 });
 
-export async function handleIncomingCall(req, res) {
-  try {
-    const callSid = req.body.CallSid;
-    const from = req.body.From;
-    
-    const context = {
-      phoneNumber: from,
-      requestType: 'phone',
-      lastShelterSearch: null
-    };
+// ============================================================================
+// WEB-BASED FUNCTIONALITY
+// ============================================================================
+// These endpoints handle requests from web browsers and other web clients
+// They provide the same core functionality as Twilio voice calls but for web use
 
-    const twiml = new VoiceResponse();
-    
-    const gather = twiml.gather({
-      input: 'speech',
-      action: `/twilio/voice/process`,
-      method: 'POST',
-      speechTimeout: 'auto',
-      enhanced: true,
-      speechModel: 'phone_call'
-    });
-
-    gather.say('Hello, I can help you find domestic violence shelters and resources. What would you like to know?');
-
-    twiml.redirect(`/twilio/voice/process`);
-
-    res.type('text/xml');
-    res.send(twiml.toString());
-
-    callContexts.set(callSid, context);
-
-  } catch (error) {
-    logger.error('Error handling incoming call:', error);
-    res.status(500).send('Error processing call');
-  }
-}
-
-// Export functions for testing
-export {
-  extractLocationFromSpeech
-};
-
-// Handle incoming voice calls
-router.post('/voice/process', async (req, res) => {
+/**
+ * Web route handler for processing speech input from web clients
+ * This endpoint allows web applications to send speech results for processing
+ * without requiring a phone call through Twilio
+ * 
+ * @route POST /twilio/web/process
+ * @param {Object} req.body.speechResult - The transcribed speech text from web client
+ * @returns {Object} JSON response with processed results
+ */
+router.post('/web/process', async (req, res) => {
   const startTime = Date.now();
-  const requestId = uuidv4();
-  const callSid = req.body.CallSid;
-  
-  logger.info('Received voice call request:', {
+  const requestId = Math.random().toString(36).substring(7);
+
+  logger.info('=== Starting new web process request ===', {
+    requestId,
+    timestamp: new Date().toISOString(),
+    url: req.originalUrl,
+    method: req.method
+  });
+
+  try {
+    const { speechResult } = req.body;
+
+    if (!speechResult) {
+      logger.error('Missing speech result:', { 
+        requestId,
+        body: req.body
+      });
+      return res.status(400).json({ error: 'Missing speech result' });
+    }
+
+    // Process the speech result as web request (same logic as Twilio but for web clients)
+    const response = await processSpeechResult(null, speechResult, requestId, 'web');
+    
+    res.json({ response });
+  } catch (error) {
+    logger.error('Error processing web request:', {
+      requestId,
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ error: 'Error processing request' });
+  }
+});
+
+// ============================================================================
+// CORE PROCESSING FUNCTION
+// ============================================================================
+// This function handles the main logic for processing speech input
+// It works for both web-based requests and Twilio voice calls
+
+/**
+ * Main process function that routes to appropriate handler based on request type
+ * This is the core function that processes speech input and returns formatted responses
+ * 
+ * @param {string} callSid - Twilio call SID (null for web requests)
+ * @param {string} speechResult - The transcribed speech text to process
+ * @param {string} requestId - Unique identifier for this request
+ * @param {string} requestType - Type of request ('web' or 'twilio')
+ * @returns {string} Formatted response appropriate for the request type
+ */
+export async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+  logger.info('Processing speech result:', {
     requestId,
     callSid,
-    body: req.body,
+    speechResult,
+    requestType,
     timestamp: new Date().toISOString()
   });
 
-  // Handle request abort
-  req.on('aborted', () => {
-    logger.warn('Request aborted by client:', {
+  try {
+    // Get intent classification (same for web and Twilio)
+    const intent = await getIntent(speechResult);
+    logger.info('Classified intent:', {
       requestId,
       callSid,
-      timestamp: new Date().toISOString(),
-      duration: Date.now() - startTime
+      intent,
+      speechResult
     });
-  });
 
-  try {
-    // Validate request
-    if (!req.body || !req.body.CallSid) {
-      logger.error('Invalid request body:', {
-        requestId,
-        body: req.body,
-        duration: Date.now() - startTime
-      });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("I'm having trouble processing your request. Please try again.");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: SPEECH_TIMEOUT,
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        timeout: '30'
-      });
-      res.type('text/xml');
-      return res.send(twiml.toString());
-    }
+    // Get conversation context (for follow-up questions)
+    const context = callSid ? getConversationContext(callSid) : null;
+    logger.info('Retrieved conversation context:', {
+      requestId,
+      callSid,
+      hasContext: !!context,
+      lastIntent: context?.lastIntent
+    });
 
-    // Check if this is a new call
-    const isNewCall = !req.body.SpeechResult;
-    
-    if (isNewCall) {
-      logger.info('New call received, generating welcome prompt:', {
+    // Extract location from speech input
+    const location = extractLocationFromSpeech(speechResult);
+    logger.info('Extracted location:', {
+      requestId,
+      callSid,
+      location,
+      originalSpeech: speechResult
+    });
+
+    if (!location) {
+      logger.info('No location found in speech, generating prompt:', {
         requestId,
         callSid,
-        duration: Date.now() - startTime
+        speechResult
       });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Hello, I can help you find domestic violence shelters and resources. What would you like to know?");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: SPEECH_TIMEOUT,
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        timeout: '30'
-      });
-      res.type('text/xml');
-      return res.send(twiml.toString());
+      return generateLocationPrompt();
     }
 
-    // Process speech result using TwilioVoiceHandler for consistent logic
-    const processStartTime = Date.now();
-    logger.info('Processing speech result:', {
+    // Rewrite query with context for better search results
+    const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+    logger.info('Rewritten query:', {
       requestId,
       callSid,
-      speechResult: req.body.SpeechResult,
-      duration: processStartTime - startTime
+      originalQuery: speechResult,
+      rewrittenQuery,
+      intent
     });
 
-    const response = await twilioVoiceHandler.processSpeechInput(req.body.SpeechResult, req.body.CallSid);
-
-    const processEndTime = Date.now();
-    logger.info('Speech processing completed:', {
+    // Call Tavily API with rewritten query
+    logger.info('Calling Tavily API:', {
       requestId,
       callSid,
-      responseLength: response.length,
-      responsePreview: response.substring(0, 100) + '...',
-      processingDuration: processEndTime - processStartTime,
-      totalDuration: processEndTime - startTime
+      query: rewrittenQuery
     });
+    const tavilyResponse = await callTavilyAPI(rewrittenQuery);
 
-    // Generate TwiML response with gather to continue conversation
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(response);
-    
-    // Add gather to continue the conversation
-    const gather = twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: SPEECH_TIMEOUT,
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
-    });
-    
-    // If no speech is detected, provide a helpful message
-    twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
-    twiml.redirect('/twilio/voice/process');
-    
-    res.type('text/xml');
-    res.send(twiml.toString());
-
-    logger.info('Response sent to client:', {
+    logger.info('Received Tavily API response:', {
       requestId,
       callSid,
-      totalDuration: Date.now() - startTime
+      responseLength: tavilyResponse?.length,
+      hasResults: !!tavilyResponse?.results,
+      resultCount: tavilyResponse?.results?.length,
+      firstResultTitle: tavilyResponse?.results?.[0]?.title,
+      firstResultUrl: tavilyResponse?.results?.[0]?.url
     });
+
+    // Format response based on request type (web vs Twilio have different formats)
+    const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, requestType, rewrittenQuery, 3);
+    logger.info('Formatted response:', {
+      requestId,
+      callSid,
+      responseLength: formattedResponse.length,
+      responsePreview: formattedResponse.substring(0, 100) + '...'
+    });
+
+    // Update conversation context for follow-up questions
+    if (callSid) {
+      updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
+      logger.info('Updated conversation context:', {
+        requestId,
+        callSid,
+        intent,
+        queryLength: rewrittenQuery.length,
+        responseLength: formattedResponse.length,
+        hasTavilyResults: !!tavilyResponse?.results,
+        resultCount: tavilyResponse?.results?.length || 0
+      });
+    }
+
+    return formattedResponse;
   } catch (error) {
-    logger.error('Error processing voice call:', {
+    logger.error('Error processing speech result:', {
       requestId,
       callSid,
       error: error.message,
       stack: error.stack,
-      body: req.body,
-      duration: Date.now() - startTime
+      speechResult
     });
-
-    // Send a user-friendly error response
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm sorry, I'm having trouble processing your request. Please try again.");
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: SPEECH_TIMEOUT,
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      timeout: '30'
-    });
-    res.type('text/xml');
-    res.send(twiml.toString());
+    throw error;
   }
-});
+}
 
 export default router;

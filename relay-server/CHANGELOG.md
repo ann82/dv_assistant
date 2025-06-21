@@ -250,6 +250,9 @@ All notable changes to this project will be documented in this file.
 - Updated vitest.config.js to use setupTests.js for global test setup
 - Removed /twilio/speech route tests as the route does not exist
 - Stabilized and cleaned up all Twilio route tests
+- Increased Twilio `speechTimeout` in all Gather prompts from 10s to 30s for better user response time and to prevent premature disconnects.
+- Improved follow-up question support and context tracking for voice agent (see FOLLOW_UP_IMPLEMENTATION.md).
+- Caching improvements for Tavily and GPT queries.
 
 ### Fixed
 - Fixed error handling to properly track fallback statistics

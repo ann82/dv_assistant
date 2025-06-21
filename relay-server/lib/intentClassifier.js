@@ -30,13 +30,14 @@ const intentSchema = {
 // Add conversation context handling
 const conversationContexts = new Map();
 
-export function updateConversationContext(callSid, intent, query, response) {
+export function updateConversationContext(callSid, intent, query, response, tavilyResults = null) {
   if (!conversationContexts.has(callSid)) {
     conversationContexts.set(callSid, {
       history: [],
       lastIntent: null,
       lastQuery: null,
-      lastResponse: null
+      lastResponse: null,
+      lastQueryContext: null
     });
   }
 
@@ -57,15 +58,64 @@ export function updateConversationContext(callSid, intent, query, response) {
   context.lastQuery = query;
   context.lastResponse = response;
 
+  // Update lastQueryContext with structured data for follow-ups
+  if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
+    const location = extractLocationFromQuery(query);
+    context.lastQueryContext = {
+      intent: intent,
+      location: location,
+      results: tavilyResults.results.slice(0, 3), // Top 3 results
+      timestamp: Date.now(),
+      smsResponse: response.smsResponse || null,
+      voiceResponse: response.voiceResponse || null
+    };
+  }
+
   logger.info('Updated conversation context:', {
     callSid,
     intent,
-    historyLength: context.history.length
+    historyLength: context.history.length,
+    hasLastQueryContext: !!context.lastQueryContext
   });
 }
 
+// Helper function to extract location from query
+function extractLocationFromQuery(query) {
+  if (!query) return null;
+  const locationPatterns = [
+    /in\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+    /near\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+    /around\s+([^,.]+(?:,\s*[^,.]+)?)/i,
+    /at\s+([^,.]+(?:,\s*[^,.]+)?)/i
+  ];
+  for (const pattern of locationPatterns) {
+    const match = query.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
 export function getConversationContext(callSid) {
-  return conversationContexts.get(callSid) || null;
+  const context = conversationContexts.get(callSid);
+  
+  // Check timeout for lastQueryContext (5 minutes)
+  if (context && context.lastQueryContext) {
+    const timeSinceLastQuery = Date.now() - context.lastQueryContext.timestamp;
+    const timeoutMs = 5 * 60 * 1000; // 5 minutes
+    
+    if (timeSinceLastQuery > timeoutMs) {
+      logger.info('Clearing lastQueryContext due to timeout:', {
+        callSid,
+        timeSinceLastQuery: Math.round(timeSinceLastQuery / 1000) + 's',
+        timeoutMs: Math.round(timeoutMs / 1000) + 's'
+      });
+      context.lastQueryContext = null;
+    }
+  }
+  
+  return context || null;
 }
 
 export function clearConversationContext(callSid) {
@@ -286,4 +336,133 @@ export function needsFactualInfo(intent) {
 // Helper function to check if a query is emergency-related
 export function isEmergencyQuery(intent) {
   return intent === 'emergency_help';
+}
+
+/**
+ * Handle follow-up questions based on previous query context
+ * @param {string} query - The current user query
+ * @param {Object} lastQueryContext - The context from the previous query
+ * @returns {Object|null} FollowUpResponse or null if not a follow-up
+ */
+export function handleFollowUp(query, lastQueryContext) {
+  if (!lastQueryContext || !lastQueryContext.intent) {
+    return null;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  
+  // Check if query is vague and could be a follow-up
+  const vagueFollowUpPatterns = [
+    /^(what|where|how|can|could)\s+(?:is|are|do|does|you)\s+(?:the|that|those|these|it|them)/i,
+    /^(tell|give)\s+(?:me)?\s+(?:the|that|those|these)/i,
+    /^(send|text|email)\s+(?:me)?\s+(?:that|those|these|it|them)/i,
+    /^(what's|what is|where's|where is)\s+(?:the|that|those|these|it|them)/i,
+    /^(can|could)\s+(?:you)?\s+(?:send|text|email|give)\s+(?:me)?/i
+  ];
+
+  const isVagueFollowUp = vagueFollowUpPatterns.some(pattern => pattern.test(lowerQuery));
+  
+  if (!isVagueFollowUp) {
+    return null;
+  }
+
+  // Check if lastQueryContext is recent (within 2-5 minutes)
+  const timeSinceLastQuery = Date.now() - lastQueryContext.timestamp;
+  const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+  
+  if (timeSinceLastQuery > maxAgeMs) {
+    logger.info('Follow-up context too old:', {
+      timeSinceLastQuery: Math.round(timeSinceLastQuery / 1000) + 's',
+      maxAgeMs: Math.round(maxAgeMs / 1000) + 's'
+    });
+    return null;
+  }
+
+  // Handle specific follow-up types based on lastQueryContext.intent
+  if (lastQueryContext.intent === 'find_shelter') {
+    return handleShelterFollowUp(query, lastQueryContext);
+  }
+
+  // Generic follow-up response
+  return {
+    type: 'follow_up',
+    intent: lastQueryContext.intent,
+    response: `Based on your previous question about ${lastQueryContext.intent.replace('_', ' ')}, here's what I found: ${lastQueryContext.results.map(r => r.title).join(', ')}. Would you like me to send you the details?`,
+    smsResponse: lastQueryContext.smsResponse,
+    results: lastQueryContext.results
+  };
+}
+
+/**
+ * Handle shelter-specific follow-up questions
+ * @param {string} query - The current user query
+ * @param {Object} lastQueryContext - The context from the previous shelter query
+ * @returns {Object} FollowUpResponse
+ */
+function handleShelterFollowUp(query, lastQueryContext) {
+  const lowerQuery = query.toLowerCase();
+  
+  // "Can you send that to me?" or "Can you text me?"
+  if (lowerQuery.includes('send') || lowerQuery.includes('text') || lowerQuery.includes('email')) {
+    return {
+      type: 'send_details',
+      intent: 'find_shelter',
+      response: `I'll send you the shelter details via text message. You should receive them shortly.`,
+      smsResponse: lastQueryContext.smsResponse,
+      results: lastQueryContext.results
+    };
+  }
+  
+  // "Where is that located?" or "What's the address?"
+  if (lowerQuery.includes('where') || lowerQuery.includes('address') || lowerQuery.includes('location')) {
+    const locationInfo = lastQueryContext.results.map(result => {
+      const title = result.title.replace(/^\[.*?\]\s*/, '').replace(/\s*-\s*.*$/i, '').trim();
+      return `${title}: ${result.url}`;
+    }).join('. ');
+    
+    return {
+      type: 'location_info',
+      intent: 'find_shelter',
+      response: `Here are the locations: ${locationInfo}. Would you like me to send you the complete details?`,
+      smsResponse: lastQueryContext.smsResponse,
+      results: lastQueryContext.results
+    };
+  }
+  
+  // "What's the number?" or "What's their phone?"
+  if (lowerQuery.includes('number') || lowerQuery.includes('phone') || lowerQuery.includes('call')) {
+    const phoneNumbers = lastQueryContext.results.map(result => {
+      const title = result.title.replace(/^\[.*?\]\s*/, '').replace(/\s*-\s*.*$/i, '').trim();
+      const phone = extractPhoneFromContent(result.content);
+      return `${title}: ${phone}`;
+    }).join('. ');
+    
+    return {
+      type: 'phone_info',
+      intent: 'find_shelter',
+      response: `Here are the phone numbers: ${phoneNumbers}. Would you like me to send you the complete details?`,
+      smsResponse: lastQueryContext.smsResponse,
+      results: lastQueryContext.results
+    };
+  }
+  
+  // Generic shelter follow-up
+  return {
+    type: 'shelter_follow_up',
+    intent: 'find_shelter',
+    response: `I found ${lastQueryContext.results.length} shelters in ${lastQueryContext.location || 'that area'}: ${lastQueryContext.results.map(r => r.title.replace(/^\[.*?\]\s*/, '').replace(/\s*-\s*.*$/i, '').trim()).join(', ')}. Would you like me to send you the details?`,
+    smsResponse: lastQueryContext.smsResponse,
+    results: lastQueryContext.results
+  };
+}
+
+/**
+ * Extract phone number from content
+ * @param {string} content - The content to search for phone numbers
+ * @returns {string} Phone number or "Not available"
+ */
+function extractPhoneFromContent(content) {
+  if (!content) return 'Not available';
+  const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
+  return phoneMatch ? phoneMatch[1] : 'Not available';
 } 

@@ -103,7 +103,9 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: 'auto',
+        speechTimeout: '30',
+        speechModel: 'phone_call',
+        enhanced: 'true',
         language: 'en-US'
       });
       
@@ -141,7 +143,9 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: 'auto',
+        speechTimeout: '30',
+        speechModel: 'phone_call',
+        enhanced: 'true',
         language: 'en-US'
       });
       
@@ -166,7 +170,9 @@ export class TwilioVoiceHandler {
         input: 'speech',
         action: '/twilio/voice/process',
         method: 'POST',
-        speechTimeout: 'auto',
+        speechTimeout: '30',
+        speechModel: 'phone_call',
+        enhanced: 'true',
         language: 'en-US'
       });
       
@@ -187,10 +193,10 @@ export class TwilioVoiceHandler {
       });
 
       // Import required functions
-      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext } = await import('../lib/intentClassifier.js');
+      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp } = await import('../lib/intentClassifier.js');
       const { extractLocationFromSpeech, generateLocationPrompt } = await import('../lib/speechProcessor.js');
       const { callTavilyAPI } = await import('../lib/apis.js');
-      const { formatTavilyResponse } = await import('../routes/twilio.js');
+      const { ResponseGenerator } = await import('../lib/response.js');
       
       // Get intent classification
       const intent = await getIntent(speechResult);
@@ -210,126 +216,48 @@ export class TwilioVoiceHandler {
         lastIntent: context?.lastIntent,
         lastQuery: context?.lastQuery,
         historyLength: context?.history?.length,
+        hasLastQueryContext: !!context?.lastQueryContext,
         fullContext: context
       });
 
-      // Check if this is a follow-up question about a specific resource
-      const followUpPatterns = [
-        'more about',
-        'tell me more',
-        'details about',
-        'information about',
-        'what about',
-        'how about',
-        'can you tell me',
-        'could you tell me',
-        'tell me about',
-        'give me more',
-        'additional information',
-        'more details',
-        'more info',
-        'what is',
-        'what are',
-        'how do',
-        'where is',
-        'where are'
-      ];
+      // Check for follow-up questions using the new handleFollowUp function
+      const followUpResponse = context?.lastQueryContext ? handleFollowUp(speechResult, context.lastQueryContext) : null;
       
-      const regexPatterns = [
-        /(?:can|could)\s+(?:you)?\s+(?:let|tell)\s+(?:me)?\s+(?:know)?\s+(?:more)?\s+(?:about)/i,
-        /(?:what|where|how|can|could)\s+(?:about|is|are|do|does)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?|resources?|services?)/i,
-        /(?:tell|give)\s+(?:me)?\s+(?:more|additional)\s+(?:information|details|about)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?|resources?|services?)/i
-      ];
-      
-      const matchedPatterns = [];
-      const lowerSpeech = speechResult.toLowerCase();
-      
-      // Check string patterns
-      for (const pattern of followUpPatterns) {
-        if (lowerSpeech.includes(pattern)) {
-          matchedPatterns.push(`string: ${pattern}`);
-        }
-      }
-      
-      // Check regex patterns
-      for (let i = 0; i < regexPatterns.length; i++) {
-        if (regexPatterns[i].test(speechResult)) {
-          matchedPatterns.push(`regex: ${regexPatterns[i].toString()}`);
-        }
-      }
-      
-      const isFollowUpQuestion = context && context.lastIntent && matchedPatterns.length > 0;
-
       logger.info('Follow-up question check:', {
         requestId,
         callSid,
-        isFollowUpQuestion,
+        isFollowUp: !!followUpResponse,
+        followUpType: followUpResponse?.type,
         speechResult,
         lastIntent: context?.lastIntent,
-        matchedPatterns,
-        hasContext: !!context,
-        contextLastIntent: context?.lastIntent
+        hasLastQueryContext: !!context?.lastQueryContext
       });
 
-      // If this is a follow-up question, process it directly without requiring location
-      if (isFollowUpQuestion) {
+      // If this is a follow-up question, handle it directly
+      if (followUpResponse) {
         logger.info('Processing follow-up question:', {
           requestId,
           callSid,
           speechResult,
+          followUpType: followUpResponse.type,
           lastIntent: context.lastIntent
         });
 
-        // Rewrite query with context
-        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
-        logger.info('Rewritten follow-up query:', {
-          requestId,
-          callSid,
-          originalQuery: speechResult,
-          rewrittenQuery,
-          intent
-        });
-
-        // Call Tavily API with rewritten query
-        logger.info('Calling Tavily API for follow-up:', {
-          requestId,
-          callSid,
-          query: rewrittenQuery
-        });
-        const tavilyResponse = await callTavilyAPI(rewrittenQuery);
-
-        logger.info('Received Tavily API response for follow-up:', {
-          requestId,
-          callSid,
-          responseLength: tavilyResponse?.length,
-          hasResults: !!tavilyResponse?.results,
-          resultCount: tavilyResponse?.results?.length,
-          firstResultTitle: tavilyResponse?.results?.[0]?.title,
-          firstResultUrl: tavilyResponse?.results?.[0]?.url
-        });
-
-        // Format response for voice
-        const formattedResponse = formatTavilyResponse(tavilyResponse, 'twilio');
-        logger.info('Formatted follow-up response:', {
-          requestId,
-          callSid,
-          responseLength: formattedResponse.length,
-          responsePreview: formattedResponse.substring(0, 100) + '...'
-        });
-
-        // Update conversation context
+        // Update conversation context with follow-up response
         if (callSid) {
-          updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
+          updateConversationContext(callSid, intent, speechResult, {
+            voiceResponse: followUpResponse.response,
+            smsResponse: followUpResponse.smsResponse
+          });
           logger.info('Updated conversation context for follow-up:', {
             requestId,
             callSid,
             intent,
-            queryLength: rewrittenQuery.length,
-            responseLength: formattedResponse.length
+            followUpType: followUpResponse.type
           });
         }
 
-        return formattedResponse;
+        return followUpResponse.response;
       }
 
       // Extract location from speech
@@ -379,7 +307,7 @@ export class TwilioVoiceHandler {
       });
 
       // Format response for voice
-      const formattedResponse = formatTavilyResponse(tavilyResponse, 'twilio');
+      const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
       logger.info('Formatted response:', {
         requestId,
         callSid,
@@ -389,13 +317,15 @@ export class TwilioVoiceHandler {
 
       // Update conversation context
       if (callSid) {
-        updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse);
+        updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
         logger.info('Updated conversation context:', {
           requestId,
           callSid,
           intent,
           queryLength: rewrittenQuery.length,
-          responseLength: formattedResponse.length
+          responseLength: formattedResponse.length,
+          hasTavilyResults: !!tavilyResponse?.results,
+          resultCount: tavilyResponse?.results?.length || 0
         });
       }
 
@@ -690,7 +620,7 @@ export class TwilioVoiceHandler {
   <Say voice="Polly.Amy">${response}</Say>
   <Pause length="1"/>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="${SPEECH_TIMEOUT}" 
+          speechTimeout="30" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>
@@ -768,7 +698,7 @@ export class TwilioVoiceHandler {
     if (shouldGather) {
       twiml += `
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="auto" 
+          speechTimeout="30" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>`;
@@ -878,7 +808,7 @@ export class TwilioVoiceHandler {
 <Response>
   <Say voice="Polly.Amy">Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.</Say>
   <Gather input="speech" action="/twilio/consent" method="POST" 
-          speechTimeout="auto" 
+          speechTimeout="30" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>

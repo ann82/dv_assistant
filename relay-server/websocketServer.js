@@ -156,7 +156,7 @@ export class TwilioWebSocketServer {
 <Response>
   <Play>${message.audioUrl}</Play>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="auto" 
+          speechTimeout="10" 
           speechModel="phone_call"
           enhanced="true"
           language="en-US"/>
