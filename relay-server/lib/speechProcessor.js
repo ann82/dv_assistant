@@ -1,54 +1,105 @@
 import logger from './logger.js';
 
 /**
- * Extract location from speech input
- * @param {string} speechResult - The speech input to process
- * @returns {string|null} The extracted location or null if not found
+ * Extract location from speech input using hybrid approach
+ * @param {string} speechInput - The speech input to process
+ * @returns {string|null} Extracted location or null if not found
  */
-export function extractLocationFromSpeech(speechResult) {
-  if (!speechResult) {
-    logger.warn('No speech result provided to extractLocationFromSpeech');
+export async function extractLocation(speechInput) {
+  if (!speechInput || typeof speechInput !== 'string') {
     return null;
   }
 
-  logger.info('Extracting location from speech', { speechResult });
-
-  // Patterns to match location mentions
-  const patterns = [
-    /in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "in San Francisco, California"
-    /find\s+shelters?\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "find shelters in San Francisco, California"
-    /looking\s+for\s+shelters?\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "looking for shelters in San Francisco, California"
-    /near\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "near San Francisco, California"
-    /around\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "around San Francisco, California"
-    /in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "in the San Francisco, California"
-    /find\s+shelters?\s+in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "find shelters in the San Francisco, California"
-    /looking\s+for\s+shelters?\s+in\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "looking for shelters in the San Francisco, California"
-    /near\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "near the San Francisco, California"
-    /around\s+the\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "around the San Francisco, California"
-    /my\s+location\s+is\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "my location is San Francisco, California"
-    /i\s+live\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i,  // "i live in San Francisco, California"
-    /i'm\s+in\s+([^,.]+(?:,\s*[^,.]+)?)/i  // "i'm in San Francisco, California"
-  ];
-
-  for (const pattern of patterns) {
-    const match = speechResult.match(pattern);
-    if (match && match[1]) {
-      let location = match[1].trim();
-      // Remove trailing phrases like 'and need resources', 'and', 'area', 'county', etc.
-      location = location.replace(/\s+(and|area|county|need resources).*$/i, '');
-      // Remove trailing 'County' if not expected
-      if (/County$/.test(location) && !/San Francisco County|Santa Clara County|San Mateo County|Alameda County|Contra Costa County|Marin County|Solano County|Sonoma County|Napa County/i.test(location)) {
-        location = location.replace(/\s*County$/i, '');
+  // Step 1: Try fast pattern matching first (cost-effective)
+  const location = extractLocationByPattern(speechInput);
+  
+  // Step 2: If pattern matching fails or is uncertain, use AI for better accuracy
+  if (!location || location.length < 2) {
+    try {
+      const aiLocation = await extractLocationWithAI(speechInput);
+      if (aiLocation) {
+        logger.info('Used AI for location extraction:', { 
+          original: speechInput, 
+          patternResult: location, 
+          aiResult: aiLocation 
+        });
+        return aiLocation;
       }
-      // Remove leading 'the' if present
-      location = location.replace(/^the\s+/i, '');
-      logger.info('Location extracted from speech', { location });
-      return location;
+    } catch (error) {
+      logger.error('AI location extraction failed, using pattern result:', error);
+      // Fall back to pattern matching result
     }
   }
+  
+  return location;
+}
 
-  logger.info('No location found in speech');
+/**
+ * Extract location using simple pattern matching (fast and cheap)
+ * @param {string} speechInput - The speech input to process
+ * @returns {string|null} Extracted location or null if not found
+ */
+function extractLocationByPattern(speechInput) {
+  const input = speechInput.toLowerCase();
+  
+  // Common location patterns
+  const locationPatterns = [
+    /(?:in|at|near|around|to|from)\s+([a-zA-Z\s]+?)(?:\s+(?:area|region|county|city|town|state))?/i,
+    /(?:shelter|help|services)\s+(?:in|at|near|around)\s+([a-zA-Z\s]+)/i,
+    /([a-zA-Z\s]+?)\s+(?:area|region|county|city|town|state)/i
+  ];
+  
+  for (const pattern of locationPatterns) {
+    const match = speechInput.match(pattern);
+    if (match && match[1]) {
+      const location = match[1].trim();
+      // Filter out common words that aren't locations
+      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services'];
+      const words = location.split(' ').filter(word => !commonWords.includes(word.toLowerCase()));
+      
+      if (words.length > 0) {
+        return words.join(' ');
+      }
+    }
+  }
+  
   return null;
+}
+
+/**
+ * Use AI to extract location from speech input (only when needed)
+ * @param {string} speechInput - The speech input to process
+ * @returns {string|null} Extracted location or null if not found
+ */
+async function extractLocationWithAI(speechInput) {
+  try {
+    const { callGPT } = await import('./apis.js');
+    
+    const prompt = `Extract the location from this speech input. Look for city names, area names, or geographic references.
+
+Speech input: "${speechInput}"
+
+If a location is found, respond with only the location name (e.g., "San Francisco", "Oakland", "Tahoe").
+If no location is found, respond with "none".
+
+Examples:
+- "I need shelter in San Francisco" → "San Francisco"
+- "homeless me a Tahoe" → "Tahoe" 
+- "help in the Oakland area" → "Oakland"
+- "I need assistance" → "none"`;
+
+    const response = await callGPT(prompt, 'gpt-3.5-turbo');
+    const location = response.trim().toLowerCase();
+    
+    if (location === 'none' || location === 'no location' || location === '') {
+      return null;
+    }
+    
+    return location;
+  } catch (error) {
+    logger.error('Error calling GPT for location extraction:', error);
+    return null;
+  }
 }
 
 /**

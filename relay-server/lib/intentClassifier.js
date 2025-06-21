@@ -344,29 +344,12 @@ export function isEmergencyQuery(intent) {
  * @param {Object} lastQueryContext - The context from the previous query
  * @returns {Object|null} FollowUpResponse or null if not a follow-up
  */
-export function handleFollowUp(query, lastQueryContext) {
+export async function handleFollowUp(query, lastQueryContext) {
   if (!lastQueryContext || !lastQueryContext.intent) {
     return null;
   }
 
-  const lowerQuery = query.toLowerCase();
-  
-  // Check if query is vague and could be a follow-up
-  const vagueFollowUpPatterns = [
-    /^(what|where|how|can|could)\s+(?:is|are|do|does|you)\s+(?:the|that|those|these|it|them)/i,
-    /^(tell|give)\s+(?:me)?\s+(?:the|that|those|these)/i,
-    /^(send|text|email)\s+(?:me)?\s+(?:that|those|these|it|them)/i,
-    /^(what's|what is|where's|where is)\s+(?:the|that|those|these|it|them)/i,
-    /^(can|could)\s+(?:you)?\s+(?:send|text|email|give)\s+(?:me)?/i
-  ];
-
-  const isVagueFollowUp = vagueFollowUpPatterns.some(pattern => pattern.test(lowerQuery));
-  
-  if (!isVagueFollowUp) {
-    return null;
-  }
-
-  // Check if lastQueryContext is recent (within 2-5 minutes)
+  // Check if lastQueryContext is recent (within 5 minutes)
   const timeSinceLastQuery = Date.now() - lastQueryContext.timestamp;
   const maxAgeMs = 5 * 60 * 1000; // 5 minutes
   
@@ -375,6 +358,35 @@ export function handleFollowUp(query, lastQueryContext) {
       timeSinceLastQuery: Math.round(timeSinceLastQuery / 1000) + 's',
       maxAgeMs: Math.round(maxAgeMs / 1000) + 's'
     });
+    return null;
+  }
+
+  // Step 1: Try fast pattern matching first (cost-effective)
+  const lowerQuery = query.toLowerCase();
+  const followUpIndicators = [
+    'more', 'details', 'information', 'about', 'tell me', 'what about',
+    'first', 'second', 'third', 'fourth', 'fifth', '1st', '2nd', '3rd', '4th', '5th',
+    'that one', 'this one', 'the one', 'those', 'these', 'it', 'them'
+  ];
+  
+  const isFollowUpByPattern = followUpIndicators.some(indicator => lowerQuery.includes(indicator));
+  
+  // Step 2: If pattern matching is uncertain, use AI for better accuracy
+  let isFollowUp = isFollowUpByPattern;
+  
+  // Use AI if pattern matching is unclear or if we want to be extra sure
+  if (!isFollowUpByPattern || lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this')) {
+    try {
+      const aiResult = await determineIfFollowUpWithAI(query, lastQueryContext);
+      isFollowUp = aiResult;
+      logger.info('Used AI for follow-up detection:', { query, aiResult, patternResult: isFollowUpByPattern });
+    } catch (error) {
+      logger.error('AI follow-up detection failed, using pattern result:', error);
+      // Fall back to pattern matching result
+    }
+  }
+  
+  if (!isFollowUp) {
     return null;
   }
 
@@ -387,10 +399,46 @@ export function handleFollowUp(query, lastQueryContext) {
   return {
     type: 'follow_up',
     intent: lastQueryContext.intent,
-    response: `Based on your previous question about ${lastQueryContext.intent.replace('_', ' ')}, here's what I found: ${lastQueryContext.results.map(r => r.title).join(', ')}. Would you like me to send you the details?`,
+    response: `Based on your previous question about ${lastQueryContext.intent.replace('_', ' ')}, here's what I found: ${lastQueryContext.results?.map(r => r.title).join(', ') || 'the information you requested'}. Would you like me to send you the details?`,
     smsResponse: lastQueryContext.smsResponse,
     results: lastQueryContext.results
   };
+}
+
+/**
+ * Use AI to determine if a query is a follow-up question (only when needed)
+ * @param {string} query - The current user query
+ * @param {Object} lastQueryContext - The context from the previous query
+ * @returns {boolean} True if it's a follow-up question
+ */
+async function determineIfFollowUpWithAI(query, lastQueryContext) {
+  try {
+    const { callGPT } = await import('./apis.js');
+    
+    const prompt = `Given this conversation context:
+Previous question: "${lastQueryContext.query || 'unknown'}"
+Previous intent: ${lastQueryContext.intent}
+Previous results: ${lastQueryContext.results?.length || 0} items found
+
+Current user query: "${query}"
+
+Is the current query a follow-up question that refers to the previous conversation? 
+Consider if the user is:
+- Asking for more details about something mentioned before
+- Referring to specific items from previous results (like "the third one", "that shelter")
+- Asking for clarification or additional information
+- Making a vague reference that requires context
+
+Respond with only "yes" or "no".`;
+
+    const response = await callGPT(prompt, 'gpt-3.5-turbo');
+    const isFollowUp = response.toLowerCase().includes('yes');
+    
+    return isFollowUp;
+  } catch (error) {
+    logger.error('Error calling GPT for follow-up determination:', error);
+    return false;
+  }
 }
 
 /**

@@ -194,7 +194,7 @@ export class TwilioVoiceHandler {
 
       // Import required functions
       const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp } = await import('../lib/intentClassifier.js');
-      const { extractLocationFromSpeech, generateLocationPrompt } = await import('../lib/speechProcessor.js');
+      const { extractLocation, generateLocationPrompt } = await import('../lib/speechProcessor.js');
       const { callTavilyAPI } = await import('../lib/apis.js');
       const { ResponseGenerator } = await import('../lib/response.js');
       
@@ -302,7 +302,7 @@ export class TwilioVoiceHandler {
       // For resource-related intents (shelter, legal, counseling), extract location
       if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
         // Extract location from speech
-        const location = extractLocationFromSpeech(speechResult);
+        const location = await extractLocation(speechResult);
         logger.info('Extracted location:', {
           requestId,
           callSid,

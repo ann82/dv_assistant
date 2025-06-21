@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createHash } from 'crypto';
 import { processSpeechResult, generateSpeechHash } from '../routes/twilio.js';
 import { callTavilyAPI, callGPT } from '../lib/apis.js';
-import { extractLocationFromSpeech, generateLocationPrompt } from '../lib/speechProcessor.js';
+import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 
 // Mock the API calls
 vi.mock('../lib/apis.js', () => ({
@@ -103,21 +103,21 @@ describe('Speech Processing', () => {
   });
 
   describe('Location Extraction', () => {
-    it('should extract location from speech with "in" pattern', () => {
-      const speech = 'I need help finding a shelter in San Francisco, California';
-      const location = extractLocationFromSpeech(speech);
-      expect(location).toBe('San Francisco, California');
+    it('should extract location from "I need shelter in San Francisco"', async () => {
+      const speech = "I need shelter in San Francisco";
+      const location = await extractLocation(speech);
+      expect(location).toBe('San Francisco');
     });
 
-    it('should extract location from speech with "find shelters in" pattern', () => {
-      const speech = 'find shelters in Oakland, California';
-      const location = extractLocationFromSpeech(speech);
-      expect(location).toBe('Oakland, California');
+    it('should extract location from "homeless me a Tahoe"', async () => {
+      const speech = "homeless me a Tahoe";
+      const location = await extractLocation(speech);
+      expect(location).toBe('Tahoe');
     });
 
-    it('should return null when no location is found', () => {
-      const speech = 'I need help finding a shelter';
-      const location = extractLocationFromSpeech(speech);
+    it('should return null for speech without location', async () => {
+      const speech = "I need help";
+      const location = await extractLocation(speech);
       expect(location).toBeNull();
     });
   });

@@ -14,7 +14,7 @@ const { VoiceResponse } = pkg;
 import { getIntent, intentHandlers, rewriteQuery, updateConversationContext, getConversationContext } from '../lib/intentClassifier.js';
 import { generateSpeechHash } from '../lib/utils.js';
 import { v4 as uuidv4 } from 'uuid';
-import { extractLocationFromSpeech, generateLocationPrompt } from '../lib/speechProcessor.js';
+import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 import { filterConfig, matchesPattern, cleanTitle } from '../lib/filterConfig.js';
 import { ResponseGenerator } from '../lib/response.js';
 
@@ -176,17 +176,7 @@ router.post('/voice', async (req, res) => {
         enhanced: 'true',
         language: 'en-US',
         speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false',
-        speechContexts: JSON.stringify([{
-          phrases: [
-            'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
-            'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
-            'hotline', 'crisis', 'safe', 'protection', 'resources',
-            'women', 'children', 'family', 'support', 'counseling',
-            'yes', 'no', 'more', 'details', 'information', 'location'
-          ],
-          boost: 20
-        }])
+        profanityFilter: 'false'
       });
       
       res.type('text/xml');
@@ -232,17 +222,7 @@ router.post('/voice/process', async (req, res) => {
         enhanced: 'true',
         language: 'en-US',
         speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false',
-        speechContexts: JSON.stringify([{
-          phrases: [
-            'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
-            'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
-            'hotline', 'crisis', 'safe', 'protection', 'resources',
-            'women', 'children', 'family', 'support', 'counseling',
-            'yes', 'no', 'more', 'details', 'information', 'location'
-          ],
-          boost: 20
-        }])
+        profanityFilter: 'false'
       });
       res.type('text/xml');
       return res.send(twiml.toString());
@@ -265,17 +245,7 @@ router.post('/voice/process', async (req, res) => {
       enhanced: 'true',
       language: 'en-US',
       speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false',
-      speechContexts: JSON.stringify([{
-        phrases: [
-          'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
-          'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
-          'hotline', 'crisis', 'safe', 'protection', 'resources',
-          'women', 'children', 'family', 'support', 'counseling',
-          'yes', 'no', 'more', 'details', 'information', 'location'
-        ],
-        boost: 20
-      }])
+      profanityFilter: 'false'
     });
     
     res.type('text/xml');
@@ -296,17 +266,7 @@ router.post('/voice/process', async (req, res) => {
       enhanced: 'true',
       language: 'en-US',
       speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false',
-      speechContexts: JSON.stringify([{
-        phrases: [
-          'shelter', 'domestic violence', 'abuse', 'help', 'emergency',
-          'Tahoe', 'Lake Tahoe', 'California', 'Nevada', 'Reno', 'Sacramento',
-          'hotline', 'crisis', 'safe', 'protection', 'resources',
-          'women', 'children', 'family', 'support', 'counseling',
-          'yes', 'no', 'more', 'details', 'information', 'location'
-        ],
-        boost: 20
-      }])
+      profanityFilter: 'false'
     });
     res.type('text/xml');
     res.send(twiml.toString());
@@ -571,7 +531,7 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
     });
 
     // Extract location from speech input
-    const location = extractLocationFromSpeech(speechResult);
+    const location = await extractLocation(speechResult);
     logger.info('Extracted location:', {
       requestId,
       callSid,
