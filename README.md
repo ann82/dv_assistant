@@ -109,109 +109,12 @@ The system uses a configuration-based approach for filtering Tavily search resul
 
 This configuration can be extended to support different types of resources or modified for specific geographic regions.
 
+## Configuration Notes
+
+- **Twilio speechTimeout**: The system now uses a 30-second `speechTimeout` for all Twilio `<Gather>` prompts, giving users more time to respond before the call times out. You can adjust this in `relay-server/routes/twilio.js` and `relay-server/lib/twilioVoice.js` if needed.
+- **Follow-up Support**: The voice agent supports follow-up questions and tracks context for up to 5 minutes after a response. See `FOLLOW_UP_IMPLEMENTATION.md` for details.
+
 ## Usage
 
 1. Start the server:
-```bash
-npm start
 ```
-
-2. The server will be available at `http://localhost:3000`
-
-3. WebSocket server will be available at `ws://localhost:3001`
-
-4. Health check endpoint: `http://localhost:3000/health`
-
-## Testing
-
-The project uses Vitest for testing. Run tests with:
-
-```bash
-npm test
-```
-
-### Test Coverage
-
-The test suite includes:
-- Twilio webhook handling and response processing
-- Tavily API response formatting
-- Audio service functionality
-- WebSocket server operations
-- Response generation and processing
-
-Key test files:
-- `tests/twilio.test.js`: Tests for Twilio webhook handling
-- `tests/tavilyResponse.test.js`: Tests for Tavily API response formatting
-- `tests/response.test.js`: Tests for response generation
-- `tests/websocketServer.test.js`: Tests for WebSocket functionality
-- `tests/audioService.test.js`: Tests for audio processing
-
-## Deployment
-
-The application is configured for deployment on Railway. The deployment process:
-
-1. Uses nixpacks as the builder
-2. Installs dependencies in the relay-server directory
-3. Starts the server using server.js as the entry point
-4. Includes all necessary files and directories
-5. Maintains proper file structure in the deployment environment
-6. Uses ES modules with proper module resolution
-
-## Architecture
-
-The application consists of several key components:
-
-- **Server**: Express.js server handling HTTP requests
-- **WebSocket Server**: Real-time communication
-- **Twilio Integration**: Voice communication
-- **OpenAI Integration**: Intelligent query handling
-- **Logging System**: Comprehensive error tracking
-- **Cost Logging**: API usage tracking
-- **Health Monitoring**: System status checks
-- **Module System**: Centralized module exports through index.js
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Missing Parameters**
-   - Check logs for parameter validation errors
-   - Verify Twilio webhook configuration
-   - Ensure all required parameters are being sent
-
-2. **Response Issues**
-   - Review TwiML response logs
-   - Check processing time logs
-   - Verify response formatting
-   - If you see a 502 error from Twilio, ensure the welcome prompt is hardcoded and not calling an undefined function.
-   - If you see duplicate responses, check that all routes are using `/twilio/voice/process` consistently.
-
-3. **Follow-up Questions Not Working**
-   - Ensure conversation context is being maintained properly
-   - Check that the `TwilioVoiceHandler.processSpeechInput()` method is being used
-   - Verify that follow-up detection patterns are working correctly
-
-4. **Timeout Issues**
-   - Monitor processing time logs
-   - Check for long-running operations
-   - Review timeout configurations
-
-### Debugging Steps
-
-1. Check the server logs for the request ID
-2. Review parameter validation logs
-3. Check processing time at each step
-4. Verify TwiML response format
-5. Review error logs if present
