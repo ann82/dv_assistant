@@ -104,7 +104,7 @@ function createVoiceResponse(results, location) {
   if (results.length === 1) {
     const result = results[0];
     const title = cleanTitleForVoice(result.title);
-    return `I found a shelter${locationText}: ${title}. Would you like me to send you the details?`;
+    return `I found a shelter${locationText}: ${title}. I'll send you the complete details via text message at the end of our call.`;
   }
 
   // Extract organization names from titles
@@ -123,7 +123,7 @@ function createVoiceResponse(results, location) {
     response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
   }
 
-  response += '. Would you like me to send you the details?';
+  response += '. I\'ll send you the complete details via text message at the end of our call.';
   return response;
 }
 

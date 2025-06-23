@@ -592,7 +592,7 @@ export class ResponseGenerator {
     if (results.length === 1) {
       const result = results[0];
       const title = this.cleanTitleForVoice(result.title);
-      return `I found a shelter${locationText}: ${title}. Would you like me to send you the details?`;
+      return `I found a shelter${locationText}: ${title}. I'll send you the complete details via text message at the end of our call.`;
     }
     const organizationNames = results.map(result => this.cleanTitleForVoice(result.title));
     let response = `I found ${results.length} shelters${locationText}`;
@@ -603,7 +603,7 @@ export class ResponseGenerator {
     } else {
       response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
     }
-    response += '. Would you like me to send you the details?';
+    response += '. I\'ll send you the complete details via text message at the end of our call.';
     return response;
   }
 
@@ -634,8 +634,8 @@ export class ResponseGenerator {
       .replace(/\s*in\s+[^,]+(?:,\s*[A-Z]{2})?$/i, '')
       .replace(/\s+/g, ' ')
       .trim();
-    if (cleanTitle.length > 50) {
-      cleanTitle = cleanTitle.substring(0, 47) + '...';
+    if (cleanTitle.length > 80) {
+      cleanTitle = cleanTitle.substring(0, 77) + '...';
     }
     return cleanTitle || 'Unknown Organization';
   }

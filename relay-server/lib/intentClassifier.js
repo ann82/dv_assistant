@@ -532,7 +532,7 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       return {
         type: 'location_info',
         intent: lastQueryContext.intent,
-        voiceResponse: `I found ${lastQueryContext.results.length} resources in ${lastQueryContext.location || 'that area'}. Would you like me to send you the details for all of them?`,
+        voiceResponse: `I found ${lastQueryContext.results.length} resources in ${lastQueryContext.location || 'that area'}. I'll send you the complete details via text message at the end of our call.`,
         smsResponse: lastQueryContext.smsResponse,
         results: lastQueryContext.results
       };
@@ -829,16 +829,16 @@ function generateGenericFollowUpResponse(lastQueryContext) {
   
   if (results.length === 1) {
     const cleanTitle = cleanResultTitle(results[0].title);
-    return `I found one helpful resource in ${location}: ${cleanTitle}. Would you like me to send you the details?`;
+    return `I found one helpful resource in ${location}: ${cleanTitle}. I'll send you the complete details via text message at the end of our call.`;
   } else if (results.length === 2) {
     const title1 = cleanResultTitle(results[0].title);
     const title2 = cleanResultTitle(results[1].title);
-    return `I found two helpful resources in ${location}: one in ${title1}, and another in ${title2}. Would you like me to send you the details?`;
+    return `I found two helpful resources in ${location}: one in ${title1}, and another in ${title2}. I'll send you the complete details via text message at the end of our call.`;
   } else {
     const title1 = cleanResultTitle(results[0].title);
     const title2 = cleanResultTitle(results[1].title);
     const title3 = cleanResultTitle(results[2].title);
-    return `I found ${results.length} helpful resources in ${location}: one in ${title1}, another in ${title2}, and a third in ${title3}. Would you like me to send you the details?`;
+    return `I found ${results.length} helpful resources in ${location}: one in ${title1}, another in ${title2}, and a third in ${title3}. I'll send you the complete details via text message at the end of our call.`;
   }
 }
 
@@ -920,7 +920,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary = generateResultSummary(result);
     const phone = extractPhoneFromContent(result.content);
     
-    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. Would you like me to send you the complete details?`;
+    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. I'll send you the complete details via text message at the end of our call.`;
   } else if (results.length === 2) {
     const result1 = results[0];
     const result2 = results[1];
@@ -929,7 +929,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary1 = generateResultSummary(result1);
     const summary2 = generateResultSummary(result2);
     
-    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. Would you like me to send you the complete details for both?`;
+    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. I'll send you the complete details via text message at the end of our call.`;
   } else {
     // For 3 or more results, provide details for the first 2 and mention the rest
     const result1 = results[0];
@@ -950,7 +950,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
       response += ` I also found ${results.length - 2} more resources.`;
     }
     
-    response += ` Would you like me to send you the complete details for all of them?`;
+    response += ` I'll send you the complete details via text message at the end of our call.`;
     return response;
   }
 } 
