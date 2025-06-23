@@ -477,7 +477,18 @@ export async function handleFollowUp(query, lastQueryContext) {
  * @returns {Object} FollowUpResponse with voiceResponse, smsResponse, and matchedResult
  */
 export async function generateFollowUpResponse(userQuery, lastQueryContext) {
-  if (!lastQueryContext.results || lastQueryContext.results.length === 0) {
+  // Custom response for off-topic follow-ups (move to top)
+  if (lastQueryContext && (lastQueryContext.intent === 'off_topic')) {
+    return {
+      type: 'off_topic',
+      intent: 'off_topic',
+      voiceResponse: "I'm here to help with domestic violence support and resources. If you have any questions about that, please let me know!",
+      smsResponse: null,
+      results: lastQueryContext.results || []
+    };
+  }
+
+  if (!lastQueryContext || !lastQueryContext.results || lastQueryContext.results.length === 0) {
     return {
       voiceResponse: "I don't have the previous search results available. Could you please repeat your location or question?",
       type: 'no_context'
@@ -564,6 +575,17 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       smsResponse: lastQueryContext.smsResponse,
       results: lastQueryContext.results,
       matchedResult
+    };
+  }
+  
+  // Generic "tell me more" or "more information" requests
+  if (lowerQuery.includes('more') || lowerQuery.includes('information') || lowerQuery.includes('about') || lowerQuery.includes('details')) {
+    return {
+      type: 'detailed_info',
+      intent: lastQueryContext.intent,
+      voiceResponse: generateDetailedShelterInfo(lastQueryContext),
+      smsResponse: lastQueryContext.smsResponse,
+      results: lastQueryContext.results
     };
   }
   
@@ -722,12 +744,61 @@ export function cleanResultTitle(title) {
  * @param {Object} result - Tavily result object
  * @returns {string} Voice-friendly summary
  */
-function generateResultSummary(result) {
+export function generateResultSummary(result) {
   if (!result.content) {
     return 'This resource provides support and assistance for those in need.';
   }
   
-  // Extract first meaningful sentence
+  const content = result.content.toLowerCase();
+  
+  // Extract key services and programs
+  const services = [];
+  
+  // Check for specific services
+  if (content.includes('emergency shelter') || content.includes('crisis shelter')) {
+    services.push('emergency shelter');
+  }
+  if (content.includes('transitional housing') || content.includes('long-term housing')) {
+    services.push('transitional housing');
+  }
+  if (content.includes('counseling') || content.includes('therapy')) {
+    services.push('counseling services');
+  }
+  if (content.includes('legal') || content.includes('attorney') || content.includes('restraining order')) {
+    services.push('legal assistance');
+  }
+  if (content.includes('support group') || content.includes('group therapy')) {
+    services.push('support groups');
+  }
+  if (content.includes('hotline') || content.includes('24/7')) {
+    services.push('24/7 hotline');
+  }
+  if (content.includes('children') || content.includes('kids') || content.includes('family')) {
+    services.push('family services');
+  }
+  if (content.includes('transportation') || content.includes('transport')) {
+    services.push('transportation assistance');
+  }
+  if (content.includes('job') || content.includes('employment') || content.includes('career')) {
+    services.push('employment assistance');
+  }
+  if (content.includes('education') || content.includes('training')) {
+    services.push('education and training');
+  }
+  
+  // Generate summary based on services found
+  if (services.length > 0) {
+    if (services.length === 1) {
+      return `This shelter provides ${services[0]}.`;
+    } else if (services.length === 2) {
+      return `This shelter provides ${services[0]} and ${services[1]}.`;
+    } else {
+      const lastService = services.pop();
+      return `This shelter provides ${services.join(', ')}, and ${lastService}.`;
+    }
+  }
+  
+  // Fallback: Extract first meaningful sentence
   const sentences = result.content.split(/[.!?]+/).filter(s => s.trim().length > 10);
   if (sentences.length === 0) {
     return 'This resource provides support and assistance for those in need.';
@@ -828,4 +899,58 @@ function extractPhoneFromContent(content) {
   if (!content) return 'Not available';
   const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
   return phoneMatch ? phoneMatch[1] : 'Not available';
+}
+
+/**
+ * Generate detailed information about shelters and their services
+ * @param {Object} lastQueryContext - The previous query context
+ * @returns {string} Voice-friendly detailed response
+ */
+export function generateDetailedShelterInfo(lastQueryContext) {
+  if (!lastQueryContext.results || lastQueryContext.results.length === 0) {
+    return "I don't have the previous search results available. Could you please repeat your location or question?";
+  }
+  
+  const results = lastQueryContext.results;
+  const location = lastQueryContext.location || 'that area';
+  
+  if (results.length === 1) {
+    const result = results[0];
+    const cleanTitle = cleanResultTitle(result.title);
+    const summary = generateResultSummary(result);
+    const phone = extractPhoneFromContent(result.content);
+    
+    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. Would you like me to send you the complete details?`;
+  } else if (results.length === 2) {
+    const result1 = results[0];
+    const result2 = results[1];
+    const title1 = cleanResultTitle(result1.title);
+    const title2 = cleanResultTitle(result2.title);
+    const summary1 = generateResultSummary(result1);
+    const summary2 = generateResultSummary(result2);
+    
+    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. Would you like me to send you the complete details for both?`;
+  } else {
+    // For 3 or more results, provide details for the first 2 and mention the rest
+    const result1 = results[0];
+    const result2 = results[1];
+    const title1 = cleanResultTitle(result1.title);
+    const title2 = cleanResultTitle(result2.title);
+    const summary1 = generateResultSummary(result1);
+    const summary2 = generateResultSummary(result2);
+    
+    let response = `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}.`;
+    
+    if (results.length === 3) {
+      const result3 = results[2];
+      const title3 = cleanResultTitle(result3.title);
+      const summary3 = generateResultSummary(result3);
+      response += ` Third, ${title3} - ${summary3}.`;
+    } else {
+      response += ` I also found ${results.length - 2} more resources.`;
+    }
+    
+    response += ` Would you like me to send you the complete details for all of them?`;
+    return response;
+  }
 } 

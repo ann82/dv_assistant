@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2024-06-24
+
+### Added
+- **Custom Off-topic Follow-up Response**
+  - When a user asks an off-topic follow-up (e.g., a song or joke request), the assistant now replies with a friendly, purpose-focused message: "I'm here to help with domestic violence support and resources. If you have any questions about that, please let me know!"
+  - This prevents confusion and keeps the conversation on track for support topics.
+
 ## [1.0.8] - 2024-12-21
 
 ### Added

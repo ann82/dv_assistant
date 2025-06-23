@@ -48,6 +48,7 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 ### Conditional Query Rewriting
 - **Intelligent Query Processing** - Smart query rewriting that adapts based on content and context
   - **Off-topic Detection**: Automatically identifies and preserves off-topic queries (jokes, weather, sports, etc.)
+  - **Custom Off-topic Follow-up Response**: If a user asks an off-topic follow-up (e.g., a song request), the assistant gently reminds them of its purpose: _"I'm here to help with domestic violence support and resources. If you have any questions about that, please let me know!"_
   - **Support Context Enhancement**: Adds relevant domestic violence context to support-related queries
   - **Follow-up Context Preservation**: Maintains conversation context for natural follow-up questions
   - **Intent-Aware Enhancement**: Adds specific terms based on intent type (shelter, legal, counseling)
@@ -59,6 +60,9 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - **Error Prevention**: Avoids the issue where "Tell me a joke" becomes "domestic violence Tell me a joke"
 
 ## Recent Updates
+
+### Off-topic Follow-up Response (v1.0.9)
+- **Custom Off-topic Follow-up Response**: The assistant now provides a friendly, purpose-focused message when users ask off-topic follow-up questions, instead of a generic or confusing response.
 
 ### Conditional Query Rewriting & Intent Classification (v1.0.8)
 - **Intelligent Query Processing** - Implemented smart conditional query rewriting system
