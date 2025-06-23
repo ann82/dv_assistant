@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2024-12-21
+
+### Added
+- **Conditional Query Rewriting System** - Implemented intelligent query processing that adapts based on content and context
+  - **Off-topic Detection**: Automatically identifies off-topic queries using pattern matching (jokes, weather, sports, music, movies, food, travel, etc.)
+  - **Support Context Enhancement**: Adds "domestic violence" context only to support-related queries
+  - **Follow-up Context Preservation**: Maintains conversation context for natural follow-up questions
+  - **Intent-Aware Enhancement**: Adds specific terms based on intent type (shelter, legal, counseling)
+  - **Pattern-Based Filtering**: Uses regex patterns to detect off-topic content without expensive AI calls
+- **Enhanced Intent Classification** - Improved intent detection with new categories and better accuracy
+  - **Off-topic Category**: New intent type for non-support-related queries
+  - **Better Intent Detection**: More accurate classification of user requests
+  - **Contextual Intent Handling**: Intent classification considers conversation context
+  - **Fallback Intent System**: Graceful handling when intent classification fails
+- **Natural Conversation Flow** - Prevents forced context injection that breaks conversation flow
+  - **Contextual Awareness**: System understands when queries should remain unchanged
+  - **Mixed Conversation Support**: Handles conversations that mix support topics with casual conversation
+  - **Error Prevention**: Fixes issue where "Tell me a joke" was being rewritten to "domestic violence Tell me a joke"
+  - **Follow-up Question Handling**: Conditional rewriting works correctly with follow-up questions
+- **Comprehensive Test Coverage** - Added tests for conditional query rewriting functionality
+  - **Off-topic Query Tests**: Verify that off-topic queries are not rewritten
+  - **Follow-up Context Tests**: Ensure follow-up questions maintain proper context
+  - **Mixed Conversation Tests**: Test conversations that mix support and casual topics
+  - **Intent Classification Tests**: Verify new off-topic intent category works correctly
+
+### Changed
+- **Query Rewriting Logic**: Updated from aggressive "always add domestic violence context" to intelligent conditional rewriting
+- **Intent Classification**: Added off-topic category and improved classification accuracy
+- **Follow-up Handling**: Enhanced to work correctly with conditional query rewriting
+- **Test Suite**: Added comprehensive tests for new conditional query rewriting functionality
+
+### Fixed
+- **Forced Context Injection**: Fixed issue where all queries were being forced into domestic violence context
+- **Conversation Flow**: Resolved problems with mixed conversations (support + casual topics)
+- **Follow-up Context**: Fixed follow-up questions losing context due to aggressive rewriting
+- **Intent Classification**: Improved accuracy and added missing off-topic category
+
 ## [1.0.7] - 2024-12-21
 
 ### Added

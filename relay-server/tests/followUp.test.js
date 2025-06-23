@@ -1,9 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock the logger module at the top level
+vi.mock('../lib/logger.js', () => ({
+  default: {
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn()
+  }
+}));
+
 import { 
   updateConversationContext, 
   getConversationContext, 
   handleFollowUp,
-  clearConversationContext 
+  clearConversationContext,
+  generateFollowUpResponse,
+  cleanResultTitle,
+  extractFocusTarget,
+  findBestMatch,
+  rewriteQuery
 } from '../lib/intentClassifier.js';
 
 describe('Follow-up Question Support', () => {
@@ -119,24 +134,27 @@ describe('Follow-up Question Support', () => {
     beforeEach(() => {
       mockLastQueryContext = {
         intent: 'find_shelter',
-        location: 'San Francisco',
+        location: 'South Lake Tahoe',
         results: [
           {
-            title: 'La Casa de las Madres',
-            url: 'https://example.com/shelter1',
-            content: 'Emergency shelter with phone 555-1234',
-            score: 0.9
+            title: '[South Lake Tahoe, CA] Domestic Violence Help, Programs & Resources',
+            content: 'South Lake Tahoe Domestic Violence Help provides emergency shelter, counseling, and legal assistance for survivors.',
+            url: 'https://example.com/south-lake-tahoe-help'
           },
           {
-            title: 'Asian Women\'s Shelter',
-            url: 'https://example.com/shelter2',
-            content: 'Safe housing with phone 555-5678',
-            score: 0.8
+            title: '[Woodfords, CA] Domestic Violence Shelter & Support Services',
+            content: 'Woodfords Domestic Violence Shelter offers safe housing and support services for families in crisis.',
+            url: 'https://example.com/woodfords-shelter'
+          },
+          {
+            title: 'National Domestic Violence Hotline - 24/7 Support',
+            content: 'The National Domestic Violence Hotline provides confidential support and resources 24/7.',
+            url: 'https://example.com/national-hotline'
           }
         ],
         timestamp: Date.now(),
-        smsResponse: 'Shelters in San Francisco:\n\n1. La Casa de las Madres\n   https://example.com/shelter1\n\n2. Asian Women\'s Shelter\n   https://example.com/shelter2',
-        voiceResponse: 'I found 2 shelters in San Francisco'
+        smsResponse: 'Test SMS response',
+        voiceResponse: 'Test voice response'
       };
     });
 
@@ -280,5 +298,257 @@ describe('Follow-up Question Support', () => {
       const nonMatchingQueries = specificQueries.filter(query => !handleFollowUp(query, mockLastQueryContext));
       expect(nonMatchingQueries.length).toBeGreaterThan(0);
     });
+  });
+
+  describe('cleanResultTitle function', () => {
+    it('should clean result titles properly', () => {
+      expect(cleanResultTitle('[South Lake Tahoe, CA] Domestic Violence Help, Programs & Resources'))
+        .toBe('South Lake Tahoe, CA');
+      
+      expect(cleanResultTitle('National Domestic Violence Hotline - 24/7 Support'))
+        .toBe('National Domestic Violence Hotline');
+      
+      expect(cleanResultTitle('Very Long Title That Should Be Truncated Because It Exceeds The Maximum Length'))
+        .toBe('Very Long Title That Should Be Truncated Because It...');
+    });
+
+    it('should handle null or empty titles', () => {
+      expect(cleanResultTitle(null)).toBe('this resource');
+      expect(cleanResultTitle('')).toBe('this resource');
+    });
+  });
+
+  describe('extractFocusTarget function', () => {
+    it('should extract location references', () => {
+      const target = extractFocusTarget('Tell me more about South Lake Tahoe', mockLastQueryContext);
+      expect(target).toBe('South Lake Tahoe');
+    });
+
+    it('should extract ordinal references', () => {
+      const target = extractFocusTarget('What about the first one?', mockLastQueryContext);
+      expect(target).toBe('first');
+    });
+
+    it('should extract demonstrative references', () => {
+      const target = extractFocusTarget('Tell me about that one', mockLastQueryContext);
+      expect(target).toBe('specific_reference');
+    });
+
+    it('should extract capitalized location names', () => {
+      const target = extractFocusTarget('I want to know about Tahoe', mockLastQueryContext);
+      expect(target).toBe('Tahoe');
+    });
+  });
+
+  describe('findBestMatch function', () => {
+    it('should find exact location matches', () => {
+      const match = findBestMatch('South Lake Tahoe', mockLastQueryContext.results);
+      expect(match).toBeTruthy();
+      expect(match.title).toContain('South Lake Tahoe');
+    });
+
+    it('should find partial matches', () => {
+      const match = findBestMatch('Tahoe', mockLastQueryContext.results);
+      expect(match).toBeTruthy();
+      expect(match.title).toContain('South Lake Tahoe');
+    });
+
+    it('should return null for no matches', () => {
+      const match = findBestMatch('NonExistentLocation', mockLastQueryContext.results);
+      expect(match).toBeNull();
+    });
+  });
+
+  describe('generateFollowUpResponse function', () => {
+    it('should handle send details requests', async () => {
+      const response = await generateFollowUpResponse('Can you send that to me?', mockLastQueryContext);
+      expect(response.type).toBe('send_details');
+      expect(response.voiceResponse).toContain('send you the find shelter details');
+      expect(response.smsResponse).toBe(mockLastQueryContext.smsResponse);
+    });
+
+    it('should handle location info requests with matched result', async () => {
+      const response = await generateFollowUpResponse('Where is South Lake Tahoe located?', mockLastQueryContext);
+      expect(response.type).toBe('location_info');
+      expect(response.voiceResponse).toContain('South Lake Tahoe, CA is located at');
+      expect(response.matchedResult).toBeTruthy();
+    });
+
+    it('should handle phone info requests', async () => {
+      const response = await generateFollowUpResponse('What\'s the phone number for South Lake Tahoe?', mockLastQueryContext);
+      expect(response.type).toBe('phone_info');
+      expect(response.voiceResponse).toContain('phone number is');
+      expect(response.matchedResult).toBeTruthy();
+    });
+
+    it('should handle specific result follow-ups', async () => {
+      const response = await generateFollowUpResponse('Tell me more about South Lake Tahoe', mockLastQueryContext);
+      expect(response.type).toBe('specific_result');
+      expect(response.voiceResponse).toContain('Here\'s what I found about South Lake Tahoe, CA');
+      expect(response.matchedResult).toBeTruthy();
+    });
+
+    it('should handle generic follow-ups', async () => {
+      const response = await generateFollowUpResponse('What did you find?', mockLastQueryContext);
+      expect(response.type).toBe('general_follow_up');
+      expect(response.voiceResponse).toContain('I found 3 helpful resources');
+    });
+
+    it('should handle context timeout', async () => {
+      const oldContext = {
+        ...mockLastQueryContext,
+        timestamp: Date.now() - (6 * 60 * 1000) // 6 minutes old
+      };
+      
+      const response = await handleFollowUp('Tell me more', oldContext);
+      expect(response).toBeNull();
+    });
+
+    it('should handle empty results', async () => {
+      const emptyContext = {
+        ...mockLastQueryContext,
+        results: []
+      };
+      
+      const response = await generateFollowUpResponse('Tell me more', emptyContext);
+      expect(response.type).toBe('no_context');
+      expect(response.voiceResponse).toContain('don\'t have the previous search results');
+    });
+  });
+
+  describe('handleFollowUp function', () => {
+    it('should detect follow-up questions with pattern matching', async () => {
+      const response = await handleFollowUp('Can you send that to me?', mockLastQueryContext);
+      expect(response).toBeTruthy();
+      expect(response.type).toBe('send_details');
+    });
+
+    it('should detect follow-up questions with AI when needed', async () => {
+      const response = await handleFollowUp('What about the third one?', mockLastQueryContext);
+      expect(response).toBeTruthy();
+    });
+
+    it('should return null for non-follow-up questions', async () => {
+      const response = await handleFollowUp('I need a shelter in Los Angeles', mockLastQueryContext);
+      expect(response).toBeNull();
+    });
+
+    it('should return null for null context', async () => {
+      const response = await handleFollowUp('Can you send that to me?', null);
+      expect(response).toBeNull();
+    });
+  });
+});
+
+describe('Conditional Query Rewriting with Follow-ups', () => {
+  test('should not rewrite off-topic queries', () => {
+    const query = 'Tell me a joke';
+    const intent = 'off_topic';
+    const rewritten = rewriteQuery(query, intent);
+    
+    expect(rewritten).toBe(query); // Should return original query unchanged
+  });
+
+  test('should not rewrite follow-ups to off-topic queries', () => {
+    // Simulate context from a previous off-topic query
+    const context = {
+      lastQuery: 'Tell me a joke',
+      lastIntent: 'off_topic',
+      timestamp: Date.now()
+    };
+    
+    // Mock getConversationContext to return our test context
+    const originalGetContext = getConversationContext;
+    getConversationContext = jest.fn().mockReturnValue(context);
+    
+    const followUpQuery = 'Tell me another one';
+    const intent = 'off_topic';
+    const rewritten = rewriteQuery(followUpQuery, intent, 'test-call-sid');
+    
+    expect(rewritten).toBe(followUpQuery); // Should return original query unchanged
+    
+    // Restore original function
+    getConversationContext = originalGetContext;
+  });
+
+  test('should rewrite follow-ups to support-related queries', () => {
+    // Simulate context from a previous support-related query
+    const context = {
+      lastQuery: 'Find shelters in New York',
+      lastIntent: 'find_shelter',
+      timestamp: Date.now()
+    };
+    
+    // Mock getConversationContext to return our test context
+    const originalGetContext = getConversationContext;
+    getConversationContext = jest.fn().mockReturnValue(context);
+    
+    const followUpQuery = 'Tell me more about the first one';
+    const intent = 'find_shelter';
+    const rewritten = rewriteQuery(followUpQuery, intent, 'test-call-sid');
+    
+    // Should combine the queries and add domestic violence context
+    expect(rewritten).toContain('Find shelters in New York');
+    expect(rewritten).toContain('Tell me more about the first one');
+    expect(rewritten).toContain('domestic violence');
+    
+    // Restore original function
+    getConversationContext = originalGetContext;
+  });
+
+  test('should handle mixed conversation flow correctly', () => {
+    // Test a conversation that starts with support, goes off-topic, then returns to support
+    
+    // 1. Initial support query
+    let context = {
+      lastQuery: 'Find shelters in New York',
+      lastIntent: 'find_shelter',
+      timestamp: Date.now()
+    };
+    
+    let originalGetContext = getConversationContext;
+    getConversationContext = jest.fn().mockReturnValue(context);
+    
+    let followUpQuery = 'Tell me more about the first one';
+    let intent = 'find_shelter';
+    let rewritten = rewriteQuery(followUpQuery, intent, 'test-call-sid');
+    
+    expect(rewritten).toContain('domestic violence');
+    expect(rewritten).toContain('Find shelters in New York');
+    
+    // 2. Off-topic follow-up
+    context = {
+      lastQuery: 'Tell me a joke',
+      lastIntent: 'off_topic',
+      timestamp: Date.now()
+    };
+    
+    getConversationContext = jest.fn().mockReturnValue(context);
+    
+    followUpQuery = 'Tell me another one';
+    intent = 'off_topic';
+    rewritten = rewriteQuery(followUpQuery, intent, 'test-call-sid');
+    
+    expect(rewritten).toBe(followUpQuery); // Should not be rewritten
+    
+    // 3. Return to support topic
+    context = {
+      lastQuery: 'I need legal help',
+      lastIntent: 'legal_services',
+      timestamp: Date.now()
+    };
+    
+    getConversationContext = jest.fn().mockReturnValue(context);
+    
+    followUpQuery = 'What about restraining orders?';
+    intent = 'legal_services';
+    rewritten = rewriteQuery(followUpQuery, intent, 'test-call-sid');
+    
+    expect(rewritten).toContain('domestic violence');
+    expect(rewritten).toContain('I need legal help');
+    expect(rewritten).toContain('What about restraining orders?');
+    
+    // Restore original function
+    getConversationContext = originalGetContext;
   });
 }); 

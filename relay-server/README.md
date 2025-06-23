@@ -45,7 +45,38 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - Intent classification
 - Entity extraction
 
+### Conditional Query Rewriting
+- **Intelligent Query Processing** - Smart query rewriting that adapts based on content and context
+  - **Off-topic Detection**: Automatically identifies and preserves off-topic queries (jokes, weather, sports, etc.)
+  - **Support Context Enhancement**: Adds relevant domestic violence context to support-related queries
+  - **Follow-up Context Preservation**: Maintains conversation context for natural follow-up questions
+  - **Intent-Aware Enhancement**: Adds specific terms based on intent type (shelter, legal, counseling)
+  - **Pattern-Based Filtering**: Uses regex patterns to detect off-topic content without AI calls
+- **Natural Conversation Flow** - Prevents forced context injection that breaks conversation flow
+  - **Contextual Awareness**: Understands when queries should remain unchanged
+  - **Mixed Conversation Support**: Handles conversations that mix support topics with casual conversation
+  - **Timeout Handling**: 5-minute context timeout prevents stale follow-up responses
+  - **Error Prevention**: Avoids the issue where "Tell me a joke" becomes "domestic violence Tell me a joke"
+
 ## Recent Updates
+
+### Conditional Query Rewriting & Intent Classification (v1.0.8)
+- **Intelligent Query Processing** - Implemented smart conditional query rewriting system
+  - **Off-topic Detection**: Automatically identifies off-topic queries using pattern matching (jokes, weather, sports, etc.)
+  - **Support Context Enhancement**: Adds "domestic violence" context only to support-related queries
+  - **Follow-up Context Preservation**: Maintains conversation context for natural follow-up questions
+  - **Intent-Aware Enhancement**: Adds specific terms based on intent type (shelter, legal, counseling)
+  - **Pattern-Based Filtering**: Uses regex patterns to detect off-topic content without expensive AI calls
+- **Enhanced Intent Classification** - Improved intent detection with new categories
+  - **Off-topic Category**: New intent type for non-support-related queries
+  - **Better Intent Detection**: More accurate classification of user requests
+  - **Contextual Intent Handling**: Intent classification considers conversation context
+  - **Fallback Intent System**: Graceful handling when intent classification fails
+- **Natural Conversation Flow** - Prevents forced context injection that breaks conversation flow
+  - **Contextual Awareness**: System understands when queries should remain unchanged
+  - **Mixed Conversation Support**: Handles conversations that mix support topics with casual conversation
+  - **Error Prevention**: Fixes issue where "Tell me a joke" was being rewritten to "domestic violence Tell me a joke"
+  - **Follow-up Question Handling**: Conditional rewriting works correctly with follow-up questions
 
 ### Hybrid AI/Pattern Approach & Caching Optimization (v1.0.7)
 - **Intelligent Hybrid Processing** - Implemented cost-effective and reliable AI/pattern hybrid approach

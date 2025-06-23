@@ -193,7 +193,7 @@ export class TwilioVoiceHandler {
       });
 
       // Import required functions
-      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp } = await import('../lib/intentClassifier.js');
+      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp, cleanResultTitle } = await import('../lib/intentClassifier.js');
       const { extractLocation, generateLocationPrompt } = await import('../lib/speechProcessor.js');
       const { callTavilyAPI } = await import('../lib/apis.js');
       const { ResponseGenerator } = await import('../lib/response.js');
@@ -221,7 +221,7 @@ export class TwilioVoiceHandler {
       });
 
       // Check for follow-up questions using the new handleFollowUp function
-      const followUpResponse = context?.lastQueryContext ? handleFollowUp(speechResult, context.lastQueryContext) : null;
+      const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
       
       logger.info('Follow-up question check:', {
         requestId,
@@ -240,24 +240,26 @@ export class TwilioVoiceHandler {
           callSid,
           speechResult,
           followUpType: followUpResponse.type,
-          lastIntent: context.lastIntent
+          lastIntent: context.lastIntent,
+          matchedResult: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
         });
 
-        // Update conversation context with follow-up response
+        // Update conversation context with follow-up response and focus tracking
         if (callSid) {
           updateConversationContext(callSid, intent, speechResult, {
-            voiceResponse: followUpResponse.response,
+            voiceResponse: followUpResponse.voiceResponse,
             smsResponse: followUpResponse.smsResponse
-          });
+          }, null, followUpResponse.matchedResult);
           logger.info('Updated conversation context for follow-up:', {
             requestId,
             callSid,
             intent,
-            followUpType: followUpResponse.type
+            followUpType: followUpResponse.type,
+            focusResultTitle: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
           });
         }
 
-        return followUpResponse.response;
+        return followUpResponse.voiceResponse;
       }
 
       // Handle different intents appropriately
