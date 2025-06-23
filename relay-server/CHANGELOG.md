@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 2024-12-21
+
+### Changed
+- **SMS Messaging Communication** - Improved user experience with clear expectations about SMS delivery
+  - **Voice Response Updates**: Replaced confusing "Would you like me to send you the details?" with clear messaging
+  - **SMS Timing Communication**: Users are now informed they'll receive complete details via SMS at the end of the call
+  - **Transparent Communication**: Clear expectations about when and how detailed information will be delivered
+  - **User Experience**: Eliminated confusion about SMS delivery timing and process
+
+### Fixed
+- **Title Truncation Issue** - Increased title length limit from 47 to 80 characters
+  - **Complete Organization Names**: Prevents truncation of long shelter names like "British Columbia Domestic Violence Help, Programs and Resources"
+  - **Voice Response Clarity**: Ensures complete shelter names are displayed in voice responses
+  - **Information Completeness**: Maintains readability while providing full organization information
+- **Syntax Error** - Fixed apostrophe escaping in tavilyProcessor.js
+  - **Proper String Escaping**: Fixed syntax error with apostrophe in "I'll send you the complete details"
+  - **Code Stability**: Ensured all voice response updates work correctly
+
+### Enhanced
+- **Call End Detection** - Improved call completion handling and SMS delivery
+  - **Automatic Detection**: System properly detects call end using Twilio status callbacks
+  - **SMS Delivery**: Detailed information sent at appropriate time with user consent
+  - **Resource Management**: Proper cleanup and resource management at call end
+  - **User Consent**: Asks for permission before sending SMS at call end
+
 ## [1.0.9] - 2024-06-24
 
 ### Added

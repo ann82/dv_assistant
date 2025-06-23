@@ -59,7 +59,33 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - **Timeout Handling**: 5-minute context timeout prevents stale follow-up responses
   - **Error Prevention**: Avoids the issue where "Tell me a joke" becomes "domestic violence Tell me a joke"
 
+### SMS Messaging System
+- **Clear User Expectations** - Improved communication about when and how users receive detailed information
+  - **Voice Response Updates**: Replaced confusing "Would you like me to send you the details?" with clear messaging
+  - **SMS Timing Communication**: Users are informed they'll receive complete details via SMS at the end of the call
+  - **Call End Detection**: System automatically detects when calls end and sends detailed SMS with full information
+  - **User Consent**: Asks for permission before sending SMS at call end
+- **Enhanced Information Delivery** - Better formatting and content for SMS messages
+  - **Complete Shelter Details**: Full shelter names, contact information, and services provided
+  - **Title Length Optimization**: Increased from 47 to 80 characters to prevent truncation of organization names
+  - **Structured SMS Format**: Clear, readable format with numbered lists and contact details
+  - **Comprehensive Resource Information**: Includes URLs, phone numbers, and service descriptions
+
 ## Recent Updates
+
+### SMS Messaging & User Experience Improvements (v1.0.10)
+- **Clear SMS Expectations**: Updated voice responses to inform users they'll receive details via SMS at end of call
+  - Replaced confusing "Would you like me to send you the details?" with clear messaging
+  - Users now know exactly when and how they'll receive detailed information
+  - Improved user experience with transparent communication about SMS delivery
+- **Title Truncation Fix**: Increased title length limit from 47 to 80 characters
+  - Prevents truncation of organization names like "British Columbia Domestic Violence Help, Programs and Resources"
+  - Ensures complete shelter names are displayed in voice responses
+  - Maintains readability while providing full information
+- **Call End Detection**: Enhanced call completion handling
+  - Automatic detection of call end using Twilio status callbacks
+  - SMS delivery at appropriate time with user consent
+  - Proper cleanup and resource management
 
 ### Off-topic Follow-up Response (v1.0.9)
 - **Custom Off-topic Follow-up Response**: The assistant now provides a friendly, purpose-focused message when users ask off-topic follow-up questions, instead of a generic or confusing response.
