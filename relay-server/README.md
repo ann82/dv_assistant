@@ -78,6 +78,10 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - Caches geocoding results for performance
   - Fallback to pattern-based detection for reliability
   - Non-US locations are detected and users are informed that support is US-only
+- **Advanced Pattern Matching & Filler Removal (2024-06-24)**
+  - Highly robust pattern matching for US city/state/ZIP and conversational queries
+  - Aggressive removal of conversational fillers ("Hey, can you help me...", etc.) at the start of queries
+  - Further reduces unnecessary GPT/OpenAI calls for common queries
 
 ### Query Rewriting & Resource Search (Enhanced)
 - **US-Only Resource Search**
@@ -85,6 +89,9 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - For US locations, queries are rewritten to optimize shelter/resource search using high-quality search terms
   - Conversational fillers are removed from the start of queries for cleaner input
   - Location context is added only when appropriate
+- **Pattern-First Optimization (2024-06-24)**
+  - Most queries are now handled by pattern matching and do not require AI calls
+  - Only ambiguous or complex queries fall back to GPT/OpenAI
 
 ## Recent Updates
 

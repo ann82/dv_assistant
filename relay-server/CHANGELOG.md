@@ -615,24 +615,14 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.11] - 2024-06-24
 
-### Added
-- **Geocoding-Based Location Detection**
-  - Integrated Nominatim/OpenStreetMap geocoding API for accurate city, state, and ZIP extraction from user queries
-  - Caching of geocoding results for performance
-  - Fallback to pattern-based detection for reliability
-- **US-Only Support**
-  - If a non-US location is detected, the agent responds: "I'm sorry, we are currently available only for US cities."
-  - Non-US locations are preserved in the query but not geolocated or used for resource search
-
-### Changed
-- **Query Rewriting Logic**
-  - All resource search and query rewriting now use geocoding-based location detection
-  - Conversational fillers are removed from the start of queries for cleaner input
-  - Location context is added only when appropriate
-
-### Fixed
-- **Comprehensive Test Coverage**
-  - Added and updated tests for enhanced location detection and query rewriting logic
+### Enhanced
+- **Pattern Matching & Filler Removal**
+  - Greatly improved pattern matching for US city/state/ZIP and conversational queries
+  - Aggressive removal of conversational fillers ("Hey, can you help me...", etc.) at the start of queries
+  - Most common queries are now handled by pattern matching, reducing unnecessary GPT/OpenAI calls
+  - Only ambiguous or complex queries fall back to AI
+- **Test Coverage**
+  - Comprehensive tests for all pattern matching, filler removal, and location extraction logic
 
 ## [1.0.10] - 2024-12-21
 
