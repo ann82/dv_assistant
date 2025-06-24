@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2024-06-09
+
+### Changed
+- Defensive type checking and logging for rewritten queries before Tavily API calls to prevent invalid query errors (422 Unprocessable Entity)
+- Improved error handling and logging for Tavily API integration
+- Updated enhanced query rewriter and location detector logic for better test consistency and robustness
+- Fixed test mocks and edge cases for query rewriting and location extraction
+- Updated test suite for more robust edge case handling
+- See README for more details
+
 ## [1.11.0] - 2024-06-09
 
 ### Changed

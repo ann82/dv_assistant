@@ -62,6 +62,12 @@ The system includes comprehensive logging throughout the request-response lifecy
 - Enhanced query rewriting uses the improved filler removal and location extraction logic.
 - Fixed async handling and response formatting in query handler and speech processor.
 - Updated test expectations and logic for consistency.
+- Defensive type checking and logging for rewritten queries before Tavily API calls to prevent invalid query errors (422 Unprocessable Entity)
+- Improved error handling and logging for Tavily API integration
+- Updated enhanced query rewriter and location detector logic for better test consistency and robustness
+- Fixed test mocks and edge cases for query rewriting and location extraction
+- Updated test suite for more robust edge case handling
+- See CHANGELOG for more details
 
 ## Installation
 
