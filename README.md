@@ -57,6 +57,11 @@ The system includes comprehensive logging throughout the request-response lifecy
 - Simplified module imports using index.js
 - Updated package.json with proper module exports
 - Removed unnecessary build step from deployment
+- Improved conversational filler removal: Now removes all consecutive leading fillers, including those with punctuation, and is consistent across modules.
+- Location extraction now consistently returns lowercase locations to match test expectations.
+- Enhanced query rewriting uses the improved filler removal and location extraction logic.
+- Fixed async handling and response formatting in query handler and speech processor.
+- Updated test expectations and logic for consistency.
 
 ## Installation
 

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2024-06-09
+
+### Changed
+- Improved conversational filler removal: Now removes all consecutive leading fillers, including those with punctuation, and is consistent across modules
+- Location extraction now returns lowercase locations for test consistency
+- Enhanced query rewriting uses improved filler removal and location extraction
+- Fixed async handling and response formatting in query handler and speech processor
+- Updated and aligned test expectations and logic for consistency
+- Fixed export/import of extractLocationFromQuery for proper test and module usage
+- Updated README to document these changes
+
 ## [1.10.0] - 2024-04-02
 
 ### Added
