@@ -210,7 +210,14 @@ export async function getIntent(query) {
     // Check if we have a valid API key
     if (!config.OPENAI_API_KEY || config.OPENAI_API_KEY === 'sk-test-key') {
       logger.warn('OpenAI API key not configured, using fallback intent classification');
-      return classifyIntentFallback(query);
+      const fallbackIntent = classifyIntentFallback(query);
+      logger.info('Fallback intent classification result:', { 
+        query, 
+        intent: fallbackIntent, 
+        confidence: 'fallback',
+        method: 'pattern_matching'
+      });
+      return fallbackIntent;
     }
 
     // Log API key format for debugging (without exposing the full key)
@@ -222,52 +229,85 @@ export async function getIntent(query) {
       isValidFormat: apiKeyPrefix === 'sk-' && apiKeyLength > 20
     });
 
+    const prompt = `Classify the following user query into one of these predefined intents for a domestic violence support assistant:
+
+Available intents:
+- find_shelter: For requests to find domestic violence shelters, safe houses, or emergency housing
+- legal_services: For requests about legal help, restraining orders, court assistance, or legal representation
+- counseling_services: For requests about therapy, counseling, mental health support, or emotional help
+- emergency_help: For urgent requests, immediate danger, or crisis situations
+- general_information: For general questions about domestic violence, resources, or support
+- other_resources: For requests about financial assistance, job training, childcare, or other support services
+- end_conversation: For requests to end the call, hang up, or stop the conversation
+- off_topic: For requests unrelated to domestic violence support (jokes, weather, sports, etc.)
+
+User query: "${query}"
+
+Respond with only the intent name (e.g., "find_shelter").`;
+
+    const startTime = Date.now();
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: `Classify the query into one of these categories:
-            - find_shelter: For requests about finding shelter homes or safe housing
-            - legal_services: For requests about legal help, restraining orders, or legal rights
-            - counseling_services: For requests about counseling, therapy, or emotional support
-            - emergency_help: For urgent situations requiring immediate assistance
-            - general_information: For general questions about domestic violence
-            - other_resources: For other types of support or resources
-            - end_conversation: For requests to end the conversation
-            - off_topic: For requests unrelated to domestic violence support (jokes, weather, sports, etc.)`
-        },
-        {
-          role: 'user',
-          content: query
-        }
-      ],
-      functions: [intentSchema],
-      function_call: { name: 'classify_intent' }
+      model: config.GPT35_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 50,
+      temperature: 0.1
+    });
+    const responseTime = Date.now() - startTime;
+
+    const intent = response.choices[0].message.content.trim().toLowerCase();
+    const usage = response.usage;
+    
+    // Calculate confidence based on response characteristics
+    const confidence = calculateIntentConfidence(intent, query, response);
+    
+    // Log detailed intent classification results
+    logger.info('Intent classification completed:', {
+      query,
+      intent,
+      confidence,
+      responseTime: `${responseTime}ms`,
+      model: config.GPT35_MODEL,
+      usage: {
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens
+      },
+      method: 'openai_gpt35'
     });
 
-    const functionCall = response.choices[0].message.function_call;
-    if (!functionCall) {
-      logger.warn('No function call returned from GPT-3.5-turbo');
-      return 'general_information';
-    }
+    // Log confidence score for monitoring
+    logger.info('AI Model Confidence Score:', {
+      query,
+      intent,
+      confidence,
+      confidenceLevel: getConfidenceLevel(confidence),
+      timestamp: new Date().toISOString()
+    });
 
-    const result = JSON.parse(functionCall.arguments);
-    logger.info('Intent classification result:', result);
-    return result.intent;
+    return intent;
 
   } catch (error) {
     logger.error('Error classifying intent:', {
       error: error.message,
       status: error.status,
-      code: error.code,
-      type: error.type,
+      statusText: error.statusText,
+      query,
       stack: error.stack
     });
     
-    // Use fallback classification on error
-    logger.info('Using fallback intent classification due to API error');
-    return classifyIntentFallback(query);
+    // Fallback to pattern matching
+    logger.info('Falling back to pattern-based intent classification');
+    const fallbackIntent = classifyIntentFallback(query);
+    
+    logger.info('Fallback intent classification result:', { 
+      query, 
+      intent: fallbackIntent, 
+      confidence: 'fallback',
+      method: 'pattern_matching',
+      error: error.message
+    });
+    
+    return fallbackIntent;
   }
 }
 
@@ -343,8 +383,41 @@ export const intentHandlers = {
     return 'end_conversation';
   },
   off_topic: async (query) => {
-    // Handle off-topic requests
-    return 'off_topic_response';
+    // Enhanced off-topic handling with conversation management
+    const queryLower = query.toLowerCase();
+    
+    // Check for conversation end requests
+    if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
+        queryLower.includes('end call') || queryLower.includes('hang up')) {
+      return {
+        type: 'conversation_end',
+        intent: 'end_conversation',
+        voiceResponse: "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.",
+        smsResponse: null,
+        shouldEndCall: true
+      };
+    }
+    
+    // Check for re-engagement attempts
+    if (queryLower.includes('help') || queryLower.includes('support') || 
+        queryLower.includes('domestic') || queryLower.includes('violence')) {
+      return {
+        type: 're_engagement',
+        intent: 'general_information',
+        voiceResponse: "I'm here to help with domestic violence support and resources. What specific information or assistance do you need today?",
+        smsResponse: "I'm here to help with domestic violence support. What do you need assistance with?",
+        shouldReengage: true
+      };
+    }
+    
+    // Handle general off-topic queries with gentle redirection
+    return {
+      type: 'off_topic_redirection',
+      intent: 'off_topic',
+      voiceResponse: "I'm specifically designed to help with domestic violence support and resources. If you have questions about that, I'd be happy to help. Otherwise, you might want to try a different service for other topics.",
+      smsResponse: "I'm here for domestic violence support. For other topics, please try a different service.",
+      shouldRedirect: true
+    };
   }
 };
 
@@ -907,4 +980,172 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     response += ` How else can I help you today?`;
     return response;
   }
+}
+
+/**
+ * Calculate intent confidence based on response characteristics
+ * @param {string} intent - The classified intent
+ * @param {string} query - The user query
+ * @param {Object} response - The GPT-3.5-turbo response
+ * @returns {number} Confidence score between 0 and 1
+ */
+function calculateIntentConfidence(intent, query, response) {
+  let confidence = 0.5; // Base confidence
+  
+  // Check if intent is valid
+  const validIntents = [
+    'find_shelter', 'legal_services', 'counseling_services', 
+    'emergency_help', 'general_information', 'other_resources', 
+    'end_conversation', 'off_topic'
+  ];
+  
+  if (!validIntents.includes(intent)) {
+    logger.warn('Invalid intent detected:', { intent, query });
+    return 0.1; // Low confidence for invalid intents
+  }
+  
+  // Boost confidence for clear keyword matches
+  const queryLower = query.toLowerCase();
+  const intentKeywords = {
+    'find_shelter': ['shelter', 'housing', 'safe', 'place to stay', 'home', 'live'],
+    'legal_services': ['legal', 'lawyer', 'attorney', 'court', 'restraining order', 'divorce'],
+    'counseling_services': ['counseling', 'therapy', 'counselor', 'therapist', 'mental health', 'emotional'],
+    'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
+    'general_information': ['what is', 'how to', 'information', 'about', 'tell me'],
+    'other_resources': ['financial', 'money', 'job', 'work', 'childcare', 'transportation'],
+    'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish'],
+    'off_topic': ['weather', 'sports', 'joke', 'funny', 'movie', 'music']
+  };
+  
+  const keywords = intentKeywords[intent] || [];
+  const keywordMatches = keywords.filter(keyword => queryLower.includes(keyword)).length;
+  
+  if (keywordMatches > 0) {
+    confidence += 0.3; // Boost for keyword matches
+  }
+  
+  // Boost confidence for longer, more specific queries
+  if (query.length > 20) {
+    confidence += 0.1;
+  }
+  
+  // Reduce confidence for very short or vague queries
+  if (query.length < 5) {
+    confidence -= 0.2;
+  }
+  
+  // Boost confidence for emergency-related queries
+  if (intent === 'emergency_help') {
+    confidence += 0.2; // Higher confidence for emergency detection
+  }
+  
+  // Cap confidence at 1.0
+  return Math.min(confidence, 1.0);
+}
+
+/**
+ * Get confidence level based on confidence score
+ * @param {number} confidence - The confidence score
+ * @returns {string} Confidence level
+ */
+function getConfidenceLevel(confidence) {
+  if (confidence >= 0.8) return 'High';
+  if (confidence >= 0.5) return 'Medium';
+  return 'Low';
+}
+
+/**
+ * Manage conversation flow based on intent and context
+ * @param {string} intent - The detected intent
+ * @param {string} query - The user query
+ * @param {Object} context - Conversation context
+ * @returns {Object} Conversation management response
+ */
+export function manageConversationFlow(intent, query, context = {}) {
+  const response = {
+    shouldContinue: true,
+    shouldEndCall: false,
+    shouldReengage: false,
+    redirectionMessage: null,
+    confidence: context.confidence || 0.5
+  };
+
+  // Handle off-topic intents
+  if (intent === 'off_topic') {
+    const queryLower = query.toLowerCase();
+    
+    // Check for conversation end requests
+    if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
+        queryLower.includes('end call') || queryLower.includes('hang up')) {
+      response.shouldEndCall = true;
+      response.shouldContinue = false;
+      response.redirectionMessage = "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.";
+      return response;
+    }
+    
+    // Check for re-engagement attempts
+    if (queryLower.includes('help') || queryLower.includes('support') || 
+        queryLower.includes('domestic') || queryLower.includes('violence')) {
+      response.shouldReengage = true;
+      response.redirectionMessage = "I'm here to help with domestic violence support and resources. What specific information or assistance do you need today?";
+      return response;
+    }
+    
+    // Handle general off-topic with gentle redirection
+    response.redirectionMessage = "I'm specifically designed to help with domestic violence support and resources. If you have questions about that, I'd be happy to help. Otherwise, you might want to try a different service for other topics.";
+    return response;
+  }
+
+  // Handle end conversation intent
+  if (intent === 'end_conversation') {
+    response.shouldEndCall = true;
+    response.shouldContinue = false;
+    response.redirectionMessage = "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.";
+    return response;
+  }
+
+  // Handle emergency situations with high priority
+  if (intent === 'emergency_help') {
+    response.shouldContinue = true;
+    response.priority = 'high';
+    return response;
+  }
+
+  // Default: continue conversation
+  return response;
+}
+
+/**
+ * Check if conversation should be re-engaged based on user behavior
+ * @param {Object} context - Conversation context
+ * @returns {boolean} Whether to attempt re-engagement
+ */
+export function shouldAttemptReengagement(context) {
+  if (!context || !context.history) {
+    return false;
+  }
+
+  const recentIntents = context.history.slice(-3).map(h => h.intent);
+  const offTopicCount = recentIntents.filter(intent => intent === 'off_topic').length;
+  
+  // Attempt re-engagement if user has been off-topic for multiple interactions
+  return offTopicCount >= 2;
+}
+
+/**
+ * Generate re-engagement message based on context
+ * @param {Object} context - Conversation context
+ * @returns {string} Re-engagement message
+ */
+export function generateReengagementMessage(context) {
+  const messages = [
+    "I'm here specifically to help with domestic violence support and resources. Is there anything related to that I can assist you with?",
+    "I want to make sure you get the help you need. Do you have questions about domestic violence resources, shelters, legal help, or counseling services?",
+    "I'm designed to help with domestic violence support. If you're experiencing domestic violence or know someone who is, I can help you find resources and information.",
+    "Let me know if you need help finding shelters, legal services, counseling, or other domestic violence resources. I'm here to help."
+  ];
+  
+  // Randomly select a message to avoid repetition
+  const randomIndex = Math.floor(Math.random() * messages.length);
+  return messages[randomIndex];
 } 

@@ -193,7 +193,7 @@ export class TwilioVoiceHandler {
       });
 
       // Import required functions
-      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp, cleanResultTitle } = await import('../lib/intentClassifier.js');
+      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp, cleanResultTitle, manageConversationFlow, shouldAttemptReengagement, generateReengagementMessage } = await import('../lib/intentClassifier.js');
       const { extractLocation, generateLocationPrompt } = await import('../lib/speechProcessor.js');
       const { callTavilyAPI } = await import('../lib/apis.js');
       const { ResponseGenerator } = await import('../lib/response.js');
@@ -219,6 +219,64 @@ export class TwilioVoiceHandler {
         hasLastQueryContext: !!context?.lastQueryContext,
         fullContext: context
       });
+
+      // Manage conversation flow based on intent
+      const conversationFlow = manageConversationFlow(intent, speechResult, context);
+      logger.info('Conversation flow management:', {
+        requestId,
+        callSid,
+        intent,
+        shouldContinue: conversationFlow.shouldContinue,
+        shouldEndCall: conversationFlow.shouldEndCall,
+        shouldReengage: conversationFlow.shouldReengage,
+        redirectionMessage: conversationFlow.redirectionMessage
+      });
+
+      // Handle conversation end
+      if (conversationFlow.shouldEndCall) {
+        logger.info('Ending conversation based on intent:', {
+          requestId,
+          callSid,
+          intent,
+          speechResult
+        });
+        return conversationFlow.redirectionMessage;
+      }
+
+      // Handle re-engagement attempts
+      if (conversationFlow.shouldReengage) {
+        logger.info('Re-engaging conversation:', {
+          requestId,
+          callSid,
+          intent,
+          speechResult
+        });
+        return conversationFlow.redirectionMessage;
+      }
+
+      // Handle off-topic redirection
+      if (conversationFlow.redirectionMessage && intent === 'off_topic') {
+        logger.info('Redirecting off-topic conversation:', {
+          requestId,
+          callSid,
+          intent,
+          speechResult
+        });
+        return conversationFlow.redirectionMessage;
+      }
+
+      // Check for re-engagement based on context
+      if (context && shouldAttemptReengagement(context)) {
+        const reengagementMessage = generateReengagementMessage(context);
+        logger.info('Attempting re-engagement based on context:', {
+          requestId,
+          callSid,
+          intent,
+          speechResult,
+          reengagementMessage
+        });
+        return reengagementMessage;
+      }
 
       // Check for follow-up questions using the new handleFollowUp function
       const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
