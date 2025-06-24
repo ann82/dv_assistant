@@ -549,8 +549,8 @@ export class ResponseGenerator {
       };
     }
 
-    // Filter out results with score < 0.7
-    const filteredResults = tavilyResponse.results.filter(r => (r.score ?? 0) >= 0.7);
+    // Filter out results with score < 0.2 (lowered from 0.7 to include more relevant results)
+    const filteredResults = tavilyResponse.results.filter(r => (r.score ?? 0) >= 0.2);
 
     // Sort results by score (highest first) and take top results
     const sortedResults = [...filteredResults]
