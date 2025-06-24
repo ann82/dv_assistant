@@ -71,6 +71,21 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - **Structured SMS Format**: Clear, readable format with numbered lists and contact details
   - **Comprehensive Resource Information**: Includes URLs, phone numbers, and service descriptions
 
+### Geocoding-Based Location Detection (NEW)
+- **Intelligent Location Extraction**
+  - Uses Nominatim/OpenStreetMap geocoding API to detect and validate locations in user queries
+  - Supports US city, state, and ZIP code detection with high accuracy
+  - Caches geocoding results for performance
+  - Fallback to pattern-based detection for reliability
+  - Non-US locations are detected and users are informed that support is US-only
+
+### Query Rewriting & Resource Search (Enhanced)
+- **US-Only Resource Search**
+  - If a non-US location is detected, the system responds: "I'm sorry, we are currently available only for US cities."
+  - For US locations, queries are rewritten to optimize shelter/resource search using high-quality search terms
+  - Conversational fillers are removed from the start of queries for cleaner input
+  - Location context is added only when appropriate
+
 ## Recent Updates
 
 ### SMS Messaging & User Experience Improvements (v1.0.10)
@@ -250,6 +265,13 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - **Natural Voice Summaries** - Voice responses for follow-ups now use the full content/snippet of the matched result and generate smooth, conversational summaries (e.g., "Here's what I found about South Lake Tahoe: ...").
 - **Comprehensive `generateFollowUpResponse()`** - New function generates a context-aware, natural voice response, SMS (if requested), and includes the matched result for further actions.
 - **Timeout Handling** - If the last context is older than 5 minutes, the system asks the user to repeat their location or query for accuracy.
+
+### Geocoding-Based Location Detection & US-Only Support (v1.0.11)
+- **Geocoding Integration**: Location detection now uses Nominatim/OpenStreetMap geocoding API for accurate city/state/ZIP extraction
+- **US-Only Support**: If a non-US location is detected, the agent responds that service is only available for US cities
+- **Query Rewriting Improvements**: All resource search and query rewriting now leverage geocoding-based detection for robust, maintainable logic
+- **Input Cleaning**: Conversational fillers are removed from the start of queries for more relevant searches
+- **Comprehensive Tests**: New and updated tests for all enhanced location and query rewriting logic
 
 ## Testing
 
