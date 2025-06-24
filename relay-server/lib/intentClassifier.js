@@ -207,6 +207,21 @@ export async function getIntent(query) {
   try {
     logger.info('Classifying intent for query:', { query });
 
+    // Check if we have a valid API key
+    if (!config.OPENAI_API_KEY || config.OPENAI_API_KEY === 'sk-test-key') {
+      logger.warn('OpenAI API key not configured, using fallback intent classification');
+      return classifyIntentFallback(query);
+    }
+
+    // Log API key format for debugging (without exposing the full key)
+    const apiKeyPrefix = config.OPENAI_API_KEY.substring(0, 7);
+    const apiKeyLength = config.OPENAI_API_KEY.length;
+    logger.info('OpenAI API key check:', { 
+      prefix: apiKeyPrefix, 
+      length: apiKeyLength,
+      isValidFormat: apiKeyPrefix === 'sk-' && apiKeyLength > 20
+    });
+
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
@@ -242,9 +257,59 @@ export async function getIntent(query) {
     return result.intent;
 
   } catch (error) {
-    logger.error('Error classifying intent:', error);
+    logger.error('Error classifying intent:', {
+      error: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+      stack: error.stack
+    });
+    
+    // Use fallback classification on error
+    logger.info('Using fallback intent classification due to API error');
+    return classifyIntentFallback(query);
+  }
+}
+
+/**
+ * Fallback intent classification using pattern matching when OpenAI API is unavailable
+ * @param {string} query - The user query to classify
+ * @returns {string} The classified intent
+ */
+function classifyIntentFallback(query) {
+  if (!query || typeof query !== 'string') {
     return 'general_information';
   }
+
+  const lowerQuery = query.toLowerCase();
+  
+  // Pattern matching for different intents
+  if (/\b(shelter|home|housing|place to stay|safe place|refuge)\b/i.test(lowerQuery)) {
+    return 'find_shelter';
+  }
+  
+  if (/\b(legal|lawyer|attorney|restraining order|order of protection|court|divorce|custody|rights)\b/i.test(lowerQuery)) {
+    return 'legal_services';
+  }
+  
+  if (/\b(counseling|therapy|therapist|counselor|mental health|emotional support|talk to someone)\b/i.test(lowerQuery)) {
+    return 'counseling_services';
+  }
+  
+  if (/\b(emergency|urgent|immediate|help now|danger|unsafe|abuse|violence)\b/i.test(lowerQuery)) {
+    return 'emergency_help';
+  }
+  
+  if (/\b(end|stop|goodbye|bye|hang up|disconnect)\b/i.test(lowerQuery)) {
+    return 'end_conversation';
+  }
+  
+  if (/\b(weather|sports|joke|funny|music|movie|food|restaurant|shopping)\b/i.test(lowerQuery)) {
+    return 'off_topic';
+  }
+  
+  // Default to general information for queries that don't match specific patterns
+  return 'general_information';
 }
 
 // Helper functions for intent-based routing

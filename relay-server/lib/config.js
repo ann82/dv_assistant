@@ -84,4 +84,13 @@ export const config = {
   },
 
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-}; 
+};
+
+// Log API key status on startup
+logger.info('API Key Status:', {
+  hasOpenAIKey: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'sk-test-key'),
+  hasTavilyKey: !!process.env.TAVILY_API_KEY,
+  hasElevenLabsKey: !!process.env.ELEVENLABS_API_KEY,
+  openAIKeyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 7) : 'none',
+  nodeEnv: process.env.NODE_ENV
+}); 
