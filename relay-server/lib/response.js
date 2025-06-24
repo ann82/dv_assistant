@@ -485,6 +485,8 @@ export class ResponseGenerator {
             query: cleanQuery,
             search_depth: 'advanced',
             include_answer: true,
+            include_results: true,
+            include_raw_content: false,
             include_domains: [],
             exclude_domains: []
           })
@@ -913,6 +915,9 @@ export class ResponseGenerator {
         body: JSON.stringify({
           query: enhancedQuery,
           search_depth: 'advanced',
+          include_answer: true,
+          include_results: true,
+          include_raw_content: false,
           include_domains: [],
           exclude_domains: ['yelp.com', 'maddiesfund.org'], // Exclude irrelevant domains
           max_results: 5

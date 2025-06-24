@@ -23,7 +23,14 @@ export class TavilyService {
                 'Content-Type': 'application/json',
                 'X-Api-Key': process.env.TAVILY_API_KEY || ''
             },
-            body: JSON.stringify({ query: cleanQuery, search_depth: 'basic', max_results: 3 })
+            body: JSON.stringify({ 
+                query: cleanQuery, 
+                search_depth: 'advanced',
+                include_answer: true,
+                include_results: true,
+                include_raw_content: false,
+                max_results: 3 
+            })
         });
         if (!response.ok) {
             throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);

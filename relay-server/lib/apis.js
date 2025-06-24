@@ -43,10 +43,11 @@ export async function callTavilyAPI(query) {
       body: JSON.stringify({
         query: cleanQuery,
         search_depth: 'advanced',
+        include_answer: true,
+        include_results: true,
+        include_raw_content: false,
         include_domains: [],
         exclude_domains: filterConfig.excludeDomains,
-        include_answer: false,
-        include_raw_content: false,
         include_images: false,
         max_results: 10
       })

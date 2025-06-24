@@ -38,6 +38,9 @@ export async function callTavilyAPI(query, intent) {
       body: JSON.stringify({
         query: cleanQuery,
         search_depth: 'advanced',
+        include_answer: true,
+        include_results: true,
+        include_raw_content: false,
         include_domains: ['211.org', 'womenshelters.org', 'domesticshelters.org'],
         max_results: 5
       })

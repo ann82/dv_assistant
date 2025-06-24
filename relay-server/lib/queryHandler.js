@@ -67,6 +67,9 @@ export async function handleUserQuery(query) {
       body: JSON.stringify({
         query: cleanRewrittenQuery,
         search_depth: 'advanced',
+        include_answer: true,
+        include_results: true,
+        include_raw_content: false,
         include_domains: ['211.org', 'womenshelters.org', 'domesticshelters.org'],
         max_results: 5
       })
