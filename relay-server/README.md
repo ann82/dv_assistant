@@ -458,6 +458,163 @@ Returns an object with:
 - All previous formatter functions are deprecated. Use only `ResponseGenerator.formatTavilyResponse` for all Tavily result formatting.
 - The function is fully tested and supports all output types (voice, SMS, web).
 
+## Custom Tavily Response Formatting (v1.0.13)
+
+The system now supports flexible, customizable Tavily response formatting with multiple format options and filtering capabilities.
+
+### Custom Format Options
+
+```js
+import { ResponseGenerator } from './lib/response.js';
+
+const tavilyResponse = await callTavilyAPI(query);
+const options = {
+  query: 'find shelters in South Lake Tahoe',
+  location: 'South Lake Tahoe',
+  minScore: 0.2,
+  maxResults: 3
+};
+
+// Simple format - basic shelter information
+const simple = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'simple', options);
+
+// Detailed format - comprehensive information with metadata
+const detailed = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'detailed', options);
+
+// Minimal format - just names and URLs
+const minimal = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'minimal', options);
+
+// Custom format - fully customizable structure
+const custom = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'custom', {
+  structure: {
+    status: 'status',
+    resources: 'resources',
+    includeScore: true,
+    includePhone: true,
+    includeContent: false
+  },
+  minScore: 0.2
+});
+```
+
+### Format Types
+
+#### Simple Format
+Returns basic shelter information with phone numbers and relevance scores:
+```json
+{
+  "success": true,
+  "message": "Found 3 shelters",
+  "count": 3,
+  "data": [
+    {
+      "name": "Domestic Violence Shelter - Safe Haven",
+      "url": "https://example.com/shelter",
+      "phone": "408-279-2962",
+      "relevance": 89
+    }
+  ],
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "query": "find shelters in South Lake Tahoe",
+  "location": "South Lake Tahoe"
+}
+```
+
+#### Detailed Format
+Returns comprehensive information with metadata:
+```json
+{
+  "success": true,
+  "message": "Found 3 shelters",
+  "count": 3,
+  "results": [
+    {
+      "title": "Domestic Violence Shelter - Safe Haven",
+      "url": "https://example.com/shelter",
+      "content": "Emergency shelter for domestic violence victims...",
+      "score": 0.890761,
+      "relevance": 89,
+      "phone": "408-279-2962",
+      "cleanName": "Domestic Violence Shelter",
+      "metadata": {
+        "hasPhone": true,
+        "contentLength": 186,
+        "isHighRelevance": true
+      }
+    }
+  ],
+  "metadata": {
+    "query": "find shelters in South Lake Tahoe",
+    "location": "South Lake Tahoe",
+    "searchDepth": "advanced",
+    "minScore": 0.2,
+    "maxResults": 3,
+    "totalResults": 3,
+    "filteredResults": 3
+  },
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### Minimal Format
+Returns just essential information:
+```json
+{
+  "found": true,
+  "count": 3,
+  "shelters": [
+    {
+      "name": "Domestic Violence Shelter - Safe Haven",
+      "url": "https://example.com/shelter"
+    }
+  ]
+}
+```
+
+#### Custom Format
+Fully customizable structure based on options:
+```json
+{
+  "status": "success",
+  "resources": [
+    {
+      "name": "Domestic Violence Shelter - Safe Haven",
+      "url": "https://example.com/shelter",
+      "score": 0.890761,
+      "relevance": 89,
+      "phone": "408-279-2962"
+    }
+  ],
+  "count": 3,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### Filtering Options
+
+- **minScore**: Minimum relevance score (0.0-1.0) for filtering results
+- **maxResults**: Maximum number of results to return
+- **query**: Original user query for context
+- **location**: Extracted location for context
+
+### Enhanced Features
+
+- **Phone Number Extraction**: Improved regex pattern handles various phone formats including parentheses
+- **Title Cleaning**: Intelligent title cleaning for voice responses while preserving original titles for custom formats
+- **Empty Response Handling**: Proper handling of null/undefined responses with appropriate success/failure status
+- **Metadata Calculation**: Accurate calculation of hasPhone, contentLength, and relevance indicators
+- **Test Data Compatibility**: Updated test data includes domestic violence keywords for realistic testing
+
+### Error Handling
+
+The system gracefully handles:
+- Empty or null Tavily responses
+- Missing or malformed result data
+- Invalid filtering options
+- Phone number extraction failures
+
+All custom format functions return consistent error responses with appropriate success/failure indicators.
+
 ## Maintenance
 
 - As of June 2024, `esbuild` and `@types/node` have been updated to their latest versions. This keeps the build and type system up to date and resolves previous version mismatch warnings.
