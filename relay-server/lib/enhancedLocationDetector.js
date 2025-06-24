@@ -320,39 +320,38 @@ function cleanConversationalFillers(query) {
 
   const conversationalFillers = [
     'hey', 'hi', 'hello', 'good morning', 'good afternoon', 'good evening',
-    'can you help me', 'could you help me', 'i need help', 'i need assistance',
     'please help me', 'please assist me', 'i would like', 'i want to',
     'i am looking for', 'i am searching for', 'i need to find', 'i want to find',
     'can you find', 'could you find', 'can you get', 'could you get',
     'i need some', 'i want some', 'i am looking for some', 'i need to get some',
     'i was wondering', 'i hope you can help', 'i hope you can assist',
-    'i hope you can find', 'i hope you can search', 'excuse me', 'sorry to bother you'
+    'i hope you can find', 'i hope you can search', 'excuse me', 'sorry to bother you',
+    'can you help me', 'could you help me'
   ];
 
-  let cleanedQuery = query.toLowerCase().trim();
-  
+  let cleaned = query.trim();
+  let original = cleaned;
+
   // Remove consecutive fillers at the start
   let previousLength = 0;
-  while (cleanedQuery.length !== previousLength) {
-    previousLength = cleanedQuery.length;
+  while (cleaned.length !== previousLength) {
+    previousLength = cleaned.length;
     for (const filler of conversationalFillers) {
-      // More aggressive pattern matching
+      // More aggressive pattern matching that handles punctuation
       const fillerPattern = new RegExp(`^\\s*${filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[.,!?;]?\\s*`, 'i');
-      cleanedQuery = cleanedQuery.replace(fillerPattern, ' ');
-      
-      // Also try without punctuation
-      const fillerPattern2 = new RegExp(`^\\s*${filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i');
-      cleanedQuery = cleanedQuery.replace(fillerPattern2, ' ');
+      if (fillerPattern.test(cleaned)) {
+        cleaned = cleaned.replace(fillerPattern, '');
+      }
     }
-    cleanedQuery = cleanedQuery.trim();
   }
 
-  // If all content was removed, return original
-  if (!cleanedQuery) {
-    return query;
+  // If we removed everything, return the original
+  if (cleaned.trim() === '') {
+    return original;
   }
 
-  return cleanedQuery;
+  // Return lowercase to match test expectations
+  return cleaned.trim().toLowerCase();
 }
 
 /**
@@ -388,7 +387,7 @@ function cleanExtractedLocation(location) {
     return null;
   }
   
-  // Convert to lowercase for consistency
+  // Return lowercase for consistency with test expectations
   return cleaned.toLowerCase();
 }
 
@@ -517,11 +516,21 @@ export async function getLocationCoordinates(location) {
   
   const locationInfo = await detectUSLocation(location);
   
-  if (locationInfo.geocodeData) {
-    return {
-      latitude: locationInfo.geocodeData.latitude,
-      longitude: locationInfo.geocodeData.longitude
-    };
+  // Only return coordinates if we have valid geocode data and the location matches
+  if (locationInfo.geocodeData && locationInfo.geocodeData.latitude && locationInfo.geocodeData.longitude) {
+    // Validate that the geocoded location is reasonably close to the requested location
+    const geocodedName = locationInfo.geocodeData.displayName || '';
+    const requestedLower = location.toLowerCase();
+    
+    // Check if the requested location appears in the geocoded result
+    // This helps filter out cases where geocoding returns a default location
+    if (geocodedName.toLowerCase().includes(requestedLower) || 
+        requestedLower.includes(locationInfo.geocodeData.city?.toLowerCase() || '')) {
+      return {
+        latitude: locationInfo.geocodeData.latitude,
+        longitude: locationInfo.geocodeData.longitude
+      };
+    }
   }
   
   return null;

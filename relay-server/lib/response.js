@@ -449,8 +449,22 @@ export class ResponseGenerator {
   }
 
   static async queryTavily(query) {
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      logger.error('Invalid query parameter for Tavily API:', {
+        query,
+        type: typeof query,
+        isNull: query === null,
+        isUndefined: query === undefined,
+        isEmpty: query === '',
+        isWhitespace: query && query.trim() === ''
+      });
+      return null;
+    }
+
+    const cleanQuery = query.trim();
     logger.info('Querying Tavily API', {
-      query,
+      query: cleanQuery,
       timestamp: new Date().toISOString()
     });
 
@@ -468,7 +482,7 @@ export class ResponseGenerator {
             'Authorization': `Bearer ${config.TAVILY_API_KEY}`
           },
           body: JSON.stringify({
-            query,
+            query: cleanQuery,
             search_depth: 'advanced',
             include_answer: true,
             include_domains: [],
@@ -482,14 +496,14 @@ export class ResponseGenerator {
             status: response.status,
             statusText: response.statusText,
             error: errorText,
-            query
+            query: cleanQuery
           });
           throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         logger.info('Tavily API response', {
-          query,
+          query: cleanQuery,
           resultCount: data.results?.length || 0,
           hasAnswer: !!data.answer,
           timestamp: new Date().toISOString()
@@ -499,7 +513,7 @@ export class ResponseGenerator {
       } catch (error) {
         logger.error('Error calling Tavily API', {
           error: error.message,
-          query,
+          query: cleanQuery,
           stack: error.stack
         });
         throw error;
@@ -507,11 +521,11 @@ export class ResponseGenerator {
     });
 
     try {
-      return await callTavilyWithRetry(query);
+      return await callTavilyWithRetry(cleanQuery);
     } catch (error) {
       logger.error('Failed to get Tavily response', {
         error: error.message,
-        query,
+        query: cleanQuery,
         stack: error.stack
       });
       return null;
@@ -861,8 +875,22 @@ export class ResponseGenerator {
 
   static async searchWithTavily(query) {
     try {
+      // Validate query parameter
+      if (!query || typeof query !== 'string' || query.trim() === '') {
+        logger.error('Invalid query parameter for Tavily search:', {
+          query,
+          type: typeof query,
+          isNull: query === null,
+          isUndefined: query === undefined,
+          isEmpty: query === '',
+          isWhitespace: query && query.trim() === ''
+        });
+        throw new Error('Invalid query parameter: query must be a non-empty string');
+      }
+
+      const cleanQuery = query.trim();
       // Enhance the query to focus on domestic violence shelters
-      const enhancedQuery = `domestic violence shelter ${query}`;
+      const enhancedQuery = `domestic violence shelter ${cleanQuery}`;
       
       const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',

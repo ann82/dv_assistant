@@ -525,7 +525,7 @@ router.post('/web/process', async (req, res) => {
  * @param {string} speechResult - The transcribed speech text to process
  * @param {string} requestId - Unique identifier for this request
  * @param {string} requestType - Type of request ('web' or 'twilio')
- * @returns {string} Formatted response appropriate for the request type
+ * @returns {Object|string} Formatted response appropriate for the request type
  */
 export async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
   logger.info('Processing speech result:', {
@@ -574,7 +574,7 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
     }
 
     // Rewrite query with context for better search results
-    const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+    const rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
     logger.info('Rewritten query:', {
       requestId,
       callSid,
@@ -583,6 +583,21 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
       intent
     });
 
+    // Defensive check and logging before Tavily API call
+    logger.info('Type and value of rewrittenQuery before Tavily:', {
+      type: typeof rewrittenQuery,
+      value: rewrittenQuery
+    });
+    if (typeof rewrittenQuery !== 'string') {
+      logger.error('rewrittenQuery is not a string, attempting to convert or throw error', {
+        rewrittenQuery
+      });
+      if (rewrittenQuery && typeof rewrittenQuery.toString === 'function') {
+        rewrittenQuery = rewrittenQuery.toString();
+      } else {
+        throw new Error('rewrittenQuery must be a string');
+      }
+    }
     // Call Tavily API with rewritten query
     logger.info('Calling Tavily API:', {
       requestId,
@@ -624,6 +639,10 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
       });
     }
 
+    // Return appropriate format based on request type
+    if (requestType === 'web') {
+      return formattedResponse;
+    }
     return formattedResponse;
   } catch (error) {
     logger.error('Error processing speech result:', {

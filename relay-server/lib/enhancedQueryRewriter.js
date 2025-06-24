@@ -11,47 +11,51 @@ import { detectUSLocation, extractLocationFromQuery, detectLocationWithGeocoding
  */
 
 // Conversational fillers to remove from the start of queries
-const CONVERSATIONAL_FILLERS = [
+let CONVERSATIONAL_FILLERS = [
   'hey', 'hi', 'hello', 'good morning', 'good afternoon', 'good evening',
-  'can you help me', 'could you help me', 'i need help', 'i need assistance',
-  'please help me', 'please assist me', 'i\'m looking for', 'i want to find',
-  'i need to find', 'i\'m trying to find', 'i\'m searching for', 'i want to search for',
-  'can you find', 'could you find', 'can you search', 'could you search',
-  'i need', 'i want', 'i\'m looking', 'i\'m trying', 'i\'m searching',
-  'help me find', 'help me search', 'assist me with', 'help me with',
-  'excuse me', 'sorry to bother you', 'i was wondering', 'i hope you can help',
-  'i hope you can assist', 'i hope you can find', 'i hope you can search'
+  'please help me', 'please assist me', 'i would like', 'i want to',
+  'i am looking for', 'i am searching for', 'i need to find', 'i want to find',
+  'can you find', 'could you find', 'can you get', 'could you get',
+  'i need some', 'i want some', 'i am looking for some', 'i need to get some',
+  'i was wondering', 'i hope you can help', 'i hope you can assist',
+  'i hope you can find', 'i hope you can search', 'excuse me', 'sorry to bother you',
+  'can you help me', 'could you help me', 'we can you help me'
 ];
+// Sort fillers by descending length to match multi-word fillers first
+CONVERSATIONAL_FILLERS = CONVERSATIONAL_FILLERS.sort((a, b) => b.length - a.length);
 
 /**
  * Clean conversational fillers from the start of a query
- * @param {string} query - The user query to clean
- * @returns {string} Cleaned query
+ * @param {string} query - The query to clean
+ * @returns {string} The cleaned query
  */
 function cleanConversationalFillers(query) {
   if (!query || typeof query !== 'string') {
     return query;
   }
 
-  let cleaned = query.toLowerCase().trim();
-  const original = query.trim();
-  
-  // Remove consecutive fillers from the start
+  let cleaned = query.trim();
+  let original = cleaned;
+
+  // Remove consecutive fillers at the start
   let previousLength = 0;
-  do {
+  while (cleaned.length !== previousLength) {
     previousLength = cleaned.length;
-    
     for (const filler of CONVERSATIONAL_FILLERS) {
-      // Check if the query starts with the filler (with optional punctuation)
-      const fillerPattern = new RegExp(`^${filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[.,!?;]?\\s*`, 'i');
-      cleaned = cleaned.replace(fillerPattern, '');
+      // More aggressive pattern matching that handles punctuation
+      const fillerPattern = new RegExp(`^\\s*${filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[.,!?;]?\\s*`, 'i');
+      if (fillerPattern.test(cleaned)) {
+        cleaned = cleaned.replace(fillerPattern, '');
+      }
     }
-  } while (cleaned.length < previousLength && cleaned.length > 0);
-  
-  // Clean up extra whitespace and restore original case if needed
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return original;
-  return cleaned;
+  }
+
+  // If we removed everything, return the original
+  if (cleaned.trim() === '') {
+    return original;
+  }
+
+  return cleaned.trim();
 }
 
 /**
@@ -63,7 +67,7 @@ function cleanConversationalFillers(query) {
  */
 export async function rewriteQuery(query, intent = 'find_shelter', callSid = null) {
   if (!query || typeof query !== 'string') {
-    return query;
+    return query || '';
   }
 
   logger.info('Rewriting query:', { query, intent, callSid });
@@ -100,6 +104,28 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     // For non-US locations, preserve the location but don't add US-specific enhancements
     logger.info('Non-US location detected:', { location: locationInfo.location, callSid });
     // Keep the original query as-is for non-US locations
+  } else {
+    // No location found - create a general shelter search query
+    logger.info('No location found, creating general shelter search query:', { callSid });
+    
+    // Check if "shelter" is already in the query
+    const hasShelterTerm = /\bshelter\b/i.test(cleanedQuery);
+    
+    if (!hasShelterTerm) {
+      // Add shelter-specific terms for better relevance
+      searchQuery = `domestic violence shelter ${cleanedQuery}`;
+    }
+    
+    // Add site restrictions for better quality results
+    searchQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+    
+    logger.info('General shelter query:', { searchQuery, callSid });
+  }
+
+  // Ensure we always return a valid string
+  if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+    searchQuery = 'domestic violence shelter resources site:org OR site:gov';
+    logger.warn('Empty search query, using fallback:', { searchQuery, callSid });
   }
 
   logger.info('Final rewritten query:', { 
@@ -110,7 +136,7 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     callSid 
   });
 
-  return searchQuery;
+  return searchQuery.trim();
 }
 
 /**

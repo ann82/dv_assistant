@@ -12,7 +12,22 @@ import { ResponseGenerator } from './response.js';
  */
 export async function callTavilyAPI(query, intent) {
   try {
-    logger.info('Calling Tavily API with query:', { query, intent });
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      logger.error('Invalid query parameter for Tavily API:', {
+        query,
+        type: typeof query,
+        intent,
+        isNull: query === null,
+        isUndefined: query === undefined,
+        isEmpty: query === '',
+        isWhitespace: query && query.trim() === ''
+      });
+      throw new Error('Invalid query parameter: query must be a non-empty string');
+    }
+
+    const cleanQuery = query.trim();
+    logger.info('Calling Tavily API with query:', { query: cleanQuery, intent });
 
     const response = await fetch('https://api.tavily.com/search', {
       method: 'POST',
@@ -21,7 +36,7 @@ export async function callTavilyAPI(query, intent) {
         'X-Api-Key': config.TAVILY_API_KEY
       },
       body: JSON.stringify({
-        query,
+        query: cleanQuery,
         search_depth: 'advanced',
         include_domains: ['211.org', 'womenshelters.org', 'domesticshelters.org'],
         max_results: 5
@@ -35,28 +50,28 @@ export async function callTavilyAPI(query, intent) {
     const data = await response.json();
     logger.info('Tavily API response:', { 
       resultCount: data.results.length,
-      query
+      query: cleanQuery
     });
 
     // If no results, use fallback
     if (!data.results || data.results.length === 0) {
       logger.info('No Tavily results, using fallback response');
-      return await fallbackResponse(query, intent);
+      return await fallbackResponse(cleanQuery, intent);
     }
 
     // Rerank results by semantic relevance
-    const rerankedResults = await rerankByRelevance(query, data.results);
+    const rerankedResults = await rerankByRelevance(cleanQuery, data.results);
     
     // If top result has low relevance score, use fallback
     if (rerankedResults[0].relevanceScore < 0.5) {
       logger.info('Low relevance results, using fallback response', {
         topScore: rerankedResults[0].relevanceScore
       });
-      return await fallbackResponse(query, intent);
+      return await fallbackResponse(cleanQuery, intent);
     }
     
     // Format the response
-    const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', query, 3);
+    const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', cleanQuery, 3);
     return formattedResponse;
 
   } catch (error) {

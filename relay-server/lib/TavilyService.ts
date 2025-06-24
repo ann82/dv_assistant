@@ -12,7 +12,13 @@ export class TavilyService {
   }
 
   async callTavilyAPI(query: string): Promise<any> {
-    const cachedResponse = this.cache.get(query);
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      throw new Error('Invalid query parameter: query must be a non-empty string');
+    }
+
+    const cleanQuery = query.trim();
+    const cachedResponse = this.cache.get(cleanQuery);
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -23,7 +29,7 @@ export class TavilyService {
         'Content-Type': 'application/json',
         'X-Api-Key': process.env.TAVILY_API_KEY || ''
       },
-      body: JSON.stringify({ query, search_depth: 'basic', max_results: 3 })
+      body: JSON.stringify({ query: cleanQuery, search_depth: 'basic', max_results: 3 })
     });
 
     if (!response.ok) {
@@ -31,7 +37,7 @@ export class TavilyService {
     }
 
     const data = await response.json();
-    this.cache.set(query, data);
+    this.cache.set(cleanQuery, data);
     return data;
   }
 } 

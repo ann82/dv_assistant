@@ -3,7 +3,21 @@ import { filterConfig } from './filterConfig.js';
 
 export async function callTavilyAPI(query) {
   try {
-    logger.info('Calling Tavily API with query:', query);
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      logger.error('Invalid query parameter for Tavily API:', {
+        query,
+        type: typeof query,
+        isNull: query === null,
+        isUndefined: query === undefined,
+        isEmpty: query === '',
+        isWhitespace: query && query.trim() === ''
+      });
+      throw new Error('Invalid query parameter: query must be a non-empty string');
+    }
+
+    const cleanQuery = query.trim();
+    logger.info('Calling Tavily API with query:', cleanQuery);
     
     // Get API key from environment
     const apiKey = process.env.TAVILY_API_KEY;
@@ -27,7 +41,7 @@ export async function callTavilyAPI(query) {
         'Authorization': `Bearer ${apiKey}`  // Changed from 'api-key' to 'Authorization: Bearer'
       },
       body: JSON.stringify({
-        query: query,
+        query: cleanQuery,
         search_depth: 'advanced',
         include_domains: [],
         exclude_domains: filterConfig.excludeDomains,

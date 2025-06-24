@@ -135,44 +135,49 @@ export function clearConversationContext(callSid) {
 }
 
 /**
- * Rewrites a query based on the detected intent to improve search results
- * @param {string} query - The original user query
+ * Rewrite query for optimal search results
+ * @param {string} query - The user query
  * @param {string} intent - The detected intent
  * @param {string} callSid - The call SID for conversation context
- * @returns {string} The rewritten query
+ * @returns {Promise<string>} The rewritten query
  */
 export async function rewriteQuery(query, intent, callSid = null) {
   if (!query || typeof query !== 'string') {
-    return query;
+    return query || '';
   }
 
   let rewrittenQuery = query.trim();
   const lowerQuery = rewrittenQuery.toLowerCase();
 
-  // Use geocoding-based location detection
-  const locationInfo = await detectLocationWithGeocoding(query);
+  try {
+    // Use geocoding-based location detection
+    const locationInfo = await detectLocationWithGeocoding(query);
 
-  // Add location context if present and US
-  if (locationInfo.location && locationInfo.isUS) {
-    // Add shelter-specific terms for shelter intent
-    if (intent === 'find_shelter' && !/\bshelter\b/i.test(rewrittenQuery)) {
-      rewrittenQuery = `domestic violence shelter near ${locationInfo.location}`;
-    } else if (intent === 'find_shelter') {
-      rewrittenQuery = `${rewrittenQuery} near ${locationInfo.location}`;
-    } else {
-      // For other intents, just add location context
-      if (!rewrittenQuery.includes(locationInfo.location)) {
-        rewrittenQuery = `${rewrittenQuery} in ${locationInfo.location}`;
+    // Add location context if present and US
+    if (locationInfo && locationInfo.location && locationInfo.isUS) {
+      // Add shelter-specific terms for shelter intent
+      if (intent === 'find_shelter' && !/\bshelter\b/i.test(rewrittenQuery)) {
+        rewrittenQuery = `domestic violence shelter near ${locationInfo.location}`;
+      } else if (intent === 'find_shelter') {
+        rewrittenQuery = `${rewrittenQuery} near ${locationInfo.location}`;
+      } else {
+        // For other intents, just add location context
+        if (!rewrittenQuery.includes(locationInfo.location)) {
+          rewrittenQuery = `${rewrittenQuery} in ${locationInfo.location}`;
+        }
       }
+      // Add site restrictions for shelter search
+      if (intent === 'find_shelter') {
+        rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+      }
+    } else if (locationInfo && locationInfo.location && !locationInfo.isUS) {
+      // For non-US locations, preserve the location but don't add US-specific enhancements
+      // Optionally, you could return a message here if you want to block non-US queries
+      // For now, just keep the original query as-is
     }
-    // Add site restrictions for shelter search
-    if (intent === 'find_shelter') {
-      rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
-    }
-  } else if (locationInfo.location && !locationInfo.isUS) {
-    // For non-US locations, preserve the location but don't add US-specific enhancements
-    // Optionally, you could return a message here if you want to block non-US queries
-    // For now, just keep the original query as-is
+  } catch (error) {
+    logger.error('Error in location detection during query rewriting:', error);
+    // Continue with the original query if location detection fails
   }
 
   // Add intent-specific enhancements for other intents
@@ -189,7 +194,8 @@ export async function rewriteQuery(query, intent, callSid = null) {
       break;
   }
 
-  return rewrittenQuery;
+  // Ensure we always return a valid string
+  return rewrittenQuery || query || '';
 }
 
 /**

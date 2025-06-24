@@ -273,7 +273,7 @@ export class TwilioVoiceHandler {
       // For general information requests, don't require location
       if (intent === 'general_information') {
         // Rewrite query for general information search
-        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+        const rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
         logger.info('Rewritten query for general information:', {
           requestId,
           callSid,
@@ -281,6 +281,18 @@ export class TwilioVoiceHandler {
           rewrittenQuery,
           intent
         });
+
+        // Ensure we have a valid query for Tavily
+        if (!rewrittenQuery || typeof rewrittenQuery !== 'string' || rewrittenQuery.trim() === '') {
+          logger.error('Invalid rewritten query for general information:', {
+            requestId,
+            callSid,
+            originalQuery: speechResult,
+            rewrittenQuery,
+            intent
+          });
+          return "I'm sorry, I couldn't process your request. Please try rephrasing your question.";
+        }
 
         // Call Tavily API for general information
         logger.info('Calling Tavily API for general information:', {
@@ -345,7 +357,7 @@ export class TwilioVoiceHandler {
         }
 
         // Rewrite query with context
-        const rewrittenQuery = rewriteQuery(speechResult, intent, callSid);
+        const rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
         logger.info('Rewritten query:', {
           requestId,
           callSid,
@@ -353,6 +365,19 @@ export class TwilioVoiceHandler {
           rewrittenQuery,
           intent
         });
+
+        // Ensure we have a valid query for Tavily
+        if (!rewrittenQuery || typeof rewrittenQuery !== 'string' || rewrittenQuery.trim() === '') {
+          logger.error('Invalid rewritten query for resource search:', {
+            requestId,
+            callSid,
+            originalQuery: speechResult,
+            rewrittenQuery,
+            intent,
+            locationInfo
+          });
+          return "I'm sorry, I couldn't process your request. Please try rephrasing your question with a specific location.";
+        }
 
         // Call Tavily API with rewritten query
         logger.info('Calling Tavily API:', {

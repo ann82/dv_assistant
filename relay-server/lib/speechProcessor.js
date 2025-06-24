@@ -42,17 +42,17 @@ export async function extractLocation(speechInput) {
 function extractLocationByPattern(speechInput) {
   const input = speechInput.toLowerCase();
   
-  // Common location patterns
+  // Common location patterns (now includes 'for')
   const locationPatterns = [
     // Standard patterns
-    /(?:in|at|near|around|to|from)\s+([a-zA-Z\s]+?)(?:\s+(?:area|region|county|city|town|state))?/i,
-    /(?:shelter|help|services)\s+(?:in|at|near|around)\s+([a-zA-Z\s]+)/i,
-    /([a-zA-Z\s]+?)\s+(?:area|region|county|city|town|state)/i,
-    
+    /(?:in|at|near|around|to|from|for)\s+([a-zA-Z\s,]+?)(?:\s+(?:area|region|county|city|town|state))?/i,
+    /(?:shelter|help|services)\s+(?:in|at|near|around|for)\s+([a-zA-Z\s,]+)/i,
+    /([a-zA-Z\s,]+?)\s+(?:area|region|county|city|town|state)/i,
+    // New: direct 'for' pattern
+    /for\s+([a-zA-Z\s,]+?)(?:[?.,!;]|$)/i,
     // Handle speech recognition errors and informal speech
     /(?:hold|help|find|need|want)\s+(?:me|a|the)?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
     /(?:homeless|me|a)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-    
     // Catch any capitalized word that might be a location (fallback)
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g
   ];
@@ -62,11 +62,11 @@ function extractLocationByPattern(speechInput) {
     if (match && match[1]) {
       const location = match[1].trim();
       // Filter out common words that aren't locations
-      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services', 'hold', 'find', 'homeless'];
+      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'for', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services', 'hold', 'find', 'homeless'];
       const words = location.split(' ').filter(word => !commonWords.includes(word.toLowerCase()));
-      
       if (words.length > 0) {
-        return words.join(' ');
+        // Return with proper case (capitalize first letter of each word)
+        return words.map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
       }
     }
   }
@@ -87,7 +87,7 @@ async function extractLocationWithAI(speechInput) {
 
 Speech input: "${speechInput}"
 
-If a location is found, respond with only the location name (e.g., "San Francisco", "Oakland", "Tahoe").
+If a location is found, respond with only the location name with proper capitalization (e.g., "San Francisco", "Oakland", "Tahoe").
 If no location is found, respond with "none".
 
 Examples:
@@ -109,13 +109,14 @@ Examples:
       return null;
     }
     
-    const location = responseText.trim().toLowerCase();
+    const location = responseText.trim();
     
-    if (location === 'none' || location === 'no location' || location === '') {
+    if (location.toLowerCase() === 'none' || location.toLowerCase() === 'no location' || location === '') {
       return null;
     }
     
-    return location;
+    // Ensure proper capitalization
+    return location.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
   } catch (error) {
     logger.error('Error calling GPT for location extraction:', error);
     return null;

@@ -1,5 +1,5 @@
 import { getIntent } from './intentClassifier.js';
-import { rewriteQuery } from './intentClassifier.js';
+import { rewriteQuery } from './enhancedQueryRewriter.js';
 import { callTavilyAPI } from './tavily.js';
 import { rerankByRelevance } from './relevanceScorer.js';
 import { fallbackResponse } from './fallbackResponder.js';
@@ -17,19 +17,45 @@ const MIN_CONFIDENCE_SCORE = 0.7;
  */
 export async function handleUserQuery(query) {
   try {
-    logger.info('Processing user query:', { query });
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      logger.error('Invalid query parameter for user query:', {
+        query,
+        type: typeof query,
+        isNull: query === null,
+        isUndefined: query === undefined,
+        isEmpty: query === '',
+        isWhitespace: query && query.trim() === ''
+      });
+      throw new Error('Invalid query parameter: query must be a non-empty string');
+    }
+
+    const cleanQuery = query.trim();
+    logger.info('Processing user query:', { query: cleanQuery });
 
     // Step 1: Get intent
-    const intent = await getIntent(query);
-    logger.info('Intent classification:', { query, intent });
+    const intent = await getIntent(cleanQuery);
+    logger.info('Intent classification:', { query: cleanQuery, intent });
 
-    // Step 2: Rewrite query based on intent
-    const rewrittenQuery = rewriteQuery(query, intent);
+    // Step 2: Rewrite query based on intent using enhanced query rewriter
+    const rewrittenQuery = await rewriteQuery(cleanQuery, intent);
     logger.info('Query rewritten:', { 
-      original: query,
+      original: cleanQuery,
       rewritten: rewrittenQuery,
       intent 
     });
+
+    // Validate rewritten query
+    if (!rewrittenQuery || typeof rewrittenQuery !== 'string' || rewrittenQuery.trim() === '') {
+      logger.error('Invalid rewritten query:', {
+        originalQuery: cleanQuery,
+        rewrittenQuery,
+        intent
+      });
+      throw new Error('Invalid rewritten query: query must be a non-empty string');
+    }
+
+    const cleanRewrittenQuery = rewrittenQuery.trim();
 
     // Step 3: Get Tavily results
     const tavilyResponse = await fetch('https://api.tavily.com/search', {
@@ -39,7 +65,7 @@ export async function handleUserQuery(query) {
         'X-Api-Key': process.env.TAVILY_API_KEY
       },
       body: JSON.stringify({
-        query: rewrittenQuery,
+        query: cleanRewrittenQuery,
         search_depth: 'advanced',
         include_domains: ['211.org', 'womenshelters.org', 'domesticshelters.org'],
         max_results: 5
@@ -55,11 +81,11 @@ export async function handleUserQuery(query) {
     // If no results, use GPT fallback
     if (!tavilyData.results || tavilyData.results.length === 0) {
       logger.info('No Tavily results, using GPT fallback');
-      const gptResponse = await fallbackResponse(rewrittenQuery, intent);
+      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent);
       
       // Log query handling
       await logQueryHandling({
-        query,
+        query: cleanQuery,
         intent,
         usedGPT: true,
         score: 0
@@ -69,7 +95,7 @@ export async function handleUserQuery(query) {
     }
 
     // Step 4: Rerank results
-    const rerankedResults = await rerankByRelevance(rewrittenQuery, tavilyData.results);
+    const rerankedResults = await rerankByRelevance(cleanRewrittenQuery, tavilyData.results);
     const topScore = rerankedResults[0]?.relevanceScore || 0;
     
     // Check if top result meets confidence threshold
@@ -78,11 +104,11 @@ export async function handleUserQuery(query) {
         topScore,
         threshold: MIN_CONFIDENCE_SCORE
       });
-      const gptResponse = await fallbackResponse(rewrittenQuery, intent);
+      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent);
       
       // Log query handling
       await logQueryHandling({
-        query,
+        query: cleanQuery,
         intent,
         usedGPT: true,
         score: topScore
@@ -92,17 +118,17 @@ export async function handleUserQuery(query) {
     }
 
     // Step 5: Format Tavily response
-    const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', query, 3);
+    const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', cleanQuery, 3);
     
     // Log query handling
     await logQueryHandling({
-      query,
+      query: cleanQuery,
       intent,
       usedGPT: false,
       score: topScore
     });
     
-    return { response: formattedResponse, source: 'tavily' };
+    return { response: formattedResponse.voiceResponse, source: 'tavily' };
 
   } catch (error) {
     logger.error('Error handling user query:', error);
