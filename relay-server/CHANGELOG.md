@@ -646,4 +646,22 @@ All notable changes to this project will be documented in this file.
 - Enhanced the voice response formatting for follow-up questions to be more natural and user-friendly.
 
 ### Fixed
-- Fixed edge cases where follow-up queries did not match any previous results, providing a graceful fallback message. 
+- Fixed edge cases where follow-up queries did not match any previous results, providing a graceful fallback message.
+
+## [1.0.12] - 2024-06-24
+
+### Added
+- **Incomplete Location Query Handling**
+  - The system now detects when a user asks for a resource but does not specify a location (e.g., "Can you help me find shelter homes near?").
+  - When this happens, the voice response prompts: "Could you please tell me which city or area you're looking for? For example, you could say 'near San Francisco' or 'in New York'."
+  - Prevents irrelevant or low-confidence searches and improves user experience.
+- **Tests**
+  - Added tests for incomplete location detection in both the location extraction logic and Twilio voice route.
+
+### Changed
+- **Voice Processing**
+  - Updated the call flow to prompt for a specific location if the query is incomplete, instead of proceeding with a vague search.
+
+### Fixed
+- **No longer promises SMS immediately after giving locations**
+  - Ensures the system only asks for SMS consent at the end of the conversation, after the user indicates they are done. 

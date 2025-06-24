@@ -89,6 +89,9 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - **Multi-Turn Conversations**: Users can now ask multiple questions before ending the call
   - **End Conversation Detection**: New `end_conversation` intent detects when users want to end the call
   - **Proper Consent Collection**: Only asks for SMS consent at the very end of the conversation
+- **Incomplete Location Query Handling (2024-06-24)**
+  - If a user asks for a resource but does not specify a location (e.g., "Can you help me find shelter homes near?"), the system detects this and prompts: "Could you please tell me which city or area you're looking for? For example, you could say 'near San Francisco' or 'in New York'."
+  - Prevents irrelevant or low-confidence searches and improves user experience
 - **Enhanced SMS Consent System**: Improved consent collection and SMS delivery
   - **Clear Consent Question**: "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no."
   - **Consent Response Detection**: Automatically detects yes/no responses and routes to consent endpoint
