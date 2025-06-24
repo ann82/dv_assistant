@@ -535,8 +535,11 @@ export class ResponseGenerator {
       };
     }
 
+    // Filter out results with score < 0.7
+    const filteredResults = tavilyResponse.results.filter(r => (r.score ?? 0) >= 0.7);
+
     // Sort results by score (highest first) and take top results
-    const sortedResults = [...tavilyResponse.results]
+    const sortedResults = [...filteredResults]
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, maxResults);
 
@@ -559,7 +562,7 @@ export class ResponseGenerator {
 
     // Compose summary for web
     const summary = `I found ${shelters.length} shelters${location ? ' in ' + location : ''}:
-\n` +
+` +
       shelters.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
 
     return {
@@ -592,7 +595,7 @@ export class ResponseGenerator {
     if (results.length === 1) {
       const result = results[0];
       const title = this.cleanTitleForVoice(result.title);
-      return `I found a shelter${locationText}: ${title}. I'll send you the complete details via text message at the end of our call.`;
+      return `I found a shelter${locationText}: ${title}. How else can I help you today?`;
     }
     const organizationNames = results.map(result => this.cleanTitleForVoice(result.title));
     let response = `I found ${results.length} shelters${locationText}`;
@@ -603,7 +606,7 @@ export class ResponseGenerator {
     } else {
       response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
     }
-    response += '. I\'ll send you the complete details via text message at the end of our call.';
+    response += '. How else can I help you today?';
     return response;
   }
 

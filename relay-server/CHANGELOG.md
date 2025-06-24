@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.12] - 2024-12-21
+
+### Added
+- **Enhanced Location Detection & Query Rewriting** - Major improvements to location processing and query handling
+  - **Enhanced Location Detector**: New comprehensive location detection system with geocoding validation
+  - **Enhanced Query Rewriter**: Advanced query processing with conversational filler removal and intelligent rewriting
+  - **Service Word Filtering**: Improved location extraction that filters out service words like "home" in "home Mumbai"
+  - **Incomplete Location Query Handling**: System now prompts users to specify location when missing
+  - **US-Only Support Messaging**: Clear messaging for non-US locations about service availability
+- **Comprehensive Test Suite Overhaul** - Major test improvements and fixes
+  - **Mock System Fixes**: Resolved mock initialization issues across all test files
+  - **Async Test Handling**: Fixed async/await patterns in test suites
+  - **API Response Alignment**: Updated tests to match current implementation response formats
+  - **Test Coverage Expansion**: Added tests for new enhanced location detection and query rewriting features
+  - **Fallback Response Tests**: Improved fallback responder test coverage and accuracy
+  - **Intent Classification Tests**: Enhanced intent classification test coverage with proper mock setup
+  - **Query Handler Tests**: Updated query handler tests to match current implementation behavior
+  - **Speech Processing Tests**: Fixed speech processing tests to align with current API usage
+  - **Cache System Tests**: Improved cache testing with proper LRU eviction and TTL handling
+
+### Changed
+- **Test Infrastructure**: Updated test setup and mock configurations for better reliability
+- **API Response Handling**: Aligned test expectations with current implementation response formats
+- **Mock Initialization**: Fixed mock setup issues that were causing test failures
+- **Test Async Patterns**: Improved async/await usage in test suites
+
+### Fixed
+- **Test Failures**: Resolved 45+ test failures across multiple test suites
+- **Mock Setup Issues**: Fixed mock initialization problems in fallbackResponder, followUp, intentClassifier, and other tests
+- **API Response Mismatches**: Aligned test expectations with current Tavily API and response generator implementations
+- **Cache Test Issues**: Fixed LRU cache eviction and TTL testing
+- **Logger Mock Problems**: Resolved logger mock setup for both default and named exports
+- **Speech Processing Tests**: Fixed speech processing tests to match current implementation behavior
+- **Location Detection Tests**: Updated location detection tests to work with new enhanced system
+- **Query Rewriting Tests**: Fixed query rewriting tests to match new enhanced implementation
+
+### Technical Improvements
+- **Enhanced Location Detector**: New `enhancedLocationDetector.js` with geocoding validation and service word filtering
+- **Enhanced Query Rewriter**: New `enhancedQueryRewriter.js` with conversational filler removal and intelligent rewriting
+- **Test Reliability**: Significantly improved test reliability and coverage
+- **Code Quality**: Better error handling and fallback mechanisms throughout the codebase
+
 ## [1.0.11] - 2024-12-21
 
 ### Added

@@ -1,11 +1,11 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ResponseGenerator } from '../lib/response.js';
-import { jest } from '@jest/globals';
 
 describe('ResponseGenerator', () => {
   beforeEach(() => {
     // Clear cache before each test
     ResponseGenerator.tavilyCache.clear();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Caching', () => {
@@ -14,8 +14,8 @@ describe('ResponseGenerator', () => {
       const mockResponse = { results: ['test result'] };
       
       // Mock the internal methods
-      ResponseGenerator.classifyIntent = jest.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
-      ResponseGenerator.queryTavily = jest.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
       
       // First call
       const response1 = await ResponseGenerator.getResponse(input);
@@ -32,8 +32,8 @@ describe('ResponseGenerator', () => {
       const mockResponse = { results: ['test result'] };
       
       // Mock the internal methods
-      ResponseGenerator.classifyIntent = jest.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
-      ResponseGenerator.queryTavily = jest.fn().mockResolvedValue(mockResponse);
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
       
       // First call
       await ResponseGenerator.getResponse(input);
@@ -57,8 +57,8 @@ describe('ResponseGenerator', () => {
         const input = `test query ${i}`;
         const mockResponse = { results: [`test result ${i}`] };
         
-        ResponseGenerator.classifyIntent = jest.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
-        ResponseGenerator.queryTavily = jest.fn().mockResolvedValue(mockResponse);
+        ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue({ confidence: 0.8, matches: [] });
+        ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockResponse);
         
         await ResponseGenerator.getResponse(input);
       }
@@ -74,8 +74,8 @@ describe('ResponseGenerator', () => {
       const mockTavilyResponse = { results: ['test result'] };
       
       // Mock the internal methods
-      ResponseGenerator.classifyIntent = jest.fn().mockResolvedValue(mockIntentResult);
-      ResponseGenerator.queryTavily = jest.fn().mockResolvedValue(mockTavilyResponse);
+      ResponseGenerator.classifyIntent = vi.fn().mockResolvedValue(mockIntentResult);
+      ResponseGenerator.queryTavily = vi.fn().mockResolvedValue(mockTavilyResponse);
       
       const startTime = Date.now();
       await ResponseGenerator.getResponse(input);

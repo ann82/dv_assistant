@@ -303,22 +303,45 @@ export class TwilioVoiceHandler {
 
       // For resource-related intents (shelter, legal, counseling), extract location
       if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
-        // Extract location from speech
-        const location = await extractLocation(speechResult);
-        logger.info('Extracted location:', {
+        // Extract location from speech using enhanced location detector
+        const { extractLocationFromQuery, detectUSLocation } = await import('./enhancedLocationDetector.js');
+        const locationInfo = extractLocationFromQuery(speechResult);
+        
+        logger.info('Extracted location info:', {
           requestId,
           callSid,
-          location,
+          locationInfo,
           originalSpeech: speechResult
         });
 
-        if (!location) {
+        // Check for incomplete location queries
+        if (locationInfo.scope === 'incomplete') {
+          logger.info('Incomplete location query detected, asking for specific location:', {
+            requestId,
+            callSid,
+            speechResult
+          });
+          return "I'd be happy to help you find shelter. Could you please tell me which city or area you're looking for? For example, you could say 'near San Francisco' or 'in New York'.";
+        }
+
+        if (!locationInfo.location) {
           logger.info('No location found in speech, generating prompt:', {
             requestId,
             callSid,
             speechResult
           });
           return generateLocationPrompt();
+        }
+
+        // Enhanced: Check if location is US or not
+        const usLocationInfo = await detectUSLocation(locationInfo.location);
+        if (usLocationInfo && usLocationInfo.isUS === false) {
+          logger.info('Non-US location detected, informing user:', { 
+            location: locationInfo.location, 
+            callSid,
+            requestId
+          });
+          return "I'm sorry, we are currently available only for US cities.";
         }
 
         // Rewrite query with context
@@ -373,6 +396,18 @@ export class TwilioVoiceHandler {
         }
 
         return formattedResponse.voiceResponse;
+      }
+
+      // Handle end conversation intent
+      if (intent === 'end_conversation') {
+        logger.info('Processing end conversation intent:', {
+          requestId,
+          callSid,
+          speechResult
+        });
+
+        // Ask for SMS consent before ending
+        return "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
       }
 
       // For emergency help, provide immediate assistance

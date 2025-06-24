@@ -230,8 +230,33 @@ router.post('/voice/process', async (req, res) => {
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
     
+    // Check if this is a consent response (yes/no to SMS question)
+    const lowerSpeech = SpeechResult.toLowerCase();
+    const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
+    const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
+    
+    // Check if the last response was asking for consent
+    const call = twilioVoiceHandler.activeCalls.get(CallSid);
+    const lastResponse = call?.lastResponse;
+    const wasAskingForConsent = lastResponse && lastResponse.includes('text message') && lastResponse.includes('yes or no');
+    
+    if (isConsentResponse && wasAskingForConsent) {
+      logger.info('Detected consent response, routing to consent endpoint:', { CallSid, SpeechResult });
+      // Redirect to consent endpoint
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.redirect('/twilio/consent');
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+    
     // Process the speech input using the TwilioVoiceHandler
     const response = await twilioVoiceHandler.processSpeechInput(SpeechResult, CallSid);
+    
+    // Store the response for consent detection
+    if (call) {
+      call.lastResponse = response;
+      twilioVoiceHandler.activeCalls.set(CallSid, call);
+    }
     
     // Generate TwiML response
     const twiml = new twilio.twiml.VoiceResponse();

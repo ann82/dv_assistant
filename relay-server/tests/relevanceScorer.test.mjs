@@ -2,89 +2,107 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { rerankByRelevance } from '../lib/relevanceScorer.js';
 
 // Mock OpenAI
-vi.mock('openai', () => ({
-  OpenAI: vi.fn().mockImplementation(() => ({
+vi.mock('openai', () => {
+  const mockOpenAI = {
     embeddings: {
       create: vi.fn()
     }
-  }))
-}));
+  };
+  
+  return {
+    OpenAI: vi.fn().mockImplementation(() => mockOpenAI)
+  };
+});
 
 describe('Relevance Scoring', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   const mockResults = [
     {
-      title: 'Domestic Violence Shelter in New York',
-      summary: 'Emergency shelter and support services for domestic violence survivors',
+      title: 'Domestic Violence Shelter',
+      summary: 'Emergency shelter for domestic violence survivors',
       url: 'https://example.com/shelter1'
     },
     {
-      title: 'General Housing Resources',
-      summary: 'Information about various housing options',
-      url: 'https://example.com/housing'
+      title: 'Legal Aid Services',
+      summary: 'Free legal assistance for domestic violence cases',
+      url: 'https://example.com/legal1'
     },
     {
-      title: 'Domestic Violence Support Services',
-      summary: 'Counseling and support for survivors',
-      url: 'https://example.com/support'
+      title: 'General Information',
+      summary: 'General information about various topics',
+      url: 'https://example.com/general1'
     }
   ];
 
   const mockEmbeddings = {
-    query: Array(1536).fill(0.1),
-    result1: Array(1536).fill(0.2),
-    result2: Array(1536).fill(0.05),
-    result3: Array(1536).fill(0.15)
+    query: [0.1, 0.2, 0.3],
+    result1: [0.1, 0.2, 0.3], // High similarity
+    result2: [0.2, 0.3, 0.4], // Medium similarity
+    result3: [0.8, 0.9, 1.0]  // Low similarity
   };
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should rerank results by relevance', async () => {
-    const openai = (await import('openai')).OpenAI;
-    
     // Mock embedding responses
-    openai.mock.results[0].value.embeddings.create
+    const { OpenAI } = await import('openai');
+    const openaiInstance = new OpenAI();
+    openaiInstance.embeddings.create
       .mockResolvedValueOnce({ data: [{ embedding: mockEmbeddings.query }] })
       .mockResolvedValueOnce({ data: [{ embedding: mockEmbeddings.result1 }] })
       .mockResolvedValueOnce({ data: [{ embedding: mockEmbeddings.result2 }] })
       .mockResolvedValueOnce({ data: [{ embedding: mockEmbeddings.result3 }] });
 
-    const query = 'domestic violence shelter';
-    const rerankedResults = await rerankByRelevance(query, mockResults);
+    const rerankedResults = await rerankByRelevance('find shelter', mockResults);
 
     expect(rerankedResults).toHaveLength(3);
-    expect(rerankedResults[0].title).toBe('Domestic Violence Shelter in New York');
     expect(rerankedResults[0].relevanceScore).toBeGreaterThan(rerankedResults[1].relevanceScore);
+    expect(rerankedResults[1].relevanceScore).toBeGreaterThan(rerankedResults[2].relevanceScore);
   });
 
   it('should only process top 5 results', async () => {
-    const openai = (await import('openai')).OpenAI;
-    const manyResults = Array(10).fill(mockResults[0]);
-    
+    const manyResults = Array.from({ length: 10 }, (_, i) => ({
+      title: `Result ${i}`,
+      summary: `Summary ${i}`,
+      url: `https://example.com/result${i}`
+    }));
+
+    const { OpenAI } = await import('openai');
+    const openaiInstance = new OpenAI();
+    openaiInstance.embeddings.create.mockResolvedValue({ data: [{ embedding: [0.1, 0.2, 0.3] }] });
+
     const rerankedResults = await rerankByRelevance('test query', manyResults);
     expect(rerankedResults).toHaveLength(5);
   });
 
   it('should handle API errors gracefully', async () => {
-    const openai = (await import('openai')).OpenAI;
-    openai.mock.results[0].value.embeddings.create.mockRejectedValue(new Error('API Error'));
+    const { OpenAI } = await import('openai');
+    const openaiInstance = new OpenAI();
+    openaiInstance.embeddings.create.mockRejectedValue(new Error('API Error'));
 
     const rerankedResults = await rerankByRelevance('test query', mockResults);
     expect(rerankedResults).toEqual(mockResults);
   });
 
   it('should combine title and summary for embedding', async () => {
-    const openai = (await import('openai')).OpenAI;
-    openai.mock.results[0].value.embeddings.create.mockResolvedValue({ 
+    const { OpenAI } = await import('openai');
+    const openaiInstance = new OpenAI();
+    openaiInstance.embeddings.create.mockResolvedValue({ 
       data: [{ embedding: mockEmbeddings.query }] 
     });
 
-    await rerankByRelevance('test query', [mockResults[0]]);
+    await rerankByRelevance('test query', mockResults);
 
-    // Check that the second call includes both title and summary
-    const secondCall = openai.mock.results[0].value.embeddings.create.mock.calls[1];
-    expect(secondCall[0].input).toContain(mockResults[0].title);
-    expect(secondCall[0].input).toContain(mockResults[0].summary);
+    // Check that the embedding was called with combined text
+    const calls = openaiInstance.embeddings.create.mock.calls;
+    expect(calls.length).toBeGreaterThan(1);
+    
+    // First call should be the query
+    expect(calls[0][0].input).toBe('test query');
+    
+    // Subsequent calls should be result combinations
+    expect(calls[1][0].input).toContain('Domestic Violence Shelter');
+    expect(calls[1][0].input).toContain('Emergency shelter for domestic violence survivors');
   });
 }); 

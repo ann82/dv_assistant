@@ -4,6 +4,18 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Features
 
+### Enhanced Location Detection & Query Rewriting (v1.0.12)
+- **Advanced Location Processing**
+  - **Enhanced Location Detector**: Comprehensive location detection with geocoding validation using Nominatim/OpenStreetMap API
+  - **Service Word Filtering**: Intelligent filtering of service words like "home" in "home Mumbai" to improve location accuracy
+  - **US-Only Support**: Clear messaging for non-US locations about service availability
+  - **Incomplete Query Handling**: Prompts users to specify location when missing (e.g., "Can you help me find shelter homes near?")
+- **Intelligent Query Processing**
+  - **Enhanced Query Rewriter**: Advanced query processing with conversational filler removal
+  - **Filler Removal**: Aggressive removal of conversational fillers ("Hey, can you help me...", etc.) at query start
+  - **Context-Aware Rewriting**: Intelligent query enhancement based on intent and context
+  - **Pattern-Based Optimization**: Reduces unnecessary API calls through smart pattern matching
+
 ### Response Generation
 - **Multi-format Response System**
   - Web-optimized responses with detailed information
@@ -290,8 +302,25 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ## Testing
 
-The test suite uses [Vitest](https://vitest.dev/) and is configured for reliability and isolation:
+The test suite uses [Vitest](https://vitest.dev/) and has been comprehensively overhauled for reliability and accuracy:
 
+### Test Infrastructure (v1.0.12)
+- **Comprehensive Test Overhaul**: Resolved 45+ test failures across multiple test suites
+- **Mock System Fixes**: Fixed mock initialization issues in fallbackResponder, followUp, intentClassifier, and other tests
+- **API Response Alignment**: Updated tests to match current implementation response formats
+- **Async Test Handling**: Improved async/await patterns in test suites
+- **Enhanced Coverage**: Added tests for new enhanced location detection and query rewriting features
+
+### Test Categories
+- **Core Functionality**: Response generation, query handling, speech processing
+- **Location Detection**: Enhanced location detector with geocoding validation
+- **Query Rewriting**: Enhanced query rewriter with filler removal and intelligent processing
+- **Intent Classification**: Intent detection and classification accuracy
+- **Cache System**: LRU cache eviction and TTL handling
+- **Fallback Responses**: Error handling and fallback mechanisms
+- **API Integration**: Tavily API and response formatting
+
+### Running Tests
 - All global mocks are set up in `tests/setupTests.js`
 - No direct `vi.mock` calls for TwilioVoiceHandler in individual test files
 - To run all tests:
@@ -304,6 +333,12 @@ npm test
 
 ```bash
 npx vitest run tests/twilio.routes.test.js
+```
+
+- To run tests in watch mode:
+
+```bash
+npm run test:watch
 ```
 
 ## Deployment

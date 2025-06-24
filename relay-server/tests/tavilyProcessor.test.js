@@ -66,7 +66,7 @@ describe('Tavily Processor', () => {
     // Verify voice response contains expected content
     expect(result.voiceResponse).toContain('South Lake Tahoe');
     expect(result.voiceResponse).toContain('shelters');
-    expect(result.voiceResponse).toContain('Would you like me to send you the details?');
+    expect(result.voiceResponse).toContain('How else can I help you today?');
 
     // Verify SMS response contains expected content
     expect(result.smsResponse).toContain('Shelters in South Lake Tahoe:');

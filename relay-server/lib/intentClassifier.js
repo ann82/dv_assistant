@@ -1,6 +1,7 @@
 import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
+import { detectLocationWithGeocoding } from './enhancedLocationDetector.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
@@ -19,6 +20,7 @@ const intentSchema = {
           'emergency_help',
           'general_information',
           'other_resources',
+          'end_conversation',
           'off_topic'
         ],
         description: 'The classified intent of the user query'
@@ -139,177 +141,53 @@ export function clearConversationContext(callSid) {
  * @param {string} callSid - The call SID for conversation context
  * @returns {string} The rewritten query
  */
-export function rewriteQuery(query, intent, callSid = null) {
-  // Convert query to lowercase for consistent matching
-  const lowerQuery = query.toLowerCase();
-  
-  // Initialize rewritten query with original
-  let rewrittenQuery = query;
-
-  // Get conversation context if available
-  const context = callSid ? getConversationContext(callSid) : null;
-
-  // Define off-topic patterns that should NOT be rewritten
-  const offTopicPatterns = [
-    /joke|funny|humor|comedy|comic/i,
-    /weather|temperature|forecast/i,
-    /sports|game|team|basketball|football|baseball/i,
-    /music|song|artist|band|concert/i,
-    /movie|film|actor|actress/i,
-    /food|restaurant|cooking|recipe/i,
-    /travel|vacation|trip|destination/i
-  ];
-
-  // Check if current query is off-topic
-  const isCurrentQueryOffTopic = offTopicPatterns.some(pattern => pattern.test(lowerQuery));
-
-  // Handle follow-up questions
-  let isFollowUp = false;
-  if (context && context.lastIntent) {
-    // Check for follow-up patterns
-    const followUpPatterns = {
-      find_shelter: [
-        /(?:what|where|how|can|could)\s+(?:about|is|are|do|does)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?)/i,
-        /(?:tell|give)\s+(?:me)?\s+(?:more|additional)\s+(?:information|details|about)\s+(?:the|those|these|that)\s+(?:shelters?|homes?|places?)/i
-      ],
-      legal_services: [
-        /(?:what|where|how|can|could)\s+(?:about|is|are|do|does)\s+(?:the|those|these|that)\s+(?:legal|lawyer|attorney|services?)/i,
-        /(?:tell|give)\s+(?:me)?\s+(?:more|additional)\s+(?:information|details|about)\s+(?:the|those|these|that)\s+(?:legal|lawyer|attorney|services?)/i
-      ],
-      counseling_services: [
-        /(?:what|where|how|can|could)\s+(?:about|is|are|do|does)\s+(?:the|those|these|that)\s+(?:counseling|therapy|support|groups?)/i,
-        /(?:tell|give)\s+(?:me)?\s+(?:more|additional)\s+(?:information|details|about)\s+(?:the|those|these|that)\s+(?:counseling|therapy|support|groups?)/i
-      ]
-    };
-
-    // Check if this is a follow-up question
-    const patterns = followUpPatterns[context.lastIntent] || [];
-    isFollowUp = patterns.some(pattern => pattern.test(lowerQuery));
-
-    if (isFollowUp) {
-      // Check if the original conversation was off-topic
-      const wasOriginalOffTopic = context.lastQuery && offTopicPatterns.some(pattern => 
-        pattern.test(context.lastQuery.toLowerCase())
-      );
-
-      if (wasOriginalOffTopic) {
-        // If original was off-topic, don't rewrite - return as-is
-        logger.info('Follow-up to off-topic query detected, no rewriting:', {
-          originalQuery: query,
-          lastQuery: context.lastQuery,
-          isFollowUp: true
-        });
-        return query;
-      } else {
-        // Use the last query's context for the follow-up
-        rewrittenQuery = `${context.lastQuery} ${query}`;
-        logger.info('Detected follow-up question:', {
-          originalQuery: query,
-          lastQuery: context.lastQuery,
-          combinedQuery: rewrittenQuery
-        });
-      }
-    }
-  }
-
-  // If current query is off-topic and not a follow-up, don't rewrite
-  if (isCurrentQueryOffTopic && !isFollowUp) {
-    logger.info('Off-topic query detected, no rewriting:', {
-      originalQuery: query,
-      isOffTopic: true
-    });
+export async function rewriteQuery(query, intent, callSid = null) {
+  if (!query || typeof query !== 'string') {
     return query;
   }
 
-  // Add "domestic violence" context if not present AND query is relevant
-  if (!lowerQuery.includes('domestic violence') && !lowerQuery.includes('domestic abuse')) {
-    // Only add domestic violence context if query is support-related
-    const supportRelatedPatterns = [
-      /help|support|assistance|resource/i,
-      /shelter|housing|safe|refuge/i,
-      /legal|lawyer|attorney|court/i,
-      /counseling|therapy|support group|mental health/i,
-      /emergency|urgent|crisis|danger/i,
-      /abuse|violence|domestic|relationship/i,
-      /hotline|helpline|phone|call/i
-    ];
+  let rewrittenQuery = query.trim();
+  const lowerQuery = rewrittenQuery.toLowerCase();
 
-    const isSupportRelated = supportRelatedPatterns.some(pattern => pattern.test(lowerQuery));
-    
-    if (isSupportRelated || isFollowUp) {
-      rewrittenQuery = `domestic violence ${rewrittenQuery}`;
+  // Use geocoding-based location detection
+  const locationInfo = await detectLocationWithGeocoding(query);
+
+  // Add location context if present and US
+  if (locationInfo.location && locationInfo.isUS) {
+    // Add shelter-specific terms for shelter intent
+    if (intent === 'find_shelter' && !/\bshelter\b/i.test(rewrittenQuery)) {
+      rewrittenQuery = `domestic violence shelter near ${locationInfo.location}`;
+    } else if (intent === 'find_shelter') {
+      rewrittenQuery = `${rewrittenQuery} near ${locationInfo.location}`;
+    } else {
+      // For other intents, just add location context
+      if (!rewrittenQuery.includes(locationInfo.location)) {
+        rewrittenQuery = `${rewrittenQuery} in ${locationInfo.location}`;
+      }
     }
+    // Add site restrictions for shelter search
+    if (intent === 'find_shelter') {
+      rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+    }
+  } else if (locationInfo.location && !locationInfo.isUS) {
+    // For non-US locations, preserve the location but don't add US-specific enhancements
+    // Optionally, you could return a message here if you want to block non-US queries
+    // For now, just keep the original query as-is
   }
 
-  // Intent-specific query enhancements (only for support-related queries)
-  if (intent !== 'off_topic') {
-    switch (intent) {
-      case 'find_shelter':
-        if (!lowerQuery.includes('shelter') && !lowerQuery.includes('safe housing')) {
-          rewrittenQuery = `${rewrittenQuery} emergency shelter safe housing`;
-        }
-        // Add specific terms to target actual shelter organizations
-        if (!lowerQuery.includes('organization') && !lowerQuery.includes('center') && !lowerQuery.includes('services')) {
-          rewrittenQuery = `${rewrittenQuery} shelter organization center services`;
-        }
-        // Exclude general information and focus on specific shelters
-        rewrittenQuery = `${rewrittenQuery} -site:wikipedia.org -site:gov -filetype:pdf`;
-        break;
-
-      case 'legal_services':
-        if (!lowerQuery.includes('legal') && !lowerQuery.includes('lawyer') && !lowerQuery.includes('attorney')) {
-          rewrittenQuery = `${rewrittenQuery} legal aid attorney services`;
-        }
-        if (!lowerQuery.includes('restraining order') && !lowerQuery.includes('protection order')) {
-          rewrittenQuery = `${rewrittenQuery} restraining order protection`;
-        }
-        break;
-
-      case 'counseling_services':
-        if (!lowerQuery.includes('counseling') && !lowerQuery.includes('therapy') && !lowerQuery.includes('support group')) {
-          rewrittenQuery = `${rewrittenQuery} counseling therapy support group`;
-        }
-        break;
-
-      case 'emergency_help':
-        if (!lowerQuery.includes('emergency') && !lowerQuery.includes('urgent')) {
-          rewrittenQuery = `emergency urgent ${rewrittenQuery}`;
-        }
-        if (!lowerQuery.includes('hotline') && !lowerQuery.includes('24/7')) {
-          rewrittenQuery = `${rewrittenQuery} 24/7 hotline immediate assistance`;
-        }
-        break;
-
-      case 'general_information':
-        if (!lowerQuery.includes('information') && !lowerQuery.includes('resources')) {
-          rewrittenQuery = `${rewrittenQuery} information resources guide`;
-        }
-        break;
-
-      case 'other_resources':
-        if (!lowerQuery.includes('resources') && !lowerQuery.includes('support')) {
-          rewrittenQuery = `${rewrittenQuery} support resources assistance`;
-        }
-        break;
-    }
+  // Add intent-specific enhancements for other intents
+  switch (intent) {
+    case 'general_information':
+      if (!lowerQuery.includes('information') && !lowerQuery.includes('resources')) {
+        rewrittenQuery = `${rewrittenQuery} information resources guide`;
+      }
+      break;
+    case 'other_resources':
+      if (!lowerQuery.includes('resources') && !lowerQuery.includes('support')) {
+        rewrittenQuery = `${rewrittenQuery} support resources assistance`;
+      }
+      break;
   }
-
-  // Add location context if present in original query
-  const locationMatch = lowerQuery.match(/(?:in|near|around|at)\s+([^,.]+?(?:,\s*[A-Za-z\s]+)?)/i);
-  if (locationMatch) {
-    const location = locationMatch[1].trim();
-    if (!rewrittenQuery.includes(location)) {
-      rewrittenQuery = `${rewrittenQuery} in ${location}`;
-    }
-  }
-
-  logger.info('Query rewritten:', {
-    original: query,
-    rewritten: rewrittenQuery,
-    intent,
-    isFollowUp: isFollowUp,
-    isOffTopic: isCurrentQueryOffTopic
-  });
 
   return rewrittenQuery;
 }
@@ -335,6 +213,7 @@ export async function getIntent(query) {
             - emergency_help: For urgent situations requiring immediate assistance
             - general_information: For general questions about domestic violence
             - other_resources: For other types of support or resources
+            - end_conversation: For requests to end the conversation
             - off_topic: For requests unrelated to domestic violence support (jokes, weather, sports, etc.)`
         },
         {
@@ -387,6 +266,10 @@ export const intentHandlers = {
   other_resources: async (query) => {
     // Handle other resource queries
     return 'resource_search';
+  },
+  end_conversation: async (query) => {
+    // Handle end conversation requests
+    return 'end_conversation';
   },
   off_topic: async (query) => {
     // Handle off-topic requests
@@ -532,7 +415,7 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       return {
         type: 'location_info',
         intent: lastQueryContext.intent,
-        voiceResponse: `I found ${lastQueryContext.results.length} resources in ${lastQueryContext.location || 'that area'}. I'll send you the complete details via text message at the end of our call.`,
+        voiceResponse: `I found ${lastQueryContext.results.length} resources in ${lastQueryContext.location || 'that area'}. How else can I help you today?`,
         smsResponse: lastQueryContext.smsResponse,
         results: lastQueryContext.results
       };
@@ -829,16 +712,16 @@ function generateGenericFollowUpResponse(lastQueryContext) {
   
   if (results.length === 1) {
     const cleanTitle = cleanResultTitle(results[0].title);
-    return `I found one helpful resource in ${location}: ${cleanTitle}. I'll send you the complete details via text message at the end of our call.`;
+    return `I found one helpful resource in ${location}: ${cleanTitle}. How else can I help you today?`;
   } else if (results.length === 2) {
     const title1 = cleanResultTitle(results[0].title);
     const title2 = cleanResultTitle(results[1].title);
-    return `I found two helpful resources in ${location}: one in ${title1}, and another in ${title2}. I'll send you the complete details via text message at the end of our call.`;
+    return `I found two helpful resources in ${location}: one in ${title1}, and another in ${title2}. How else can I help you today?`;
   } else {
     const title1 = cleanResultTitle(results[0].title);
     const title2 = cleanResultTitle(results[1].title);
     const title3 = cleanResultTitle(results[2].title);
-    return `I found ${results.length} helpful resources in ${location}: one in ${title1}, another in ${title2}, and a third in ${title3}. I'll send you the complete details via text message at the end of our call.`;
+    return `I found ${results.length} helpful resources in ${location}: one in ${title1}, another in ${title2}, and a third in ${title3}. How else can I help you today?`;
   }
 }
 
@@ -920,7 +803,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary = generateResultSummary(result);
     const phone = extractPhoneFromContent(result.content);
     
-    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. I'll send you the complete details via text message at the end of our call.`;
+    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. How else can I help you today?`;
   } else if (results.length === 2) {
     const result1 = results[0];
     const result2 = results[1];
@@ -929,7 +812,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary1 = generateResultSummary(result1);
     const summary2 = generateResultSummary(result2);
     
-    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. I'll send you the complete details via text message at the end of our call.`;
+    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. How else can I help you today?`;
   } else {
     // For 3 or more results, provide details for the first 2 and mention the rest
     const result1 = results[0];
@@ -950,7 +833,7 @@ export function generateDetailedShelterInfo(lastQueryContext) {
       response += ` I also found ${results.length - 2} more resources.`;
     }
     
-    response += ` I'll send you the complete details via text message at the end of our call.`;
+    response += ` How else can I help you today?`;
     return response;
   }
 } 

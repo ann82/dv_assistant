@@ -31,7 +31,7 @@ describe('Query Handler', () => {
     // Mock intent classification
     const { getIntent, rewriteQuery } = await import('../lib/intentClassifier.js');
     getIntent.mockResolvedValue('find_shelter');
-    rewriteQuery.mockReturnValue('domestic violence shelter near me');
+    rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily response
     global.fetch.mockResolvedValue({
@@ -78,7 +78,7 @@ describe('Query Handler', () => {
     // Mock intent classification
     const { getIntent, rewriteQuery } = await import('../lib/intentClassifier.js');
     getIntent.mockResolvedValue('find_shelter');
-    rewriteQuery.mockReturnValue('domestic violence shelter near me');
+    rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily response
     global.fetch.mockResolvedValue({
@@ -128,7 +128,7 @@ describe('Query Handler', () => {
     // Mock intent classification
     const { getIntent, rewriteQuery } = await import('../lib/intentClassifier.js');
     getIntent.mockResolvedValue('find_shelter');
-    rewriteQuery.mockReturnValue('domestic violence shelter near me');
+    rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock empty Tavily response
     global.fetch.mockResolvedValue({
@@ -161,7 +161,7 @@ describe('Query Handler', () => {
     // Mock intent classification
     const { getIntent, rewriteQuery } = await import('../lib/intentClassifier.js');
     getIntent.mockResolvedValue('find_shelter');
-    rewriteQuery.mockReturnValue('domestic violence shelter near me');
+    rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily error
     global.fetch.mockResolvedValue({
@@ -212,5 +212,21 @@ describe('Query Handler', () => {
       score: 0,
       error: 'Intent classification failed'
     });
+  });
+
+  it('should handle off-topic queries appropriately', async () => {
+    // Mock intent classification
+    const { getIntent, rewriteQuery } = await import('../lib/intentClassifier.js');
+    getIntent.mockResolvedValue('off_topic');
+    rewriteQuery.mockResolvedValue('Tell me a joke');
+
+    // Mock GPT fallback for off-topic
+    const { fallbackResponse } = await import('../lib/fallbackResponder.js');
+    fallbackResponse.mockResolvedValue('I\'m here to help with domestic violence support. Please let me know if you need assistance with that.');
+
+    const result = await handleUserQuery('Tell me a joke');
+    
+    expect(result.source).toBe('gpt');
+    expect(result.response).toContain('domestic violence support');
   });
 }); 

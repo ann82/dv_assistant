@@ -97,6 +97,44 @@ describe('Twilio Routes', () => {
       expect(response.status).toBe(200);
       expect(mockTwilioVoiceHandler.handleSpeechInput).toHaveBeenCalled();
     });
+
+    it('should handle end conversation intent and route to consent', async () => {
+      // Mock the voice processing to return consent question
+      mockTwilioVoiceHandler.handleSpeechInput.mockImplementation((req, res) => {
+        res.type('text/xml');
+        res.send('<Response><Say>Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.</Say></Response>');
+      });
+
+      const response = await request(app)
+        .post('/twilio/voice/process')
+        .send({ 
+          CallSid: 'test-call-sid',
+          SpeechResult: 'goodbye'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('Before we end this call');
+      expect(response.text).toContain('text message');
+    });
+
+    it('should handle incomplete location queries', async () => {
+      // Mock the voice processing to return location prompt
+      mockTwilioVoiceHandler.handleSpeechInput.mockImplementation((req, res) => {
+        res.type('text/xml');
+        res.send('<Response><Say>I\'d be happy to help you find shelter. Could you please tell me which city or area you\'re looking for? For example, you could say \'near San Francisco\' or \'in New York\'.</Say></Response>');
+      });
+
+      const response = await request(app)
+        .post('/twilio/voice/process')
+        .send({ 
+          CallSid: 'test-call-sid',
+          SpeechResult: 'Can you help me find shelter homes near?'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('Could you please tell me which city or area');
+      expect(response.text).toContain('near San Francisco');
+    });
   });
 
   describe('POST /twilio/voice/status', () => {
