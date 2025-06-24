@@ -83,17 +83,22 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - Aggressive removal of conversational fillers ("Hey, can you help me...", etc.) at the start of queries
   - Further reduces unnecessary GPT/OpenAI calls for common queries
 
-### Query Rewriting & Resource Search (Enhanced)
-- **US-Only Resource Search**
-  - If a non-US location is detected, the system responds: "I'm sorry, we are currently available only for US cities."
-  - For US locations, queries are rewritten to optimize shelter/resource search using high-quality search terms
-  - Conversational fillers are removed from the start of queries for cleaner input
-  - Location context is added only when appropriate
-- **Pattern-First Optimization (2024-06-24)**
-  - Most queries are now handled by pattern matching and do not require AI calls
-  - Only ambiguous or complex queries fall back to GPT/OpenAI
-
-## Recent Updates
+### Improved Call Flow & SMS Consent System (v1.0.11)
+- **Natural Conversation Flow**: Completely redesigned call flow for better user experience
+  - **Voice Response Updates**: Changed from immediate SMS promise to "How else can I help you today?"
+  - **Multi-Turn Conversations**: Users can now ask multiple questions before ending the call
+  - **End Conversation Detection**: New `end_conversation` intent detects when users want to end the call
+  - **Proper Consent Collection**: Only asks for SMS consent at the very end of the conversation
+- **Enhanced SMS Consent System**: Improved consent collection and SMS delivery
+  - **Clear Consent Question**: "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no."
+  - **Consent Response Detection**: Automatically detects yes/no responses and routes to consent endpoint
+  - **Explicit Consent Required**: SMS is only sent if user explicitly consents during the call
+  - **Graceful Call Ending**: Call ends properly after consent processing
+- **Call End Detection & SMS Delivery**: Improved call completion handling
+  - **Twilio Status Webhooks**: Proper detection of call end using Twilio status callbacks
+  - **Consent-Based SMS**: SMS delivery only occurs if user gave consent during the call
+  - **Resource Management**: Proper cleanup and resource management at call end
+  - **Comprehensive Logging**: Detailed logging of consent and SMS delivery process
 
 ### SMS Messaging & User Experience Improvements (v1.0.10)
 - **Clear SMS Expectations**: Updated voice responses to inform users they'll receive details via SMS at end of call
