@@ -606,20 +606,32 @@ export class ResponseGenerator {
 
   static createVoiceResponse(results, location) {
     const locationText = location ? ` in ${location}` : '';
+    
+    // Handle case when there are no results
+    if (!results || results.length === 0) {
+      return `I'm sorry, I couldn't find any shelters${locationText}. Would you like me to search for resources in a different location?`;
+    }
+    
     if (results.length === 1) {
       const result = results[0];
       const title = this.cleanTitleForVoice(result.title);
       return `I found a shelter${locationText}: ${title}. How else can I help you today?`;
     }
+    
     const organizationNames = results.map(result => this.cleanTitleForVoice(result.title));
     let response = `I found ${results.length} shelters${locationText}`;
+    
     if (organizationNames.length === 2) {
       response += `: ${organizationNames[0]} and ${organizationNames[1]}`;
     } else if (organizationNames.length === 3) {
       response += `: ${organizationNames[0]}, ${organizationNames[1]}, and ${organizationNames[2]}`;
-    } else {
+    } else if (organizationNames.length > 3) {
       response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
+    } else {
+      // Fallback for unexpected cases
+      response += `: ${organizationNames.join(', ')}`;
     }
+    
     response += '. How else can I help you today?';
     return response;
   }

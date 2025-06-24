@@ -510,3 +510,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - More detailed error logging
   - Better error response structure
   - Processing time tracking in errors
+
+## [1.13.0] - 2024-06-24
+
+### Fixed
+- Fixed bug where voice response would say 'undefined and undefined' if no shelters were found. Now, a clear message is given when no results pass the Tavily score threshold.
+
+### Changed
+- Clarified Tavily score threshold: Only results with a score >= 0.7 are included in responses by default. If you want to include more results, you can lower this threshold in the code.

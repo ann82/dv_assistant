@@ -67,6 +67,8 @@ The system includes comprehensive logging throughout the request-response lifecy
 - Updated enhanced query rewriter and location detector logic for better test consistency and robustness
 - Fixed test mocks and edge cases for query rewriting and location extraction
 - Updated test suite for more robust edge case handling
+- **Fixed bug where voice response would say 'undefined and undefined' if no shelters were found. Now, a clear message is given when no results pass the Tavily score threshold.**
+- **Clarified Tavily score threshold:** Only results with a score >= 0.7 are included in responses by default. If you want to include more results, you can lower this threshold in the code.
 - See CHANGELOG for more details
 
 ## Installation
