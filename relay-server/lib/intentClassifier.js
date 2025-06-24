@@ -1067,7 +1067,7 @@ export function manageConversationFlow(intent, query, context = {}) {
     shouldEndCall: false,
     shouldReengage: false,
     redirectionMessage: null,
-    confidence: context.confidence || 0.5
+    confidence: (context && context.confidence) ? context.confidence : 0.5
   };
 
   // Handle off-topic intents
@@ -1121,7 +1121,7 @@ export function manageConversationFlow(intent, query, context = {}) {
  * @returns {boolean} Whether to attempt re-engagement
  */
 export function shouldAttemptReengagement(context) {
-  if (!context || !context.history) {
+  if (!context || !context.history || !Array.isArray(context.history)) {
     return false;
   }
 
