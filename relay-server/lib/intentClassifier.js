@@ -339,6 +339,11 @@ function classifyIntentFallback(query) {
 
   const lowerQuery = query.toLowerCase();
   
+  // Check for end conversation first (before other checks)
+  if (/\b(end|stop|goodbye|bye|hang up|disconnect|thank you|thanks)\b/i.test(lowerQuery)) {
+    return 'end_conversation';
+  }
+  
   // First check for domestic violence related keywords
   const domesticViolenceKeywords = [
     'domestic', 'violence', 'abuse', 'shelter', 'safe', 'refuge', 'protection',
@@ -388,10 +393,6 @@ function classifyIntentFallback(query) {
     return 'emergency_help';
   }
   
-  if (/\b(end|stop|goodbye|bye|hang up|disconnect)\b/i.test(lowerQuery)) {
-    return 'end_conversation';
-  }
-  
   // Default to general information for domestic violence related queries
   return 'general_information';
 }
@@ -432,7 +433,8 @@ export const intentHandlers = {
     
     // Check for conversation end requests
     if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
-        queryLower.includes('end call') || queryLower.includes('hang up')) {
+        queryLower.includes('end call') || queryLower.includes('hang up') ||
+        queryLower.includes('thank you') || queryLower.includes('thanks')) {
       return {
         type: 'conversation_end',
         intent: 'end_conversation',
@@ -1268,7 +1270,7 @@ function calculateIntentConfidence(intent, query, response) {
     'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
     'general_information': ['what is', 'how to', 'information', 'about', 'tell me'],
     'other_resources': ['financial', 'money', 'job', 'work', 'childcare', 'transportation'],
-    'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish'],
+    'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish', 'thank you', 'thanks'],
     'off_topic': ['weather', 'sports', 'joke', 'funny', 'movie', 'music']
   };
   
@@ -1331,7 +1333,8 @@ export function manageConversationFlow(intent, query, context = {}) {
     
     // Check for conversation end requests
     if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
-        queryLower.includes('end call') || queryLower.includes('hang up')) {
+        queryLower.includes('end call') || queryLower.includes('hang up') ||
+        queryLower.includes('thank you') || queryLower.includes('thanks')) {
       response.shouldEndCall = true;
       response.shouldContinue = false;
       response.redirectionMessage = "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.";

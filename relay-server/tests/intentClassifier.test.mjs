@@ -87,6 +87,20 @@ describe('Intent Classification', () => {
       const intent = await getIntent('I need help');
       expect(intent).toBe('off_topic'); // "I need help" without context is off-topic
     });
+
+    it('should classify "thank you" as end_conversation intent', async () => {
+      const intent1 = await getIntent('thank you');
+      expect(intent1).toBe('end_conversation');
+
+      const intent2 = await getIntent('thanks');
+      expect(intent2).toBe('end_conversation');
+
+      const intent3 = await getIntent('thank you so much');
+      expect(intent3).toBe('end_conversation');
+
+      const intent4 = await getIntent('thanks for your help');
+      expect(intent4).toBe('end_conversation');
+    });
   });
 
   describe('intentHandlers', () => {

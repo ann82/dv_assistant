@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `speechModel: 'phone_call'` for optimized phone conversation recognition
   - `enhanced: 'true'` for improved accuracy
   - `profanityFilter: 'false'` to avoid filtering important words
-  - `interimSpeechResultsCallback` for real-time feedback
 - **Intelligent speech preprocessing system** with advanced cleaning capabilities
   - **Automatic artifact removal**: Cleans `[inaudible]`, `[background noise]`, `[static]`, etc.
   - **Common error correction**: Fixes frequent speech recognition errors
@@ -23,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - "close to me" → "near me"
   - **Garbled speech detection**: Identifies unclear speech patterns using multiple criteria
   - **Key word extraction**: Extracts relevant keywords from heavily garbled speech
-- **Real-time speech feedback** through interim speech results handling
 - **Comprehensive test coverage** for all speech preprocessing functions
 - **Enhanced logging** for speech recognition quality monitoring
 
@@ -427,6 +425,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Improved fallback logic:** Pattern-matching fallback classifier ensures reliability if OpenAI API is unavailable.
 - **Expanded test coverage:** Added tests for medical, entertainment, and generic queries to ensure robust off-topic detection.
 - **Improved follow-up question handling:** The system now correctly interprets queries like "tell me more about the last one" or "the first one", mapping them to the correct Tavily result and providing detailed information from the content. This logic is fully covered by the test suite.
+- The system now recognizes 'thank you', 'thanks', and similar gratitude phrases as a signal to end the call and deliver the end message. This works for both the main and fallback intent classification logic, and is covered by automated tests.
 
 ### Removed
 - Obsolete tests and unused files
@@ -622,10 +621,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.16.0] - 2024-06-25
 
 ### Added
-- Comprehensive follow-up question support: context tracking, vague query detection, and specific handlers for address, phone, and details follow-ups
-- 5-minute timeout for follow-up context to prevent stale responses
 - Enhanced speech-to-text recognition: new Twilio parameters, speech preprocessing (artifact removal, error correction, garbled speech detection, keyword extraction)
-- Real-time interim speech results endpoint for improved feedback
 - Node.js deprecation warning suppression and documentation, updated dependencies, and version management files
 
 ### Changed
@@ -667,3 +663,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
+
+## [1.18.1] - 2025-06-25
+
+### Fixed
+- Improved fallback logic: If Tavily API returns an empty results array but provides a useful answer (e.g., shelter name and phone in the answer field), the system now extracts and presents this information to the user in both voice and SMS responses.
