@@ -33,6 +33,9 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Voice responses never include HTTP/HTTPS URLs; users are offered to receive details (including address and link) via text message for location/address queries
 - Robust follow-up detection, even if OpenAI API key is missing
 - Improved user experience for follow-up and location/address queries
+- Pet-related follow-up questions (e.g., "Do they allow pets?") are now recognized as valid follow-ups and not off-topic
+- Filtering logic for shelter results is now more intelligent and no longer excludes real shelters that lack phone/address fields
+- All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
 
 ## Enhanced Speech-to-Text Recognition
 
@@ -203,6 +206,9 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **Follow-up detection logic is now robust even if the OpenAI API key is missing, and works reliably for vague queries like "tell me more about the first one"**
 - **All tests pass, including new tests for follow-up detection and conversational flow**
 - **Improved user experience for follow-up and location/address queries**
+- **Pet-related follow-up questions are now handled as relevant, not off-topic**
+- **Improved filtering logic for shelter results**
+- **Documentation cleanup: only README.md and CHANGELOG.md remain**
 
 ## Custom Tavily Response Formatting
 

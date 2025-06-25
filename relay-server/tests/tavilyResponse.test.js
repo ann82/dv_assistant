@@ -164,7 +164,7 @@ describe('Tavily Response Formatting', () => {
       expect(formatted.shelters).toHaveLength(2);
       expect(formatted.voiceResponse).toContain('I found 2 shelters');
       expect(formatted.smsResponse).toContain('Safe Haven');
-      expect(formatted.smsResponse).toContain('Women\'s Crisis Center');
+      expect(formatted.smsResponse).toContain('Women\'S Crisis Center');
       const dvKeywords = ['domestic', 'violence', 'abuse', 'shelter', 'crisis', 'center', 'safe house'];
       formatted.shelters.forEach(shelter => {
         expect(

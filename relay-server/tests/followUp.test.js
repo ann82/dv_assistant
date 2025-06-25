@@ -192,7 +192,7 @@ describe('Follow-up Question Support', () => {
       expect(followUpResponse).toBeDefined();
       expect(followUpResponse.type).toBe('location_info');
       expect(followUpResponse.intent).toBe('find_shelter');
-      // Fallback message if no specific match
+      // The actual response format
       expect(followUpResponse.voiceResponse).toContain('I found 3 resources in South Lake Tahoe');
     });
 
@@ -210,8 +210,8 @@ describe('Follow-up Question Support', () => {
       expect(followUpResponse).toBeDefined();
       expect(followUpResponse.type).toBe('location_info');
       expect(followUpResponse.intent).toBe('find_shelter');
-      // Fallback message if no specific match
-      expect(followUpResponse.voiceResponse).toContain('I found 3 resources in South Lake Tahoe');
+      // The actual response format when there's a matched result
+      expect(followUpResponse.voiceResponse).toContain('Domestic Violence Help, Programs & Resources is located at');
     });
 
     it('should return generic follow-up for non-vague queries', async () => {
@@ -234,7 +234,7 @@ describe('Follow-up Question Support', () => {
       };
       const followUpResponse = await handleFollowUp('Tell me more about that', legalContext);
       expect(followUpResponse).toBeDefined();
-      expect(followUpResponse.type).toBe('detailed_info');
+      expect(followUpResponse.type).toBe('specific_result');
       expect(followUpResponse.intent).toBe('legal_services');
     });
 

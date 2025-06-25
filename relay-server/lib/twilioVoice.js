@@ -221,16 +221,7 @@ export class TwilioVoiceHandler {
       const { callTavilyAPI } = await import('../lib/apis.js');
       const { ResponseGenerator } = await import('../lib/response.js');
       
-      // Get intent classification
-      const intent = await getIntent(speechResult);
-      logger.info('Classified intent:', {
-        requestId,
-        callSid,
-        intent,
-        speechResult
-      });
-
-      // Get conversation context
+      // Get conversation context FIRST
       const context = callSid ? getConversationContext(callSid) : null;
       logger.info('Retrieved conversation context:', {
         requestId,
@@ -241,6 +232,57 @@ export class TwilioVoiceHandler {
         historyLength: context?.history?.length,
         hasLastQueryContext: !!context?.lastQueryContext,
         fullContext: context
+      });
+
+      // Check for follow-up questions BEFORE intent classification
+      const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
+      
+      logger.info('Follow-up question check (before intent classification):', {
+        requestId,
+        callSid,
+        isFollowUp: !!followUpResponse,
+        followUpType: followUpResponse?.type,
+        speechResult,
+        lastIntent: context?.lastIntent,
+        hasLastQueryContext: !!context?.lastQueryContext
+      });
+
+      // If this is a follow-up question, handle it directly and skip intent classification
+      if (followUpResponse) {
+        logger.info('Processing follow-up question (bypassing intent classification):', {
+          requestId,
+          callSid,
+          speechResult,
+          followUpType: followUpResponse.type,
+          lastIntent: context.lastIntent,
+          matchedResult: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
+        });
+
+        // Update conversation context with follow-up response and focus tracking
+        if (callSid) {
+          updateConversationContext(callSid, context.lastIntent || 'general_information', speechResult, {
+            voiceResponse: followUpResponse.voiceResponse,
+            smsResponse: followUpResponse.smsResponse
+          }, null, followUpResponse.matchedResult);
+          logger.info('Updated conversation context for follow-up:', {
+            requestId,
+            callSid,
+            intent: context.lastIntent || 'general_information',
+            followUpType: followUpResponse.type,
+            focusResultTitle: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
+          });
+        }
+
+        return followUpResponse.voiceResponse;
+      }
+
+      // Only classify intent if it's not a follow-up question
+      const intent = await getIntent(speechResult);
+      logger.info('Classified intent:', {
+        requestId,
+        callSid,
+        intent,
+        speechResult
       });
 
       // Manage conversation flow based on intent
@@ -302,48 +344,6 @@ export class TwilioVoiceHandler {
           reengagementMessage
         });
         return reengagementMessage;
-      }
-
-      // Check for follow-up questions using the new handleFollowUp function
-      const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
-      
-      logger.info('Follow-up question check:', {
-        requestId,
-        callSid,
-        isFollowUp: !!followUpResponse,
-        followUpType: followUpResponse?.type,
-        speechResult,
-        lastIntent: context?.lastIntent,
-        hasLastQueryContext: !!context?.lastQueryContext
-      });
-
-      // If this is a follow-up question, handle it directly
-      if (followUpResponse) {
-        logger.info('Processing follow-up question:', {
-          requestId,
-          callSid,
-          speechResult,
-          followUpType: followUpResponse.type,
-          lastIntent: context.lastIntent,
-          matchedResult: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
-        });
-
-        // Update conversation context with follow-up response and focus tracking
-        if (callSid) {
-          updateConversationContext(callSid, intent, speechResult, {
-            voiceResponse: followUpResponse.voiceResponse,
-            smsResponse: followUpResponse.smsResponse
-          }, null, followUpResponse.matchedResult);
-          logger.info('Updated conversation context for follow-up:', {
-            requestId,
-            callSid,
-            intent,
-            followUpType: followUpResponse.type,
-            focusResultTitle: followUpResponse.matchedResult ? cleanResultTitle(followUpResponse.matchedResult.title) : null
-          });
-        }
-
-        return followUpResponse.voiceResponse;
       }
 
       // Handle different intents appropriately

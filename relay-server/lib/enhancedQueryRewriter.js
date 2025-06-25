@@ -98,14 +98,19 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     
     if (!hasShelterTerm) {
       // Add shelter-specific terms for better relevance
-      searchQuery = `domestic violence shelter near ${locationInfo.location}`;
+      searchQuery = `domestic violence shelter ${locationInfo.location}`;
     } else {
-      // If shelter terms are present, just add "near location"
-      searchQuery = `${cleanedQuery} near ${locationInfo.location}`;
+      // If shelter terms are present, check if location is already mentioned
+      const hasLocation = new RegExp(`\\b${locationInfo.location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(cleanedQuery);
+      if (!hasLocation) {
+        searchQuery = `${cleanedQuery} ${locationInfo.location}`;
+      } else {
+        searchQuery = cleanedQuery;
+      }
     }
     
-    // Add site restrictions for better quality results
-    searchQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+    // Add minimal site restrictions for better quality results (simplified)
+    searchQuery += ' site:org OR site:gov';
     
     logger.info('Enhanced US query:', { searchQuery, callSid });
   } else if (locationInfo.location && !locationInfo.isUS) {
@@ -120,7 +125,7 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
 
   // Ensure we always return a valid string
   if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
-    searchQuery = 'domestic violence shelter resources site:org OR site:gov';
+    searchQuery = 'domestic violence shelter resources';
     logger.warn('Empty search query, using fallback:', { searchQuery, callSid });
   }
 

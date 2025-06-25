@@ -656,3 +656,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - No more URLs read out in voice responses
 - Follow-up questions are no longer classified as off-topic
+
+## [1.18.0] - 2024-06-27
+
+### Added
+- Pet-related follow-up questions (e.g., "Do they allow pets?") are now recognized as valid follow-ups and not off-topic
+
+### Changed
+- Filtering logic for shelter results is now more intelligent and no longer excludes real shelters that lack phone/address fields
+
+### Removed
+- All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity

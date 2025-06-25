@@ -220,13 +220,14 @@ function cleanTitleForSMS(title) {
  * @returns {Object} Detailed information
  */
 export function getResultDetails(result) {
+  const content = result.content || result.raw_content || '';
   return {
     title: cleanTitleForSMS(result.title),
     url: result.url,
     score: result.score,
-    content: result.content,
-    phoneNumbers: extractPhoneNumbers(result.content),
-    address: extractAddress(result.content)
+    content: content,
+    phoneNumbers: extractPhoneNumbers(content),
+    address: extractAddress(content)
   };
 }
 
@@ -236,7 +237,7 @@ export function getResultDetails(result) {
  * @returns {Array} Array of phone numbers found
  */
 function extractPhoneNumbers(content) {
-  if (!content) return [];
+  if (!content || typeof content !== 'string') return [];
   
   const phonePatterns = [
     /(\d{3}[-.]?\d{3}[-.]?\d{4})/g,  // Standard US format
@@ -262,7 +263,7 @@ function extractPhoneNumbers(content) {
  * @returns {string} Extracted address or empty string
  */
 function extractAddress(content) {
-  if (!content) return '';
+  if (!content || typeof content !== 'string') return '';
   
   // Simple address pattern (can be enhanced)
   const addressPattern = /(\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Place|Pl|Way|Circle|Cir|Terrace|Ter)[^,]*)/i;

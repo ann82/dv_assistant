@@ -164,16 +164,18 @@ export async function rewriteQuery(query, intent, callSid = null) {
         if (!/\bshelter\b/i.test(rewrittenQuery)) {
           rewrittenQuery = `${rewrittenQuery} shelter`;
         }
-        rewrittenQuery = `${rewrittenQuery} near ${locationInfo.location}`;
         
-        // Add specific site restrictions to focus on relevant domains
-        rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+        // Check if location is already mentioned to avoid duplication
+        const hasLocation = new RegExp(`\\b${locationInfo.location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rewrittenQuery);
+        if (!hasLocation) {
+          rewrittenQuery = `${rewrittenQuery} ${locationInfo.location}`;
+        }
         
-        // Exclude generic resource guides and city pages
-        rewrittenQuery += ' -"resource guide" -"community resources" -"city resources" -"municipal resources"';
+        // Add minimal site restrictions to focus on relevant domains
+        rewrittenQuery += ' site:org OR site:gov';
         
-        // Add specific terms to improve relevance
-        rewrittenQuery += ' "domestic violence" "emergency shelter" "crisis center"';
+        // Add specific terms to improve relevance (simplified)
+        rewrittenQuery += ' "domestic violence"';
       } else {
         // For other intents, just add location context
         if (!rewrittenQuery.includes(locationInfo.location)) {
@@ -531,31 +533,69 @@ export async function handleFollowUp(query, lastQueryContext) {
   // Step 1: Try fast pattern matching first (cost-effective)
   const lowerQuery = query.toLowerCase();
   const followUpIndicators = [
+    // General follow-up words
     'more', 'details', 'information', 'about', 'tell me', 'what about',
+    'can you tell me', 'i want to know', 'i need to know', 'show me',
+    // Ordinal references
     'first', 'second', 'third', 'fourth', 'fifth', '1st', '2nd', '3rd', '4th', '5th',
-    'that one', 'this one', 'the one', 'those', 'these', 'it', 'them'
+    // Demonstrative references
+    'that one', 'this one', 'the one', 'those', 'these', 'it', 'them',
+    'that place', 'this place', 'that shelter', 'this shelter',
+    // Specific follow-up patterns
+    'where is', 'what is the address', 'what is the phone', 'what is the number',
+    'can you send', 'can you text', 'can you message',
+    // Pet-related follow-up patterns
+    'pets', 'pet', 'animals', 'pet policy', 'pet-friendly', 'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services'
   ];
   
   const isFollowUpByPattern = followUpIndicators.some(indicator => lowerQuery.includes(indicator));
   
+  // Additional check for very short queries that are likely follow-ups
+  const isShortQuery = query.trim().length <= 10;
+  const hasFollowUpWords = lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this') || lowerQuery.includes('it');
+  const isLikelyShortFollowUp = isShortQuery && hasFollowUpWords;
+  
   // Step 2: If pattern matching is uncertain, use AI for better accuracy
-  let isFollowUp = isFollowUpByPattern;
+  let isFollowUp = isFollowUpByPattern || isLikelyShortFollowUp;
   
   // Use AI if pattern matching is unclear or if we want to be extra sure
-  if (!isFollowUpByPattern || lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this')) {
+  if (!isFollowUpByPattern || lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this') || isLikelyShortFollowUp) {
     try {
       const aiResult = await determineIfFollowUpWithAI(query, lastQueryContext);
-      isFollowUp = aiResult;
-      logger.info('Used AI for follow-up detection:', { query, aiResult, patternResult: isFollowUpByPattern });
+      // Only use AI result if it's true, otherwise fall back to pattern matching
+      if (aiResult === true) {
+        isFollowUp = true;
+      }
+      // If AI returns false, keep the pattern matching result
+      logger.info('Used AI for follow-up detection:', { 
+        query, 
+        aiResult, 
+        patternResult: isFollowUpByPattern,
+        isLikelyShortFollowUp,
+        finalResult: isFollowUp
+      });
     } catch (error) {
       logger.error('AI follow-up detection failed, using pattern result:', error);
-      // Fall back to pattern matching result
+      // Fall back to pattern matching result - don't override with false
     }
   }
   
   if (!isFollowUp) {
+    logger.info('Not detected as follow-up:', { 
+      query, 
+      patternResult: isFollowUpByPattern,
+      isLikelyShortFollowUp,
+      finalResult: isFollowUp
+    });
     return null;
   }
+
+  logger.info('Detected as follow-up question:', { 
+    query, 
+    patternResult: isFollowUpByPattern,
+    isLikelyShortFollowUp,
+    finalResult: isFollowUp
+  });
 
   // Generate improved follow-up response
   return await generateFollowUpResponse(query, lastQueryContext);
@@ -614,7 +654,7 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       return {
         type: 'location_info',
         intent: lastQueryContext.intent,
-        voiceResponse: `${cleanTitle} is located at ${matchedResult.url}. Would you like me to send you the complete details?`,
+        voiceResponse: `I can provide you with the address for ${cleanTitle}. Would you like me to send you the complete details including the address via text message?`,
         smsResponse: lastQueryContext.smsResponse,
         results: lastQueryContext.results,
         matchedResult

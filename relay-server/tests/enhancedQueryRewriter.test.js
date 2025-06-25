@@ -191,13 +191,13 @@ describe('Enhanced Query Rewriter', () => {
     it('should rewrite US location queries with shelter terms', async () => {
       const result = await rewriteQuery('Hey, I need help in San Francisco');
       
-      expect(result).toBe('domestic violence shelter near San Francisco site:org OR site:gov -site:wikipedia.org -filetype:pdf');
+      expect(result).toBe('domestic violence shelter San Francisco site:org OR site:gov');
     });
 
     it('should preserve existing shelter terms in US locations', async () => {
       const result = await rewriteQuery('Hi, I need shelter in Oakland');
       
-      expect(result).toBe('I need shelter in Oakland near Oakland site:org OR site:gov -site:wikipedia.org -filetype:pdf');
+      expect(result).toBe('I need shelter in Oakland site:org OR site:gov');
     });
 
     it('should handle non-US locations without US-specific enhancements', async () => {
@@ -221,7 +221,32 @@ describe('Enhanced Query Rewriter', () => {
     it('should log the rewriting process', async () => {
       const result = await rewriteQuery('Hey, help me in San Francisco', 'find_shelter', 'test-call-sid');
       
-      expect(result).toContain('domestic violence shelter near San Francisco');
+      expect(result).toContain('domestic violence shelter San Francisco');
+      expect(result).toContain('site:org OR site:gov');
+    });
+
+    it('should enhance US location queries with site restrictions', async () => {
+      const result = await rewriteQuery('find shelter in San Francisco', 'find_shelter');
+      expect(result).toBe('find shelter in San Francisco site:org OR site:gov');
+    });
+
+    it('should preserve existing shelter terms and add location', async () => {
+      const result = await rewriteQuery('I need shelter in Oakland', 'find_shelter');
+      expect(result).toBe('I need shelter in Oakland site:org OR site:gov');
+    });
+
+    it('should handle geocoding failures gracefully', async () => {
+      // Should still return a reasonable result
+      const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
+      
+      expect(result).toContain('find shelter near New York City, NY?');
+      expect(result).toContain('site:org OR site:gov');
+    });
+
+    it('should handle complex location scenarios', async () => {
+      const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
+      
+      expect(result).toContain('find shelter near New York City, NY?');
       expect(result).toContain('site:org OR site:gov');
     });
   });
@@ -230,7 +255,7 @@ describe('Enhanced Query Rewriter', () => {
     it('should work as an alias for rewriteQuery', async () => {
       const result = await testQueryRewriting('Hey, I need help in San Francisco');
       
-      expect(result).toBe('domestic violence shelter near San Francisco site:org OR site:gov -site:wikipedia.org -filetype:pdf');
+      expect(result).toBe('domestic violence shelter San Francisco site:org OR site:gov');
     });
   });
 
@@ -239,14 +264,14 @@ describe('Enhanced Query Rewriter', () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('shelter near New York City, NY');
+      expect(result).toContain('find shelter near New York City, NY?');
       expect(result).toContain('site:org OR site:gov');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('shelter near New York City, NY');
+      expect(result).toContain('find shelter near New York City, NY?');
       expect(result).toContain('site:org OR site:gov');
     });
   });

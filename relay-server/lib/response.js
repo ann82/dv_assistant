@@ -104,7 +104,8 @@ const EXCLUDED_DOMAINS = [
   'kayak.com',
   'cheaptickets.com',
   'travelocity.com',
-  'maddiesfund.org'
+  'maddiesfund.org',
+  'domesticshelters.org'
 ];
 
 export class ResponseGenerator {
@@ -602,7 +603,7 @@ export class ResponseGenerator {
             search_depth: 'advanced',
             include_answer: true,
             include_results: true,
-            include_raw_content: false,
+            include_raw_content: true,
             include_domains: [],
             exclude_domains: []
           })
@@ -756,14 +757,26 @@ export class ResponseGenerator {
       const url = (result.url || '').toLowerCase();
       const score = result.score || 0;
 
+      // Debug logging
+      console.log('Filtering result:', {
+        title: result.title,
+        score,
+        hasContent: !!content,
+        hasUrl: !!url
+      });
+
       // Increase score threshold for better quality results
       if (score < 0.5) {
+        console.log('Filtered out due to low score:', score);
         return false;
       }
 
       // Check for DV/shelter relevance in title or content
       const isRelevant = dvKeywords.some(kw => title.includes(kw) || content.includes(kw));
-      if (!isRelevant) return false;
+      if (!isRelevant) {
+        console.log('Filtered out due to no DV keywords');
+        return false;
+      }
 
       // Exclude generic resource guides and city pages
       const isGenericResource = GENERIC_RESOURCE_PATTERNS.some(pattern => 
@@ -776,8 +789,122 @@ export class ResponseGenerator {
         url.includes(domain)
       );
 
-      return !isGenericResource && !isCityPage && !isExcludedDomain;
+      // Exclude results with "Not available" for both phone and address (directory pages)
+      const hasNoContactInfo = (result.phone === 'Not available' || result.phone === '') && 
+                              (result.address === 'Not available' || result.address === '');
+
+      // More intelligent filtering: check if this looks like a directory page vs. specific shelter
+      const isDirectoryPage = this.isDirectoryPage(title, content, url);
+
+      console.log('Filter checks:', {
+        isGenericResource,
+        isCityPage,
+        isExcludedDomain,
+        hasNoContactInfo,
+        isDirectoryPage
+      });
+
+      const shouldInclude = !isGenericResource && !isCityPage && !isExcludedDomain && !hasNoContactInfo && !isDirectoryPage;
+      console.log('Final decision:', shouldInclude ? 'INCLUDE' : 'EXCLUDE');
+      
+      return shouldInclude;
     });
+  }
+
+  /**
+   * Check if a result looks like a directory page rather than a specific shelter
+   * @param {string} title - The title to check
+   * @param {string} content - The content to check
+   * @param {string} url - The URL to check
+   * @returns {boolean} True if this looks like a directory page
+   */
+  static isDirectoryPage(title, content, url) {
+    const lowerTitle = title.toLowerCase();
+    const lowerContent = content.toLowerCase();
+    const lowerUrl = url.toLowerCase();
+
+    // Check for directory page indicators
+    const directoryIndicators = [
+      // Generic directory patterns
+      'domestic violence programs',
+      'domestic violence help',
+      'domestic violence resources',
+      'domestic violence services',
+      'domestic violence assistance',
+      'domestic violence support',
+      'domestic violence information',
+      'domestic violence directory',
+      'domestic violence guide',
+      'domestic violence listings',
+      'domestic violence finder',
+      'domestic violence search',
+      'domestic violence database',
+      'domestic violence network',
+      'domestic violence organizations',
+      'domestic violence agencies',
+      'domestic violence providers',
+      'domestic violence centers',
+      'domestic violence shelters and programs',
+      'domestic violence help, programs',
+      'domestic violence programs and services',
+      'domestic violence assistance programs',
+      'domestic violence support programs',
+      'domestic violence crisis programs',
+      'domestic violence intervention programs',
+      'domestic violence prevention programs',
+      'domestic violence advocacy programs',
+      'domestic violence counseling programs',
+      'domestic violence hotline programs',
+      'domestic violence emergency programs',
+      'domestic violence victim programs',
+      'domestic violence survivor programs',
+      'domestic violence refuge programs',
+      'domestic violence housing programs',
+      'domestic violence protection programs',
+      'domestic violence safety programs',
+      'domestic violence escape programs',
+      'domestic violence help programs',
+      'domestic violence resource programs'
+    ];
+
+    // Check if title matches directory patterns
+    const matchesDirectoryPattern = directoryIndicators.some(pattern => 
+      lowerTitle.includes(pattern)
+    );
+
+    // Check for directory page content indicators
+    const hasDirectoryContent = lowerContent.includes('domestic violence shelters and programs') ||
+                               lowerContent.includes('domestic violence help, programs') ||
+                               lowerContent.includes('domestic violence programs and services') ||
+                               lowerContent.includes('domestic violence assistance programs') ||
+                               lowerContent.includes('domestic violence support programs') ||
+                               lowerContent.includes('domestic violence crisis programs') ||
+                               lowerContent.includes('domestic violence intervention programs') ||
+                               lowerContent.includes('domestic violence prevention programs') ||
+                               lowerContent.includes('domestic violence advocacy programs') ||
+                               lowerContent.includes('domestic violence counseling programs') ||
+                               lowerContent.includes('domestic violence hotline programs') ||
+                               lowerContent.includes('domestic violence emergency programs') ||
+                               lowerContent.includes('domestic violence victim programs') ||
+                               lowerContent.includes('domestic violence survivor programs') ||
+                               lowerContent.includes('domestic violence refuge programs') ||
+                               lowerContent.includes('domestic violence housing programs') ||
+                               lowerContent.includes('domestic violence protection programs') ||
+                               lowerContent.includes('domestic violence safety programs') ||
+                               lowerContent.includes('domestic violence escape programs') ||
+                               lowerContent.includes('domestic violence help programs') ||
+                               lowerContent.includes('domestic violence resource programs');
+
+    // Check for directory page URL patterns
+    const hasDirectoryUrl = lowerUrl.includes('domesticshelters.org') ||
+                           lowerUrl.includes('help/') ||
+                           lowerUrl.includes('search?q=') ||
+                           lowerUrl.includes('directory') ||
+                           lowerUrl.includes('listings') ||
+                           lowerUrl.includes('find') ||
+                           lowerUrl.includes('search');
+
+    return matchesDirectoryPattern || hasDirectoryContent || hasDirectoryUrl;
   }
 
   /**
@@ -1211,7 +1338,7 @@ export class ResponseGenerator {
           search_depth: 'advanced',
           include_answer: true,
           include_results: true,
-          include_raw_content: false,
+          include_raw_content: true,
           include_domains: [],
           exclude_domains: ['yelp.com', 'maddiesfund.org'], // Exclude irrelevant domains
           max_results: 5
@@ -1807,9 +1934,15 @@ export class ResponseGenerator {
         // Append all consecutive lines that are not phone/fax/email or blank
         for (let j = i + 1; j < lines.length; j++) {
           const nextLine = lines[j];
-          if (/^(Phone|Fax|Email|Contact|Website)[:\s]/i.test(nextLine)) break;
-          if (!nextLine) break;
-          address += ' ' + nextLine;
+          // If next line looks like part of address (contains city, state, zip)
+          if (nextLine.match(/[A-Z]{2}\s*\d{5}/) || nextLine.match(/[A-Z][a-z]+,\s*[A-Z]{2}/)) {
+            address += ' ' + nextLine;
+          } else if (nextLine.match(/^P\.?\s*O\.?\s*Box/i)) {
+            // Handle P.O. Box
+            address += ' ' + nextLine;
+          } else {
+            break;
+          }
         }
         if (address.length > 10) {
           return address;
