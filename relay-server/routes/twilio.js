@@ -685,22 +685,61 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
   });
 
   try {
-    // Get intent classification (same for web and Twilio)
+    // Get conversation context FIRST (for follow-up questions)
+    const context = callSid ? getConversationContext(callSid) : null;
+    logger.info('Retrieved conversation context:', {
+      requestId,
+      callSid,
+      hasContext: !!context,
+      lastIntent: context?.lastIntent,
+      hasLastQueryContext: !!context?.lastQueryContext,
+      needsLocation: context?.lastQueryContext?.needsLocation || false
+    });
+
+    // Check for follow-up questions BEFORE intent classification
+    const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
+    
+    logger.info('Follow-up question check:', {
+      requestId,
+      callSid,
+      isFollowUp: !!followUpResponse,
+      followUpType: followUpResponse?.type,
+      speechResult,
+      lastIntent: context?.lastIntent
+    });
+
+    // If this is a follow-up question, handle it directly
+    if (followUpResponse) {
+      logger.info('Processing follow-up response:', {
+        requestId,
+        callSid,
+        followUpType: followUpResponse.type,
+        hasResults: !!followUpResponse.results,
+        resultCount: followUpResponse.results?.length || 0
+      });
+
+      // Update conversation context with follow-up response
+      if (callSid) {
+        updateConversationContext(callSid, followUpResponse.intent || context?.lastIntent || 'general_information', speechResult, {
+          voiceResponse: followUpResponse.voiceResponse,
+          smsResponse: followUpResponse.smsResponse
+        }, followUpResponse.results && followUpResponse.results.length > 0 ? { results: followUpResponse.results } : null);
+      }
+
+      // Return appropriate format based on request type
+      if (requestType === 'web') {
+        return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
+      }
+      return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
+    }
+
+    // Get intent classification (only if not a follow-up)
     const intent = await getIntent(speechResult);
     logger.info('Classified intent:', {
       requestId,
       callSid,
       intent,
       speechResult
-    });
-
-    // Get conversation context (for follow-up questions)
-    const context = callSid ? getConversationContext(callSid) : null;
-    logger.info('Retrieved conversation context:', {
-      requestId,
-      callSid,
-      hasContext: !!context,
-      lastIntent: context?.lastIntent
     });
 
     // Extract location from speech input

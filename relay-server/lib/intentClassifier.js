@@ -62,6 +62,7 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   context.lastResponse = response;
 
   // Update lastQueryContext with structured data for follow-ups
+  // Set lastQueryContext for resource requests even if no results yet
   if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
     const location = extractLocationFromQuery(query);
     context.lastQueryContext = {
@@ -71,6 +72,18 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       timestamp: Date.now(),
       smsResponse: response.smsResponse || null,
       voiceResponse: response.voiceResponse || null
+    };
+  } else if (isResourceQuery(intent)) {
+    // For resource requests without results, still set context for location follow-ups
+    const location = extractLocationFromQuery(query);
+    context.lastQueryContext = {
+      intent: intent,
+      location: location,
+      results: [], // Empty results array
+      timestamp: Date.now(),
+      smsResponse: response.smsResponse || null,
+      voiceResponse: response.voiceResponse || null,
+      needsLocation: !location // Flag to indicate location is needed
     };
   } else if (matchedResult) {
     // Update context with focus tracking for follow-up responses
@@ -86,7 +99,8 @@ export function updateConversationContext(callSid, intent, query, response, tavi
     intent,
     historyLength: context.history.length,
     hasLastQueryContext: !!context.lastQueryContext,
-    focusResultTitle: context.lastQueryContext?.focusResultTitle || null
+    focusResultTitle: context.lastQueryContext?.focusResultTitle || null,
+    needsLocation: context.lastQueryContext?.needsLocation || false
   });
 }
 
@@ -542,7 +556,6 @@ export async function handleFollowUp(query, lastQueryContext) {
   const followUpIndicators = [
     // General follow-up words
     'more', 'details', 'information', 'about', 'tell me', 'what about',
-    'can you tell me', 'i want to know', 'i need to know', 'show me',
     // Ordinal references
     'first', 'second', 'third', 'fourth', 'fifth', '1st', '2nd', '3rd', '4th', '5th',
     // Demonstrative references
@@ -562,7 +575,22 @@ export async function handleFollowUp(query, lastQueryContext) {
   const hasFollowUpWords = lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this') || lowerQuery.includes('it');
   const isLikelyShortFollowUp = isShortQuery && hasFollowUpWords;
   
-  // Step 2: If pattern matching is uncertain, use AI for better accuracy
+  // Step 2: Check for location-only statements as follow-ups to resource requests
+  const isLocationOnlyStatement = isLocationStatement(query);
+  const isResourceRequest = isResourceQuery(lastQueryContext.intent);
+  const needsLocation = lastQueryContext.needsLocation;
+  
+  // If this is a location statement and the last query was a resource request that needs location
+  if (isLocationOnlyStatement && isResourceRequest && needsLocation) {
+    logger.info('Detected location-only statement as follow-up to resource request:', {
+      query,
+      lastIntent: lastQueryContext.intent,
+      needsLocation
+    });
+    return await generateLocationFollowUpResponse(query, lastQueryContext);
+  }
+  
+  // Step 3: If pattern matching is uncertain, use AI for better accuracy
   let isFollowUp = isFollowUpByPattern || isLikelyShortFollowUp;
   
   // Use AI if pattern matching is unclear or if we want to be extra sure
@@ -1411,4 +1439,131 @@ export function generateReengagementMessage(context) {
   // Randomly select a message to avoid repetition
   const randomIndex = Math.floor(Math.random() * messages.length);
   return messages[randomIndex];
+}
+
+// Helper function to detect if a query is a location-only statement
+function isLocationStatement(query) {
+  if (!query) return false;
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // Common location statement patterns
+  const locationPatterns = [
+    /^i\s+(?:live|am|stay|reside)\s+(?:in|at|near|around)\s+.+/i,
+    /^i'm\s+(?:in|at|near|around)\s+.+/i,
+    /^i\s+am\s+(?:in|at|near|around)\s+.+/i,
+    /^my\s+(?:location|area|city|town)\s+is\s+.+/i,
+    /^i'm\s+(?:from|in)\s+.+/i,
+    /^i\s+(?:am|live)\s+from\s+.+/i
+  ];
+  
+  // Check if query matches any location pattern
+  const matchesLocationPattern = locationPatterns.some(pattern => pattern.test(query));
+  
+  // Also check for location keywords without being a question
+  const locationKeywords = ['live', 'reside', 'stay', 'from', 'area', 'city', 'town', 'location'];
+  const hasLocationKeywords = locationKeywords.some(keyword => lowerQuery.includes(keyword));
+  const isNotQuestion = !lowerQuery.includes('?') && !lowerQuery.includes('where') && !lowerQuery.includes('what');
+  
+  return matchesLocationPattern || (hasLocationKeywords && isNotQuestion);
+}
+
+// Helper function to generate response for location-only follow-ups
+async function generateLocationFollowUpResponse(locationQuery, lastQueryContext) {
+  try {
+    // Extract location from the statement
+    const location = extractLocationFromLocationStatement(locationQuery);
+    
+    if (!location) {
+      return {
+        type: 'location_follow_up',
+        intent: lastQueryContext.intent,
+        voiceResponse: "I didn't catch the location clearly. Could you please tell me which city or area you're looking for?",
+        smsResponse: null,
+        results: []
+      };
+    }
+    
+    // Create a new query combining the original intent with the location
+    const originalQuery = lastQueryContext.lastQuery || lastQueryContext.intent.replace('_', ' ');
+    const combinedQuery = `${originalQuery} in ${location}`;
+    
+    logger.info('Generating location follow-up response:', {
+      originalQuery,
+      locationQuery,
+      combinedQuery,
+      location
+    });
+    
+    // Import required functions for processing
+    const { callTavilyAPI } = await import('./apis.js');
+    const { ResponseGenerator } = await import('./response.js');
+    
+    // Process the combined query
+    const tavilyResponse = await ResponseGenerator.queryTavily(combinedQuery);
+    
+    if (tavilyResponse && tavilyResponse.results && tavilyResponse.results.length > 0) {
+      // Format response for voice
+      const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', combinedQuery, 3);
+      
+      return {
+        type: 'location_follow_up',
+        intent: lastQueryContext.intent,
+        voiceResponse: formattedResponse.voiceResponse,
+        smsResponse: formattedResponse.smsResponse,
+        results: tavilyResponse.results,
+        location: location
+      };
+    } else {
+      return {
+        type: 'location_follow_up',
+        intent: lastQueryContext.intent,
+        voiceResponse: `I couldn't find any ${lastQueryContext.intent.replace('_', ' ')} resources in ${location}. Could you try a nearby city or let me know if you need help with something else?`,
+        smsResponse: null,
+        results: [],
+        location: location
+      };
+    }
+  } catch (error) {
+    logger.error('Error generating location follow-up response:', error);
+    return {
+      type: 'location_follow_up',
+      intent: lastQueryContext.intent,
+      voiceResponse: "I'm having trouble processing that location. Could you please try again or let me know if you need help with something else?",
+      smsResponse: null,
+      results: []
+    };
+  }
+}
+
+// Helper function to extract location from location statements
+function extractLocationFromLocationStatement(query) {
+  if (!query) return null;
+  
+  // Patterns for extracting location from statements like "I live in Santa Clara"
+  const locationPatterns = [
+    /(?:i\s+(?:live|am|stay|reside)\s+(?:in|at|near|around)\s+)([^,.]+(?:,\s*[^,.]+)?)/i,
+    /(?:i'm\s+(?:in|at|near|around)\s+)([^,.]+(?:,\s*[^,.]+)?)/i,
+    /(?:i\s+am\s+(?:in|at|near|around)\s+)([^,.]+(?:,\s*[^,.]+)?)/i,
+    /(?:my\s+(?:location|area|city|town)\s+is\s+)([^,.]+(?:,\s*[^,.]+)?)/i,
+    /(?:i'm\s+(?:from|in)\s+)([^,.]+(?:,\s*[^,.]+)?)/i,
+    /(?:i\s+(?:am|live)\s+from\s+)([^,.]+(?:,\s*[^,.]+)?)/i
+  ];
+  
+  for (const pattern of locationPatterns) {
+    const match = query.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  // Fallback: extract capitalized words that might be location names
+  const words = query.split(/\s+/);
+  const capitalizedWords = words.filter(word => /^[A-Z][a-z]+/.test(word));
+  
+  if (capitalizedWords.length > 0) {
+    return capitalizedWords.join(' ');
+  }
+  
+  return null;
 } 
