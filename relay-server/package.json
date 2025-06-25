@@ -9,8 +9,6 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "tsc",
-    "postinstall": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
