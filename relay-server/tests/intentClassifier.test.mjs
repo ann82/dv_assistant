@@ -5,7 +5,8 @@ import {
   rewriteQuery, 
   updateConversationContext, 
   getConversationContext, 
-  clearConversationContext 
+  clearConversationContext,
+  generateFollowUpResponse
 } from '../lib/intentClassifier.js';
 
 // Mock OpenAI
@@ -221,6 +222,80 @@ describe('Intent Classification', () => {
         const intent = await getIntent(query);
         expect(intent).not.toBe('off_topic');
       }
+    });
+  });
+
+  describe('Follow-up Question Handling', () => {
+    it('should handle "last one" follow-up questions correctly', async () => {
+      // Mock lastQueryContext with sample results
+      const lastQueryContext = {
+        intent: 'general_information',
+        location: 'San Jose, California',
+        results: [
+          {
+            title: 'First Shelter - Domestic Violence Support Center',
+            content: 'This shelter provides emergency housing, counseling services, and legal assistance for domestic violence survivors. They offer 24/7 hotline support and family services including childcare.',
+            url: 'https://example1.org',
+            score: 0.9
+          },
+          {
+            title: 'Second Shelter - Safe Haven for Families',
+            content: 'Safe Haven provides transitional housing, support groups, and employment assistance. They specialize in helping families with children and offer transportation assistance.',
+            url: 'https://example2.org',
+            score: 0.8
+          },
+          {
+            title: 'Third Shelter - Crisis Intervention Center',
+            content: 'This crisis center offers emergency shelter, safety planning, and advocacy services. They provide 24/7 crisis intervention and have partnerships with local law enforcement.',
+            url: 'https://example3.org',
+            score: 0.7
+          }
+        ],
+        timestamp: Date.now()
+      };
+
+      // Test "last one" follow-up
+      const followUpResponse = await generateFollowUpResponse('Can you tell me more about the last one?', lastQueryContext);
+      
+      expect(followUpResponse).toBeDefined();
+      expect(followUpResponse.type).toBe('specific_result');
+      expect(followUpResponse.intent).toBe('general_information');
+      expect(followUpResponse.voiceResponse).toContain('Third Shelter');
+      expect(followUpResponse.voiceResponse).toContain('emergency shelter');
+      expect(followUpResponse.voiceResponse).toContain('safety planning');
+      expect(followUpResponse.voiceResponse).toContain('advocacy services');
+    });
+
+    it('should handle "first one" follow-up questions correctly', async () => {
+      const lastQueryContext = {
+        intent: 'find_shelter',
+        location: 'San Jose, California',
+        results: [
+          {
+            title: 'First Shelter - Domestic Violence Support Center',
+            content: 'This shelter provides emergency housing, counseling services, and legal assistance for domestic violence survivors. They offer 24/7 hotline support and family services including childcare.',
+            url: 'https://example1.org',
+            score: 0.9
+          },
+          {
+            title: 'Second Shelter - Safe Haven for Families',
+            content: 'Safe Haven provides transitional housing, support groups, and employment assistance.',
+            url: 'https://example2.org',
+            score: 0.8
+          }
+        ],
+        timestamp: Date.now()
+      };
+
+      // Test "first one" follow-up
+      const followUpResponse = await generateFollowUpResponse('Tell me more about the first one', lastQueryContext);
+      
+      expect(followUpResponse).toBeDefined();
+      expect(followUpResponse.type).toBe('specific_result');
+      expect(followUpResponse.voiceResponse).toContain('First Shelter');
+      expect(followUpResponse.voiceResponse).toContain('counseling services');
+      expect(followUpResponse.voiceResponse).toContain('legal assistance');
+      expect(followUpResponse.voiceResponse).toContain('family services');
     });
   });
 }); 

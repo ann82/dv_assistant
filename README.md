@@ -121,6 +121,7 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **Custom Tavily Response Formatting (v1.0.13):** New flexible formatting system with multiple format options (simple, detailed, minimal, custom) for different use cases. Enhanced phone number extraction, title cleaning, and metadata calculation with comprehensive test coverage.
 - **See CHANGELOG for more details**
 - **Simplified intent classification and off-topic detection:** Only queries with domestic violence-related keywords are considered on-topic; all others are classified as off-topic. This approach is robust, easier to maintain, and fully covered by tests.
+- **Improved follow-up question handling:** The system now correctly interprets queries like "tell me more about the last one" or "the first one", mapping them to the correct Tavily result and providing detailed information from the content. Fully covered by tests.
 
 ## Custom Tavily Response Formatting
 

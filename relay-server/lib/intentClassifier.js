@@ -707,22 +707,42 @@ function extractFocusTarget(userQuery, lastQueryContext) {
     }
   }
   
-  // Check for ordinal references
+  // Check for ordinal references and map them to result indices
   const ordinalPatterns = [
-    /(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)/i,
-    /(one|two|three|four|five)/i
+    { pattern: /(first|1st)/i, index: 0 },
+    { pattern: /(second|2nd)/i, index: 1 },
+    { pattern: /(third|3rd)/i, index: 2 },
+    { pattern: /(fourth|4th)/i, index: 3 },
+    { pattern: /(fifth|5th)/i, index: 4 }
   ];
   
-  for (const pattern of ordinalPatterns) {
+  for (const { pattern, index } of ordinalPatterns) {
     const match = userQuery.match(pattern);
-    if (match) {
-      return match[1];
+    if (match && lastQueryContext.results && lastQueryContext.results[index]) {
+      // Return the title of the specific result instead of the ordinal word
+      return lastQueryContext.results[index].title;
+    }
+  }
+  
+  // Check for "last one", "the last one", etc.
+  if (lowerQuery.includes('last') && (lowerQuery.includes('one') || lowerQuery.includes('result'))) {
+    if (lastQueryContext.results && lastQueryContext.results.length > 0) {
+      // Return the title of the last result
+      const lastIndex = lastQueryContext.results.length - 1;
+      return lastQueryContext.results[lastIndex].title;
     }
   }
   
   // Check for demonstrative references
   if (lowerQuery.includes('that') || lowerQuery.includes('this') || lowerQuery.includes('the one')) {
-    return 'specific_reference';
+    // If we have a focused result from previous context, use that
+    if (lastQueryContext.focusResultTitle) {
+      return lastQueryContext.focusResultTitle;
+    }
+    // Otherwise, default to the first result
+    if (lastQueryContext.results && lastQueryContext.results.length > 0) {
+      return lastQueryContext.results[0].title;
+    }
   }
   
   // Extract potential location names (capitalized words)
@@ -876,6 +896,12 @@ export function generateResultSummary(result) {
   if (content.includes('education') || content.includes('training')) {
     services.push('education and training');
   }
+  if (content.includes('safety planning') || content.includes('safety plan')) {
+    services.push('safety planning');
+  }
+  if (content.includes('advocacy') || content.includes('advocate')) {
+    services.push('advocacy services');
+  }
   
   // Generate summary based on services found
   if (services.length > 0) {
@@ -889,17 +915,39 @@ export function generateResultSummary(result) {
     }
   }
   
-  // Fallback: Extract first meaningful sentence
-  const sentences = result.content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+  // Fallback: Extract first meaningful sentence that contains relevant information
+  const sentences = result.content.split(/[.!?]+/).filter(s => s.trim().length > 15);
   if (sentences.length === 0) {
     return 'This resource provides support and assistance for those in need.';
   }
   
-  let summary = sentences[0].trim();
+  // Look for a sentence that contains relevant keywords
+  const relevantKeywords = ['shelter', 'domestic violence', 'support', 'help', 'assistance', 'counseling', 'legal', 'family', 'children', 'emergency', 'crisis', 'safe'];
+  
+  let bestSentence = sentences[0];
+  let bestScore = 0;
+  
+  for (const sentence of sentences) {
+    const lowerSentence = sentence.toLowerCase();
+    let score = 0;
+    
+    for (const keyword of relevantKeywords) {
+      if (lowerSentence.includes(keyword)) {
+        score += 1;
+      }
+    }
+    
+    if (score > bestScore) {
+      bestScore = score;
+      bestSentence = sentence;
+    }
+  }
+  
+  let summary = bestSentence.trim();
   
   // Truncate if too long for voice
-  if (summary.length > 100) {
-    summary = summary.substring(0, 97) + '...';
+  if (summary.length > 120) {
+    summary = summary.substring(0, 117) + '...';
   }
   
   return summary;
@@ -1011,7 +1059,26 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary = generateResultSummary(result);
     const phone = extractPhoneFromContent(result.content);
     
-    return `Here's detailed information about ${cleanTitle}: ${summary}. You can contact them at ${phone}. How else can I help you today?`;
+    // Extract more detailed information from content
+    const detailedInfo = extractDetailedInfo(result.content);
+    
+    let response = `Here's detailed information about ${cleanTitle}: ${summary}`;
+    
+    if (detailedInfo.services.length > 0) {
+      response += ` They provide ${detailedInfo.services.join(', ')}.`;
+    }
+    
+    if (detailedInfo.highlights.length > 0) {
+      response += ` ${detailedInfo.highlights.join(' ')}`;
+    }
+    
+    if (phone !== 'Not available') {
+      response += ` You can contact them at ${phone}.`;
+    }
+    
+    response += ` How else can I help you today?`;
+    
+    return response;
   } else if (results.length === 2) {
     const result1 = results[0];
     const result2 = results[1];
@@ -1020,7 +1087,25 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary1 = generateResultSummary(result1);
     const summary2 = generateResultSummary(result2);
     
-    return `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}. How else can I help you today?`;
+    // Extract detailed info for both results
+    const detailedInfo1 = extractDetailedInfo(result1.content);
+    const detailedInfo2 = extractDetailedInfo(result2.content);
+    
+    let response = `Here's what I found about the shelters in ${location}: `;
+    
+    response += `First, ${title1} - ${summary1}`;
+    if (detailedInfo1.services.length > 0) {
+      response += ` They provide ${detailedInfo1.services.join(', ')}.`;
+    }
+    
+    response += ` Second, ${title2} - ${summary2}`;
+    if (detailedInfo2.services.length > 0) {
+      response += ` They provide ${detailedInfo2.services.join(', ')}.`;
+    }
+    
+    response += ` How else can I help you today?`;
+    
+    return response;
   } else {
     // For 3 or more results, provide details for the first 2 and mention the rest
     const result1 = results[0];
@@ -1030,20 +1115,86 @@ export function generateDetailedShelterInfo(lastQueryContext) {
     const summary1 = generateResultSummary(result1);
     const summary2 = generateResultSummary(result2);
     
-    let response = `Here's what I found about the shelters in ${location}: First, ${title1} - ${summary1}. Second, ${title2} - ${summary2}.`;
+    // Extract detailed info for first two results
+    const detailedInfo1 = extractDetailedInfo(result1.content);
+    const detailedInfo2 = extractDetailedInfo(result2.content);
     
-    if (results.length === 3) {
-      const result3 = results[2];
-      const title3 = cleanResultTitle(result3.title);
-      const summary3 = generateResultSummary(result3);
-      response += ` Third, ${title3} - ${summary3}.`;
-    } else {
-      response += ` I also found ${results.length - 2} more resources.`;
+    let response = `Here's what I found about the shelters in ${location}: `;
+    
+    response += `First, ${title1} - ${summary1}`;
+    if (detailedInfo1.services.length > 0) {
+      response += ` They provide ${detailedInfo1.services.join(', ')}.`;
+    }
+    
+    response += ` Second, ${title2} - ${summary2}`;
+    if (detailedInfo2.services.length > 0) {
+      response += ` They provide ${detailedInfo2.services.join(', ')}.`;
+    }
+    
+    if (results.length > 3) {
+      response += ` I also found ${results.length - 2} more resources in that area.`;
     }
     
     response += ` How else can I help you today?`;
+    
     return response;
   }
+}
+
+/**
+ * Extract detailed information from content
+ * @param {string} content - The content to analyze
+ * @returns {Object} Object with services and highlights
+ */
+function extractDetailedInfo(content) {
+  if (!content) return { services: [], highlights: [] };
+  
+  const lowerContent = content.toLowerCase();
+  const services = [];
+  const highlights = [];
+  
+  // Extract services
+  if (lowerContent.includes('counseling') || lowerContent.includes('therapy')) {
+    services.push('counseling services');
+  }
+  if (lowerContent.includes('legal') || lowerContent.includes('attorney') || lowerContent.includes('restraining order')) {
+    services.push('legal assistance');
+  }
+  if (lowerContent.includes('support group') || lowerContent.includes('group therapy')) {
+    services.push('support groups');
+  }
+  if (lowerContent.includes('hotline') || lowerContent.includes('24/7')) {
+    services.push('24/7 hotline');
+  }
+  if (lowerContent.includes('children') || lowerContent.includes('kids') || lowerContent.includes('family')) {
+    services.push('family services');
+  }
+  if (lowerContent.includes('transportation') || lowerContent.includes('transport')) {
+    services.push('transportation assistance');
+  }
+  if (lowerContent.includes('job') || lowerContent.includes('employment') || lowerContent.includes('career')) {
+    services.push('employment assistance');
+  }
+  if (lowerContent.includes('education') || lowerContent.includes('training')) {
+    services.push('education and training');
+  }
+  if (lowerContent.includes('housing') || lowerContent.includes('shelter')) {
+    services.push('emergency housing');
+  }
+  if (lowerContent.includes('safety planning') || lowerContent.includes('safety plan')) {
+    services.push('safety planning');
+  }
+  
+  // Extract highlights (first meaningful sentence)
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  if (sentences.length > 0) {
+    const firstSentence = sentences[0].trim();
+    if (firstSentence.length > 0) {
+      highlights.push(firstSentence);
+    }
+  }
+  
+  return { services, highlights };
 }
 
 /**
