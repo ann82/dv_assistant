@@ -28,7 +28,7 @@ const HTTP_STATUS = {
 };
 
 export class TwilioVoiceHandler {
-  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, server, VoiceResponseClass = twilio.twiml.VoiceResponse) {
+  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, VoiceResponseClass = twilio.twiml.VoiceResponse) {
     // Handle test environment where credentials might not be available
     if (process.env.NODE_ENV === 'test') {
       this.accountSid = accountSid || 'ACtest123456789';
@@ -56,15 +56,12 @@ export class TwilioVoiceHandler {
     this.twilioClient = twilio(this.accountSid, this.authToken);
     this.processingRequests = new Map(); // Track processing requests
     this.VoiceResponseClass = VoiceResponseClass;
-    if (server) {
-      this.wsServer = new TwilioWebSocketServer(server);
-    } else {
-      this.wsServer = null;
-    }
+    this.wsServer = null; // Initialize as null, will be set later via setWebSocketServer
   }
 
-  setWebSocketServer(server) {
-    this.wsServer = new TwilioWebSocketServer(server);
+  setWebSocketServer(wsServer) {
+    // Accept the WebSocket server instance directly instead of creating a new one
+    this.wsServer = wsServer;
   }
 
   async handleIncomingCall(req) {

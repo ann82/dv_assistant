@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - 2024-12-21
+
+### Fixed
+- **WebSocket Server Initialization Error** - Resolved critical server startup failure
+  - **Root Cause**: `server.on is not a function` error caused by incorrect WebSocket server initialization
+  - **Issue**: `TwilioVoiceHandler.setWebSocketServer()` was trying to create a new `TwilioWebSocketServer` instance with an existing instance instead of an HTTP server
+  - **Fix**: Modified `setWebSocketServer()` method to accept `TwilioWebSocketServer` instances directly instead of creating new ones
+  - **Constructor Cleanup**: Removed unused server parameter handling from `TwilioVoiceHandler` constructor
+  - **Server Startup**: Server now starts successfully without initialization errors
+  - **WebSocket Functionality**: WebSocket server properly initialized and ready for Twilio voice calls
+
+### Technical Improvements
+- **WebSocket Architecture**: Simplified WebSocket server initialization flow
+- **Code Clarity**: Removed confusing server parameter handling from constructor
+- **Error Prevention**: Eliminated potential for similar initialization errors in future
+- **Server Reliability**: Improved server startup reliability and stability
+
 ## [1.0.14] - 2024-12-21
 
 ### Fixed

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import http from 'http';
 import { config } from './lib/config.js';
 import twilioRoutes from './routes/twilio.js';
 import { TwilioWebSocketServer } from './websocketServer.js';
@@ -89,17 +90,6 @@ if (!fs.existsSync(audioDir)) {
 // Serve audio files
 app.use('/audio', express.static(audioDir));
 
-// Create WebSocket server
-const server = app.listen(port, '0.0.0.0', () => {
-  logger.info(`Server running on port ${port}`);
-});
-
-// Initialize WebSocket server
-const wsServer = new TwilioWebSocketServer(server);
-
-// Set WebSocket server in Twilio routes
-twilioRoutes.setWebSocketServer(wsServer);
-
 // Mount Twilio routes
 app.use('/twilio', twilioRoutes);
 
@@ -153,6 +143,24 @@ app.use((req, res) => {
     error: 'Not Found',
     message: 'The requested resource was not found'
   });
+});
+
+// Create HTTP server with Express app
+const server = http.createServer(app);
+
+// Debug log to confirm server object
+console.log('DEBUG: typeof server:', typeof server);
+console.log('DEBUG: server keys:', Object.keys(server));
+
+// Initialize WebSocket server
+const wsServer = new TwilioWebSocketServer(server);
+
+// Set WebSocket server in Twilio routes
+twilioRoutes.setWebSocketServer(wsServer);
+
+// Start the server
+server.listen(port, '0.0.0.0', () => {
+  logger.info(`Server running on port ${port}`);
 });
 
 // Handle server shutdown
