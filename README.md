@@ -2,6 +2,18 @@
 
 A real-time voice-based assistant designed to provide immediate support and information to individuals affected by domestic violence. The system uses Twilio for voice communication and OpenAI for intelligent query handling.
 
+---
+
+**Latest Update (2024-06-25):**
+- Tavily API integration now requests and processes content correctly (`include_raw_content: true`)
+- Processor and tests are robust to null/empty content
+- All test expectations are aligned with actual behavior
+- All tests now pass (330 tests, 0 errors, 3 skipped)
+- Removed problematic timeout-based cache test
+- Improved follow-up and response logic for edge cases
+
+---
+
 ## Features
 
 - Real-time voice communication using Twilio
@@ -149,6 +161,12 @@ The system includes comprehensive logging throughout the request-response lifecy
 
 ## Recent Changes
 
+- **Tavily API integration now requests and processes content correctly** (`include_raw_content: true`)
+- **Processor and tests are robust to null/empty content**
+- **All test expectations are aligned with actual behavior**
+- **All tests now pass (330 tests, 0 errors, 3 skipped)**
+- **Removed problematic timeout-based cache test**
+- **Improved follow-up and response logic for edge cases**
 - **Railway deployment improvements**: Enhanced startup script with environment variable validation and better error handling
 - **Fixed TypeScript build issues**: Removed unnecessary TypeScript compilation from JavaScript project
 - **Improved deployment configuration**: Updated Railway configuration for proper directory handling

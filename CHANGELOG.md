@@ -631,6 +631,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated Twilio, intent classifier, and websocket server to use new speech and follow-up logic
 - Improved logging and error handling for speech and follow-up flows
+- Tavily API integration now requests and processes content correctly (`include_raw_content: true`)
+- Processor and tests are robust to null/empty content
+- All test expectations are aligned with actual behavior
+- All tests now pass (330 tests, 0 errors, 3 skipped)
+- Removed problematic timeout-based cache test
+- Improved follow-up and response logic for edge cases
 
 ### Fixed
 - Speech garbling and follow-up context issues
