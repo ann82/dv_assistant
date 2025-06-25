@@ -166,6 +166,25 @@ router.post('/voice', async (req, res) => {
       // This is a new call - provide welcome message
       logger.info('Processing new call:', { CallSid });
       
+      // Initialize call in both WebSocket server and voice handler
+      const wsServer = getWebSocketServer();
+      if (wsServer) {
+        wsServer.registerCall(CallSid, req.body.From || 'unknown');
+      }
+      
+      // Initialize call in voice handler
+      if (!twilioVoiceHandler.activeCalls.has(CallSid)) {
+        twilioVoiceHandler.activeCalls.set(CallSid, {
+          from: req.body.From || 'unknown',
+          startTime: Date.now(),
+          hasConsent: false,
+          conversationHistory: [],
+          timeouts: new Set(),
+          lastActivity: Date.now()
+        });
+        logger.info('Initialized call in voice handler:', { CallSid, from: req.body.From });
+      }
+      
       // Generate welcome message without complex validation
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
@@ -276,6 +295,19 @@ router.post('/voice/process', async (req, res) => {
     }
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
+    
+    // Ensure call is initialized in voice handler (in case it wasn't initialized in voice endpoint)
+    if (!twilioVoiceHandler.activeCalls.has(CallSid)) {
+      twilioVoiceHandler.activeCalls.set(CallSid, {
+        from: req.body.From || 'unknown',
+        startTime: Date.now(),
+        hasConsent: false,
+        conversationHistory: [],
+        timeouts: new Set(),
+        lastActivity: Date.now()
+      });
+      logger.info('Initialized call in voice handler during speech processing:', { CallSid, from: req.body.From });
+    }
     
     // Preprocess speech input to improve recognition accuracy
     const cleanedSpeechResult = twilioVoiceHandler.preprocessSpeech(SpeechResult);
