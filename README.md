@@ -15,6 +15,27 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Enhanced logging and debugging capabilities
 - Robust filtering, caching, and response formatting logic
 - Customizable Tavily response formatting with required fields always present
+- **Improved Railway deployment with enhanced startup script and error handling**
+
+## Railway Deployment
+
+The system is optimized for Railway deployment with enhanced error handling and startup procedures:
+
+- **Smart Startup Script**: Validates all required environment variables before starting
+- **Enhanced Error Handling**: Clear error messages for missing configuration
+- **Health Check Endpoint**: Built-in health monitoring at `/health`
+- **Graceful Shutdown**: Proper handling of SIGTERM and SIGINT signals
+- **Comprehensive Logging**: Detailed startup and runtime logging
+
+### Required Environment Variables for Railway
+
+- `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
+- `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
+- `TWILIO_PHONE_NUMBER` - Your Twilio phone number
+- `TAVILY_API_KEY` - Your Tavily API key
+- `OPENAI_API_KEY` - Your OpenAI API key
+
+See `RAILWAY_DEPLOYMENT.md` for detailed deployment instructions and troubleshooting.
 
 ## Enhanced Logging and Debugging
 
@@ -42,6 +63,9 @@ The system includes comprehensive logging throughout the request-response lifecy
 
 ## Recent Changes
 
+- **Railway deployment improvements**: Enhanced startup script with environment variable validation and better error handling
+- **Fixed TypeScript build issues**: Removed unnecessary TypeScript compilation from JavaScript project
+- **Improved deployment configuration**: Updated Railway configuration for proper directory handling
 - **All tests now pass (100% green, 304 tests)**
 - **Custom Tavily response formatting always includes required fields**: status, resources, count, and timestamp are always present in custom format output
 - **Filtering, caching, and response formatting logic are robust and fully covered by tests**

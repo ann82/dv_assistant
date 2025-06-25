@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install --legacy-peer-deps"
+buildCommand = "cd relay-server && npm install --legacy-peer-deps"
 
 [deploy]
-startCommand = "node relay-server/server.js"
+startCommand = "cd relay-server && node start.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "always"

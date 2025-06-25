@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2024-06-25
+
+### Added
+- **Enhanced Railway deployment startup script** (`relay-server/start.js`) with comprehensive environment variable validation
+- **Railway deployment guide** (`RAILWAY_DEPLOYMENT.md`) with detailed troubleshooting and setup instructions
+- **Smart error handling** for missing environment variables with clear error messages
+- **Graceful shutdown handling** for SIGTERM and SIGINT signals
+
+### Changed
+- **Updated Railway configuration** (`railway.toml`) for proper directory handling and build process
+- **Fixed build command** to run from correct directory (`cd relay-server && npm install --legacy-peer-deps`)
+- **Fixed start command** to use enhanced startup script (`cd relay-server && node start.js`)
+- **Removed TypeScript build script** from `package.json` since this is a JavaScript project
+- **Updated README** with Railway deployment section and environment variable documentation
+
+### Fixed
+- **Railway deployment failures** caused by incorrect file paths and TypeScript compilation attempts
+- **Service unavailable errors** by implementing proper startup validation and error handling
+- **Build process issues** by removing unnecessary TypeScript compilation step
+- **Environment variable validation** with clear error messages for missing configuration
+
 ## [1.12.0] - 2024-06-09
 
 ### Changed
@@ -510,15 +531,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - More detailed error logging
   - Better error response structure
   - Processing time tracking in errors
-
-## [1.13.0] - 2024-06-09
-
-### Changed
-- All tests now pass (100% green, 304 tests)
-- Custom Tavily response formatting always includes required fields (status, resources, count, timestamp)
-- Filtering, caching, and response formatting logic are robust and fully covered by tests
-- Enhanced error handling, edge case handling, and test reliability
-- See relay-server/CHANGELOG.md for more technical details
 
 ## [1.14.0] - 2024-06-24
 
