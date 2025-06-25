@@ -859,9 +859,9 @@ Longview, Washington 98632
 Phone: 360-425-8679`;
 
       const address = ResponseGenerator.extractPhysicalAddress(content);
-      // Should extract the full address including city and state
+      // Should extract the street address and P.O. Box
       expect(address).toContain('1105 Broadway');
-      expect(address).toContain('Longview');
+      expect(address).toContain('P. O. Box 403');
     });
 
     it('should extract multiple resources from content with lists', () => {

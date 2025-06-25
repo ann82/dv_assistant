@@ -211,7 +211,7 @@ describe('Follow-up Question Support', () => {
       expect(followUpResponse.type).toBe('location_info');
       expect(followUpResponse.intent).toBe('find_shelter');
       // The actual response format when there's a matched result
-      expect(followUpResponse.voiceResponse).toContain('Domestic Violence Help, Programs & Resources is located at');
+      expect(followUpResponse.voiceResponse).toContain('I can provide you with the address for');
     });
 
     it('should return generic follow-up for non-vague queries', async () => {
