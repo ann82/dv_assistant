@@ -147,7 +147,6 @@ export async function testQueryRewriting(query, intent = 'find_shelter') {
 
 // Export utility functions for testing
 export {
-  cleanConversationalFillers,
   extractLocationFromQuery,
   detectLocationWithGeocoding
 }; 
