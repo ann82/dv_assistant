@@ -533,18 +533,6 @@ export class TwilioVoiceHandler {
         return formattedResponse.voiceResponse;
       }
 
-      // Handle end conversation intent
-      if (intent === 'end_conversation') {
-        logger.info('Processing end conversation intent:', {
-          requestId,
-          callSid,
-          speechResult
-        });
-
-        // Ask for SMS consent before ending
-        return "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
-      }
-
       // For emergency help, provide immediate assistance
       if (intent === 'emergency_help') {
         return "This is an emergency situation. Please call 911 immediately. You can also call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance. They are available 24/7 and can help you with safety planning and emergency resources.";
