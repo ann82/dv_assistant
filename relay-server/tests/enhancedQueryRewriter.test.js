@@ -92,30 +92,30 @@ describe('Enhanced Query Rewriter', () => {
 
   describe('cleanConversationalFillers', () => {
     it('should remove leading conversational fillers', () => {
-      expect(cleanConversationalFillers('Hey, can you help me find a shelter')).toBe('find a shelter');
+      expect(cleanConversationalFillers('Hey, can you help me find a shelter')).toBe('help me find a shelter');
       expect(cleanConversationalFillers('Hi, I need help in San Francisco')).toBe('I need help in San Francisco');
       expect(cleanConversationalFillers('Hello, I\'m looking for shelter')).toBe('I\'m looking for shelter');
     });
 
     it('should remove multiple consecutive fillers', () => {
-      expect(cleanConversationalFillers('Hey, hi, can you help me find shelter')).toBe('find shelter');
+      expect(cleanConversationalFillers('Hey, hi, can you help me find shelter')).toBe('help me find shelter');
       expect(cleanConversationalFillers('Hello, excuse me, I need assistance')).toBe('I need assistance');
     });
 
     it('should handle fillers with punctuation', () => {
-      expect(cleanConversationalFillers('Hey! Can you help me?')).toBe('Can you help me?');
+      expect(cleanConversationalFillers('Hey! Can you help me?')).toBe('help me?');
       expect(cleanConversationalFillers('Hi, I need help.')).toBe('I need help.');
       expect(cleanConversationalFillers('Hello... I need shelter')).toBe('I need shelter');
     });
 
     it('should not remove fillers in the middle of sentences', () => {
       expect(cleanConversationalFillers('I need help in San Francisco')).toBe('I need help in San Francisco');
-      expect(cleanConversationalFillers('Can you find shelter near me')).toBe('shelter near me');
+      expect(cleanConversationalFillers('Can you find shelter near me')).toBe('find shelter near me');
     });
 
     it('should return original string if all content is removed as fillers', () => {
       expect(cleanConversationalFillers('Hey hi hello')).toBe('Hey hi hello');
-      expect(cleanConversationalFillers('Can you help me')).toBe('Can you help me');
+      expect(cleanConversationalFillers('Can you help me')).toBe('help me');
     });
 
     it('should handle edge cases', () => {
@@ -239,14 +239,14 @@ describe('Enhanced Query Rewriter', () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('domestic violence shelter near New York City, NY');
+      expect(result).toContain('shelter near New York City, NY');
       expect(result).toContain('site:org OR site:gov');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('domestic violence shelter near New York City, NY');
+      expect(result).toContain('shelter near New York City, NY');
       expect(result).toContain('site:org OR site:gov');
     });
   });

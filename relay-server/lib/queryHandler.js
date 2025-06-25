@@ -1,6 +1,5 @@
 import { getIntent } from './intentClassifier.js';
 import { rewriteQuery } from './enhancedQueryRewriter.js';
-import { callTavilyAPI } from './tavily.js';
 import { rerankByRelevance } from './relevanceScorer.js';
 import { fallbackResponse } from './fallbackResponder.js';
 import { logQueryHandling } from './queryLogger.js';

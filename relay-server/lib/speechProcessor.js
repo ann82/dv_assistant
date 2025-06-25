@@ -1,4 +1,7 @@
 import logger from './logger.js';
+import { cleanConversationalFillers, rewriteQuery } from './enhancedQueryRewriter.js';
+import { extractLocationFromQuery } from './enhancedLocationDetector.js';
+import { processTavilyQuery } from './tavilyProcessor.js';
 
 /**
  * Extract location from speech input using hybrid approach
@@ -81,7 +84,7 @@ function extractLocationByPattern(speechInput) {
  */
 async function extractLocationWithAI(speechInput) {
   try {
-    const { callGPT } = await import('./apis.js');
+    const { ResponseGenerator } = await import('./response.js');
     
     const prompt = `Extract the location from this speech input. Look for city names, area names, or geographic references.
 
@@ -96,16 +99,16 @@ Examples:
 - "help in the Oakland area" → "Oakland"
 - "I need assistance" → "none"`;
 
-    const response = await callGPT(prompt, 'gpt-3.5-turbo');
+    const response = await ResponseGenerator.generateGPTResponse(prompt, 'gpt-3.5-turbo', {});
     
-    // Handle the response properly - callGPT returns an object with a text property
+    // Handle the response properly - generateGPTResponse returns an object with a text property
     let responseText;
     if (typeof response === 'string') {
       responseText = response;
     } else if (response && typeof response === 'object' && response.text) {
       responseText = response.text;
     } else {
-      logger.error('Unexpected response format from callGPT:', { response, type: typeof response });
+      logger.error('Unexpected response format from generateGPTResponse:', { response, type: typeof response });
       return null;
     }
     
@@ -152,4 +155,66 @@ export function generateLocationPrompt() {
   ];
 
   return prompts[Math.floor(Math.random() * prompts.length)];
+}
+
+/**
+ * Process speech result and generate response
+ * @param {string} speechInput - The speech input to process
+ * @param {string} callSid - Call SID for logging
+ * @returns {Promise<Object>} Processing result
+ */
+export async function processSpeechResult(speechInput, callSid) {
+  try {
+    logger.info('Processing speech result:', { speechInput, callSid });
+
+    // Validate input
+    if (!speechInput || typeof speechInput !== 'string' || speechInput.trim() === '') {
+      logger.warn('Empty or invalid speech input:', { speechInput, callSid });
+      return {
+        success: false,
+        error: 'No speech input provided',
+        callSid
+      };
+    }
+
+    // Clean conversational fillers
+    const cleanedInput = cleanConversationalFillers(speechInput);
+    logger.info('Cleaned input:', { original: speechInput, cleaned: cleanedInput, callSid });
+
+    // Extract location
+    const locationInfo = extractLocationFromQuery(cleanedInput);
+    logger.info('Location extracted:', { locationInfo, callSid });
+
+    // Rewrite query for better search results
+    const rewrittenQuery = await rewriteQuery(cleanedInput, 'find_shelter', callSid);
+    logger.info('Query rewritten:', { original: cleanedInput, rewritten: rewrittenQuery, callSid });
+
+    // Process with Tavily
+    const tavilyResult = await processTavilyQuery(rewrittenQuery, {
+      location: locationInfo.location,
+      scope: locationInfo.scope
+    });
+
+    logger.info('Tavily processing complete:', { 
+      success: tavilyResult.success, 
+      resultCount: tavilyResult.results?.length || 0,
+      callSid 
+    });
+
+    return {
+      success: true,
+      results: tavilyResult.results || [],
+      query: rewrittenQuery,
+      location: locationInfo.location,
+      callSid
+    };
+
+  } catch (error) {
+    logger.error('Error processing speech result:', { error: error.message, callSid });
+    return {
+      success: false,
+      error: error.message,
+      callSid
+    };
+  }
 } 

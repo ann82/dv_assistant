@@ -604,7 +604,7 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
       callSid,
       query: rewrittenQuery
     });
-    const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+    const tavilyResponse = await ResponseGenerator.queryTavily(rewrittenQuery);
 
     logger.info('Received Tavily API response:', {
       requestId,
@@ -621,8 +621,11 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
     logger.info('Formatted response:', {
       requestId,
       callSid,
-      responseLength: formattedResponse.length,
-      responsePreview: formattedResponse.substring(0, 100) + '...'
+      responseType: typeof formattedResponse,
+      responseLength: typeof formattedResponse === 'string' ? formattedResponse.length : JSON.stringify(formattedResponse).length,
+      responsePreview: typeof formattedResponse === 'string' ? 
+        (formattedResponse.substring(0, 100) + '...') : 
+        JSON.stringify(formattedResponse).substring(0, 100) + '...'
     });
 
     // Update conversation context for follow-up questions

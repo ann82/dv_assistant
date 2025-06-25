@@ -3,10 +3,109 @@ import { OpenAI } from 'openai';
 import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
-import { withRetryAndThrottle } from './apiUtils.js';
 import { gptCache } from './queryCache.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+
+// Constants for filtering
+const DV_KEYWORDS = [
+  'domestic violence',
+  'domestic abuse',
+  'intimate partner violence',
+  'family violence',
+  'spousal abuse',
+  'partner abuse',
+  'relationship violence',
+  'gender-based violence',
+  'violence against women',
+  'battered women',
+  'abuse survivor',
+  'victim of abuse'
+];
+
+const SHELTER_KEYWORDS = [
+  'shelter',
+  'safe house',
+  'emergency housing',
+  'crisis center',
+  'crisis shelter',
+  'emergency shelter',
+  'transitional housing',
+  'support services',
+  'counseling services',
+  'advocacy services',
+  'victim services',
+  'survivor services',
+  'emergency assistance',
+  'crisis intervention',
+  'safety planning',
+  'protective services'
+];
+
+const GENERIC_RESOURCE_PATTERNS = [
+  'resource guide',
+  'resource directory',
+  'community resources',
+  'city resources',
+  'municipal resources',
+  'government resources',
+  'public resources',
+  'services directory',
+  'community services',
+  'social services',
+  'general resources',
+  'information guide',
+  'help directory',
+  'assistance directory',
+  'resource center',
+  'community center',
+  'information center',
+  'help center',
+  'assistance center',
+  'services center',
+  'resource hub',
+  'community hub',
+  'information hub',
+  'help hub',
+  'assistance hub',
+  'services hub'
+];
+
+const CITY_PAGE_PATTERNS = [
+  'city of',
+  'municipal',
+  'government',
+  'public',
+  'community'
+];
+
+const EXCLUDED_DOMAINS = [
+  'yelp.com',
+  'facebook.com',
+  'instagram.com',
+  'twitter.com',
+  'linkedin.com',
+  'pinterest.com',
+  'tiktok.com',
+  'youtube.com',
+  'reddit.com',
+  'tripadvisor.com',
+  'zillow.com',
+  'realtor.com',
+  'trulia.com',
+  'hotels.com',
+  'booking.com',
+  'airbnb.com',
+  'vrbo.com',
+  'expedia.com',
+  'orbitz.com',
+  'priceline.com',
+  'hotwire.com',
+  'kayak.com',
+  'cheaptickets.com',
+  'travelocity.com',
+  'maddiesfund.org'
+];
 
 export class ResponseGenerator {
   static tavilyCache = new Map();
@@ -33,11 +132,14 @@ export class ResponseGenerator {
   };
 
   static getCachedAnalysis(input) {
+    if (!input) return null;
     const normalizedInput = input.toLowerCase().trim();
-    return gptCache.get(normalizedInput);
+    const cached = gptCache.get(normalizedInput);
+    return cached || null;
   }
 
   static setCachedAnalysis(input, analysis) {
+    if (!input) return;
     const normalizedInput = input.toLowerCase().trim();
     gptCache.set(normalizedInput, analysis, 3600000); // Cache for 1 hour
   }
@@ -47,6 +149,19 @@ export class ResponseGenerator {
   }
 
   static analyzeQuery(input) {
+    // Handle null/undefined input
+    if (!input) {
+      return {
+        isFactual: false,
+        confidence: 0,
+        matches: {
+          patterns: [],
+          score: 0,
+          totalWeight: 0
+        }
+      };
+    }
+
     // Log incoming query
     logger.info('Analyzing query', {
       input,
@@ -126,10 +241,11 @@ export class ResponseGenerator {
     }
 
     // Calculate confidence score
-    const confidence = totalWeight > 0 ? patternScore / totalWeight : 0;
+    // Pattern scores can be high (15-20 for complex queries), so normalize appropriately
+    const confidence = patternScore > 0 ? Math.min(patternScore / 20, 1.0) : 0;
 
-    // Determine if query is factual
-    const isFactual = confidence >= 0.3;
+    // Determine if query is factual - use a lower threshold since we're normalizing differently
+    const isFactual = confidence >= 0.1;
 
     // Log final analysis
     logger.info('Query analysis complete', {
@@ -427,7 +543,7 @@ export class ResponseGenerator {
       }
     ];
 
-    const callOpenAIWithRetry = withRetryAndThrottle(async function callOpenAI() {
+    const callOpenAIWithRetry = async function callOpenAI() {
       const response = await openai.chat.completions.create({
         model,
         messages,
@@ -437,7 +553,7 @@ export class ResponseGenerator {
         frequency_penalty: 0.3
       });
       return response;
-    });
+    };
 
     const response = await callOpenAIWithRetry();
     const text = response.choices[0].message.content;
@@ -473,7 +589,7 @@ export class ResponseGenerator {
       return null;
     }
 
-    const callTavilyWithRetry = withRetryAndThrottle(async function callTavily(query) {
+    const callTavilyWithRetry = async function callTavily(query) {
       try {
         const response = await fetch('https://api.tavily.com/search', {
           method: 'POST',
@@ -520,7 +636,7 @@ export class ResponseGenerator {
         });
         throw error;
       }
-    });
+    };
 
     try {
       return await callTavilyWithRetry(cleanQuery);
@@ -551,8 +667,8 @@ export class ResponseGenerator {
       };
     }
 
-    // Filter out results with score < 0.2 (lowered from 0.7 to include more relevant results)
-    const filteredResults = tavilyResponse.results.filter(r => (r.score ?? 0) >= 0.2);
+    // Enhanced filtering for better quality results
+    const filteredResults = this.filterRelevantResults(tavilyResponse.results, userQuery);
 
     // Sort results by score (highest first) and take top results
     const sortedResults = [...filteredResults]
@@ -587,6 +703,88 @@ export class ResponseGenerator {
       summary,
       shelters
     };
+  }
+
+  /**
+   * Enhanced filtering to identify relevant domestic violence shelters
+   * @param {Array} results - Tavily search results
+   * @param {string} userQuery - Original user query for context
+   * @returns {Array} Filtered results
+   */
+  static filterRelevantResults(results, userQuery = '') {
+    if (!results || !Array.isArray(results)) {
+      return [];
+    }
+
+    // Define DV/shelter keywords for robust relevance checking
+    const dvKeywords = [
+      'domestic', 'violence', 'abuse', 'shelter', 'crisis', 'center', 'safe house',
+      'emergency', 'victim', 'survivor', 'support', 'advocacy', 'counseling', 'refuge', 'protection', 'safety', 'escape', 'help', 'resources'
+    ];
+
+    return results.filter(result => {
+      const content = (result.content || '').toLowerCase();
+      const title = (result.title || '').toLowerCase();
+      const url = (result.url || '').toLowerCase();
+      const score = result.score || 0;
+
+      // Increase score threshold for better quality results
+      if (score < 0.5) {
+        return false;
+      }
+
+      // Check for DV/shelter relevance in title or content
+      const isRelevant = dvKeywords.some(kw => title.includes(kw) || content.includes(kw));
+      if (!isRelevant) return false;
+
+      // Exclude generic resource guides and city pages
+      const isGenericResource = GENERIC_RESOURCE_PATTERNS.some(pattern => 
+        title.includes(pattern) || content.includes(pattern)
+      );
+      const isCityPage = CITY_PAGE_PATTERNS.some(pattern => 
+        title.includes(pattern) || content.includes(pattern)
+      );
+      const isExcludedDomain = EXCLUDED_DOMAINS.some(domain => 
+        url.includes(domain)
+      );
+
+      return !isGenericResource && !isCityPage && !isExcludedDomain;
+    });
+  }
+
+  /**
+   * Check if content has specific domestic violence content
+   * @param {string} content - Content to check
+   * @param {string} title - Title to check
+   * @returns {boolean} True if has specific DV content
+   */
+  static hasSpecificDVContent(content, title) {
+    const specificDVTerms = [
+      'domestic violence shelter',
+      'domestic violence safe house',
+      'domestic violence crisis center',
+      'domestic violence services',
+      'domestic violence program',
+      'domestic violence assistance',
+      'domestic violence support',
+      'domestic violence advocacy',
+      'domestic violence counseling',
+      'domestic violence hotline',
+      'domestic violence emergency',
+      'domestic violence victim',
+      'domestic violence survivor',
+      'domestic violence refuge',
+      'domestic violence housing',
+      'domestic violence protection',
+      'domestic violence safety',
+      'domestic violence escape',
+      'domestic violence help',
+      'domestic violence resources'
+    ];
+
+    return specificDVTerms.some(term => 
+      content.includes(term) || title.includes(term)
+    );
   }
 
   static extractLocationFromQuery(query) {
@@ -672,24 +870,32 @@ export class ResponseGenerator {
   }
 
   static cleanTitleForSMS(title) {
-    if (!title) return 'Unknown Organization';
-    let cleanTitle = title
-      .replace(/^\[.*?\]\s*/, '')
-      .replace(/^THE BEST \d+ /i, '')
-      .replace(/^Best \d+ /i, '')
-      .replace(/^Best /i, '')
-      .replace(/\s*-\s*Yelp$/i, '')
-      .replace(/\s*-\s*The Real Yellow.*$/i, '')
-      .replace(/\s*-\s*.*$/i, '')
-      .replace(/\s+/g, ' ')
+    if (!title) return '';
+    // Remove common site/branding suffixes and focus on the main DV/shelter part
+    let cleaned = title.replace(/\s*-\s*THE BEST.*$/i, '')
+      .replace(/\s*-\s*Yelp.*$/i, '')
+      .replace(/\s*-\s*Homeless Shelters.*$/i, '')
+      .replace(/\s*-\s*Directory.*$/i, '')
+      .replace(/\s*-\s*Services.*$/i, '')
+      .replace(/\s*-\s*Resource Center.*$/i, '')
+      .replace(/\s*-\s*Coalition.*$/i, '')
+      .replace(/\s*-\s*Program.*$/i, '')
+      .replace(/\s*-\s*Support.*$/i, '')
+      .replace(/\s*-\s*Help.*$/i, '')
+      .replace(/\s*-\s*Hotline.*$/i, '')
+      .replace(/\s*-\s*\d{4,}.*$/i, '')
+      .replace(/\s*\|\s*.*$/i, '')
+      .replace(/\s*\(.*\)\s*$/, '')
       .trim();
-    return cleanTitle || 'Unknown Organization';
+    // If the cleaned title is empty, fallback to the original
+    if (!cleaned) cleaned = title;
+    return cleaned;
   }
 
   static extractPhone(content) {
     if (!content) return 'Not available';
-    const phoneMatch = content.match(/(\d{3}[-.]?\d{3}[-.]?\d{4})/);
-    return phoneMatch ? phoneMatch[1] : 'Not available';
+    const phoneMatch = content.match(/\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/);
+    return phoneMatch ? `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}` : 'Not available';
   }
 
   static shouldUseGPT4(input, context) {
@@ -1165,6 +1371,253 @@ export class ResponseGenerator {
 
   static getRoutingStats() {
     return this.routingStats;
+  }
+
+  /**
+   * Format Tavily response with custom structure and filtering options
+   * @param {Object} tavilyResponse - Raw Tavily API response
+   * @param {string} format - Format type: 'simple', 'detailed', 'minimal', 'custom'
+   * @param {Object} options - Formatting options
+   * @returns {Object} Formatted response
+   */
+  static formatTavilyResponseCustom(tavilyResponse, format = 'simple', options = {}) {
+    try {
+      // Handle null/undefined responses
+      if (!tavilyResponse || !tavilyResponse.results) {
+        return this.getEmptyResponse(format);
+      }
+
+      // Apply filtering
+      const filteredResults = this.filterRelevantResults(tavilyResponse.results, options.query || '');
+      
+      // Apply score threshold if specified
+      const minScore = options.minScore || 0.7;
+      const scoreFilteredResults = filteredResults.filter(result => 
+        result.score && result.score >= minScore
+      );
+
+      // Apply max results limit if specified
+      const maxResults = options.maxResults || 3;
+      const limitedResults = scoreFilteredResults.slice(0, maxResults);
+
+      // Format based on type
+      switch (format) {
+        case 'simple':
+          return this.formatSimpleResponse(limitedResults, options);
+        case 'detailed':
+          return this.formatDetailedResponse(limitedResults, options);
+        case 'minimal':
+          return this.formatMinimalResponse(limitedResults, options);
+        case 'custom':
+          return this.formatCustomResponse(limitedResults, options);
+        default:
+          return this.formatSimpleResponse(limitedResults, options);
+      }
+    } catch (error) {
+      logger.error('Error in formatTavilyResponseCustom:', error);
+      return this.getEmptyResponse(format);
+    }
+  }
+
+  /**
+   * Format response in simple structure
+   */
+  static formatSimpleResponse(results, options = {}) {
+    const shelters = results.map(result => ({
+      name: result.title,
+      url: result.url,
+      phone: this.extractPhone(result.content) || 'Not available',
+      relevance: Math.round((result.score || 0) * 100)
+    }));
+
+    return {
+      success: shelters.length > 0,
+      message: shelters.length > 0 ? `Found ${shelters.length} shelters` : 'No shelters found in that area.',
+      count: shelters.length,
+      data: shelters,
+      timestamp: new Date().toISOString(),
+      query: options.query || '',
+      location: options.location || ''
+    };
+  }
+
+  /**
+   * Format response in detailed structure
+   */
+  static formatDetailedResponse(results, options = {}) {
+    const shelters = results.map(result => ({
+      title: result.title,
+      url: result.url,
+      content: result.content,
+      score: result.score,
+      relevance: Math.round((result.score || 0) * 100),
+      phone: this.extractPhone(result.content) || 'Not available',
+      cleanName: this.cleanTitleForVoice(result.title),
+      metadata: {
+        hasPhone: this.extractPhone(result.content) !== 'Not available',
+        contentLength: result.content ? result.content.length : 0,
+        isHighRelevance: (result.score || 0) >= 0.8
+      }
+    }));
+
+    return {
+      success: shelters.length > 0,
+      message: shelters.length > 0 ? `Found ${shelters.length} shelters` : 'No shelters found in that area.',
+      count: shelters.length,
+      results: shelters,
+      metadata: {
+        query: options.query || '',
+        location: options.location || '',
+        searchDepth: options.searchDepth || 'basic',
+        minScore: options.minScore || 0.7,
+        maxResults: options.maxResults || 3,
+        totalResults: results.length,
+        filteredResults: shelters.length
+      },
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Format response in minimal structure
+   */
+  static formatMinimalResponse(results, options = {}) {
+    return {
+      found: results.length > 0,
+      count: results.length,
+      shelters: results.map(result => ({
+        name: result.title,
+        url: result.url
+      }))
+    };
+  }
+
+  /**
+   * Format response with custom structure
+   */
+  static formatCustomResponse(results, options = {}) {
+    const customStructure = options.structure || {};
+    const response = {};
+
+    // Apply custom structure mapping
+    Object.keys(customStructure).forEach(key => {
+      const field = customStructure[key];
+      
+      switch (field) {
+        case 'status':
+          response[key] = 'success';
+          break;
+        case 'count':
+          response[key] = results.length;
+          break;
+        case 'resources':
+        case 'shelters':
+          response[key] = results.map(result => {
+            const item = {
+              name: result.title,
+              url: result.url
+            };
+            if (options.includeScore || customStructure.includeScore) {
+              item.score = result.score;
+              item.relevance = Math.round((result.score || 0) * 100);
+            }
+            if (options.includePhone || customStructure.includePhone) {
+              item.phone = this.extractPhone(result.content) || 'Not available';
+            }
+            if (options.includeContent || customStructure.includeContent) {
+              item.description = result.content.substring(0, 200) + '...';
+            }
+            return item;
+          });
+          break;
+        case 'query':
+          response[key] = options.query || '';
+          break;
+        case 'location':
+          response[key] = options.location || '';
+          break;
+        case 'content':
+          response[key] = options.includeContent ? results.map(r => r.content) : undefined;
+          break;
+        default:
+          // Don't add undefined fields to response
+          break;
+      }
+    });
+
+    // Always include required fields
+    if (!('status' in response)) {
+      response.status = 'success';
+    }
+    if (!('resources' in response)) {
+      response.resources = results.map(result => {
+        const item = {
+          name: result.title,
+          url: result.url,
+          phone: this.extractPhone(result.content) || 'Not available',
+          relevance: Math.round((result.score || 0) * 100),
+          score: result.score
+        };
+        return item;
+      });
+    }
+    if (!('count' in response)) {
+      response.count = results.length;
+    }
+    if (!('timestamp' in response)) {
+      response.timestamp = new Date().toISOString();
+    }
+
+    return response;
+  }
+
+  /**
+   * Get empty response for null/undefined inputs
+   */
+  static getEmptyResponse(format) {
+    switch (format) {
+      case 'simple':
+        return {
+          success: false,
+          message: 'No shelters found in that area.',
+          count: 0,
+          data: [],
+          timestamp: new Date().toISOString(),
+          query: '',
+          location: ''
+        };
+      case 'detailed':
+        return {
+          success: false,
+          message: 'No shelters found in that area.',
+          count: 0,
+          results: [],
+          metadata: {
+            query: '',
+            location: '',
+            searchDepth: 'basic',
+            minScore: 0.7,
+            maxResults: 3,
+            totalResults: 0,
+            filteredResults: 0
+          },
+          timestamp: new Date().toISOString()
+        };
+      case 'minimal':
+        return {
+          found: false,
+          count: 0,
+          shelters: []
+        };
+      default:
+        return {
+          success: false,
+          message: 'No shelters found in that area.',
+          count: 0,
+          data: [],
+          timestamp: new Date().toISOString()
+        };
+    }
   }
 }
 

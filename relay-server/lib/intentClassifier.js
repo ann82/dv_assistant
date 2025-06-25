@@ -156,19 +156,29 @@ export async function rewriteQuery(query, intent, callSid = null) {
     // Add location context if present and US
     if (locationInfo && locationInfo.location && locationInfo.isUS) {
       // Add shelter-specific terms for shelter intent
-      if (intent === 'find_shelter' && !/\bshelter\b/i.test(rewrittenQuery)) {
-        rewrittenQuery = `domestic violence shelter near ${locationInfo.location}`;
-      } else if (intent === 'find_shelter') {
+      if (intent === 'find_shelter') {
+        // Make the query more specific to domestic violence shelters
+        if (!/\b(domestic violence|abuse|victim|survivor)\b/i.test(rewrittenQuery)) {
+          rewrittenQuery = `domestic violence shelter ${rewrittenQuery}`;
+        }
+        if (!/\bshelter\b/i.test(rewrittenQuery)) {
+          rewrittenQuery = `${rewrittenQuery} shelter`;
+        }
         rewrittenQuery = `${rewrittenQuery} near ${locationInfo.location}`;
+        
+        // Add specific site restrictions to focus on relevant domains
+        rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
+        
+        // Exclude generic resource guides and city pages
+        rewrittenQuery += ' -"resource guide" -"community resources" -"city resources" -"municipal resources"';
+        
+        // Add specific terms to improve relevance
+        rewrittenQuery += ' "domestic violence" "emergency shelter" "crisis center"';
       } else {
         // For other intents, just add location context
         if (!rewrittenQuery.includes(locationInfo.location)) {
           rewrittenQuery = `${rewrittenQuery} in ${locationInfo.location}`;
         }
-      }
-      // Add site restrictions for shelter search
-      if (intent === 'find_shelter') {
-        rewrittenQuery += ' site:org OR site:gov -site:wikipedia.org -filetype:pdf';
       }
     } else if (locationInfo && locationInfo.location && !locationInfo.isUS) {
       // For non-US locations, preserve the location but don't add US-specific enhancements

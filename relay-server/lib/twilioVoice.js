@@ -1,6 +1,6 @@
 import { WebSocket as RealWebSocket } from 'ws';
 import { config } from './config.js';
-import { ResponseGenerator } from '../dist/ResponseGenerator.js';
+import { ResponseGenerator } from './response.js';
 import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
 import logger from './logger.js';
@@ -132,26 +132,33 @@ export class TwilioVoiceHandler {
       logger.info('Received speech input:', { speechResult, callSid });
 
       // Process the speech input
-      const response = await this.processSpeechInput(speechResult, callSid);
+      const processResult = await this.processSpeechInput(speechResult, callSid);
       
-      // Generate TwiML response with gather to continue conversation
+      // Extract response and shouldEndCall from processResult
+      const response = typeof processResult === 'string' ? processResult : processResult.response;
+      const shouldEndCall = typeof processResult === 'object' && processResult.shouldEndCall;
+      
+      // Generate TwiML response
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say(response);
       
-      // Add gather to continue the conversation
-      const gather = twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: 'auto',
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US'
-      });
-      
-      // If no speech is detected, repeat the prompt
-      twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
-      twiml.redirect('/twilio/voice/process');
+      // Only add gather if we don't want to end the call
+      if (!shouldEndCall) {
+        // Add gather to continue the conversation
+        const gather = twiml.gather({
+          input: 'speech',
+          action: '/twilio/voice/process',
+          method: 'POST',
+          speechTimeout: 'auto',
+          speechModel: 'phone_call',
+          enhanced: 'true',
+          language: 'en-US'
+        });
+        
+        // If no speech is detected, repeat the prompt
+        twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
+        twiml.redirect('/twilio/voice/process');
+      }
       
       return twiml;
     } catch (error) {
@@ -240,7 +247,10 @@ export class TwilioVoiceHandler {
           intent,
           speechResult
         });
-        return conversationFlow.redirectionMessage;
+        return {
+          response: conversationFlow.redirectionMessage,
+          shouldEndCall: true
+        };
       }
 
       // Handle re-engagement attempts

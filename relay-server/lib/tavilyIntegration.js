@@ -1,11 +1,44 @@
 import { processTavilyResponse, getResultDetails } from './tavilyProcessor.js';
-import { TavilyService } from './TavilyService.js';
 import logger from './logger.js';
 
 /**
  * Enhanced Tavily integration that uses the new processor
  */
-export class EnhancedTavilyService extends TavilyService {
+export class EnhancedTavilyService {
+  
+  /**
+   * Call Tavily API directly
+   * @param {string} query - Search query
+   * @returns {Object} Tavily API response
+   */
+  async callTavilyAPI(query) {
+    try {
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': process.env.TAVILY_API_KEY
+        },
+        body: JSON.stringify({
+          query,
+          search_depth: 'advanced',
+          include_answer: true,
+          include_results: true,
+          include_raw_content: false,
+          max_results: 5
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Tavily API error: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      logger.error('Error calling Tavily API:', error);
+      throw error;
+    }
+  }
   
   /**
    * Search for shelters and return processed voice/SMS responses
