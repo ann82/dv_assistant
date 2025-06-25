@@ -200,6 +200,45 @@ router.post('/voice', async (req, res) => {
   }
 });
 
+// Helper function to handle SMS consent logic
+async function handleSMSConsent(CallSid, SpeechResult, res) {
+  logger.info('Handling SMS consent:', { CallSid, SpeechResult });
+  
+  const call = twilioVoiceHandler.activeCalls.get(CallSid);
+  if (!call) {
+    logger.error(`No active call found for CallSid: ${CallSid}`);
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("I'm sorry, I encountered an error. The call will now end.");
+    twiml.hangup();
+    res.type('text/xml');
+    return res.send(twiml.toString());
+  }
+
+  // Process consent response (check if user said "yes")
+  const hasConsent = SpeechResult.toLowerCase().includes('yes');
+  call.hasConsent = hasConsent;
+  twilioVoiceHandler.activeCalls.set(CallSid, call);
+
+  // Generate and send summary if consent was given
+  if (hasConsent) {
+    const summary = await twilioVoiceHandler.generateCallSummary(CallSid, call);
+    await twilioVoiceHandler.sendSMSWithRetry(CallSid, call, summary);
+  }
+
+  // End the call with appropriate message
+  const twiml = new twilio.twiml.VoiceResponse();
+  twiml.say(hasConsent ? 
+    "Thank you. You will receive a text message with the summary and resources shortly." :
+    "Thank you. Have a great day.");
+  twiml.hangup();
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+
+  // Clean up call data
+  await twilioVoiceHandler.cleanupCall(CallSid);
+}
+
 /**
  * Endpoint for processing speech input from Twilio
  * This is called when Twilio sends transcribed speech back to the server
@@ -268,12 +307,11 @@ router.post('/voice/process', async (req, res) => {
     });
     
     if (isConsentResponse && wasAskingForConsent) {
-      logger.info('Detected consent response, routing to consent endpoint:', { CallSid, SpeechResult });
-      // Redirect to consent endpoint
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.redirect('/twilio/consent');
-      res.type('text/xml');
-      return res.send(twiml.toString());
+      logger.info('Detected consent response, handling consent directly:', { CallSid, SpeechResult });
+      
+      // Handle consent directly instead of redirecting
+      await handleSMSConsent(CallSid, SpeechResult, res);
+      return;
     }
     
     // Process the speech input using the TwilioVoiceHandler
@@ -281,11 +319,11 @@ router.post('/voice/process', async (req, res) => {
     
     // Check if processSpeechInput detected a consent response
     if (response && typeof response === 'object' && response.shouldRedirectToConsent) {
-      logger.info('processSpeechInput detected consent response, redirecting to consent endpoint:', { CallSid, SpeechResult });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.redirect('/twilio/consent');
-      res.type('text/xml');
-      return res.send(twiml.toString());
+      logger.info('processSpeechInput detected consent response, handling consent directly:', { CallSid, SpeechResult });
+      
+      // Handle consent directly instead of redirecting
+      await handleSMSConsent(CallSid, SpeechResult, res);
+      return;
     }
     
     // Store the response for consent detection
