@@ -47,9 +47,8 @@ let wsServer = null;
 // Add a setter for the WebSocket server
 router.setWebSocketServer = (server, mockServer) => {
   wsServer = server;
-  if (mockServer) {
-    twilioVoiceHandler.setWebSocketServer(mockServer);
-  }
+  // Always set the WebSocket server in the voice handler
+  twilioVoiceHandler.setWebSocketServer(server);
 };
 
 // Get the global WebSocket server instance
@@ -248,7 +247,7 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
   const twiml = new twilio.twiml.VoiceResponse();
   twiml.say(hasConsent ? 
     "Thank you. You will receive a text message with the summary and resources shortly." :
-    "Thank you. Have a great day.");
+    "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.");
   twiml.hangup();
 
   res.type('text/xml');
@@ -591,7 +590,7 @@ router.post('/consent', async (req, res) => {
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say(hasConsent ? 
       "Thank you. You will receive a text message with the summary and resources shortly." :
-      "Thank you. Have a great day.");
+      "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.");
     twiml.hangup();
 
     res.type('text/xml');

@@ -1127,6 +1127,12 @@ export class TwilioVoiceHandler {
 
   async generateCallSummary(callSid, call) {
     try {
+      // Check if WebSocket server is available
+      if (!this.wsServer) {
+        logger.warn(`[Call ${callSid}] WebSocket server not available, generating basic summary`);
+        return `Call Summary:\n\nThank you for calling the Domestic Violence Support Assistant. We discussed resources and support options. If you need further assistance, please call back anytime.`;
+      }
+      
       const summary = await this.wsServer.handleCallEnd(callSid);
       if (!summary) {
         throw new Error('No summary generated');

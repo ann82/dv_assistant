@@ -431,6 +431,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed SMS consent flow to properly ask for consent before ending calls when users say "thank you" or similar phrases. The system now asks "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no." and properly handles the consent response.
 - Fixed SMS consent parameter issue where redirecting to the consent endpoint was losing request parameters. Now handles consent directly in the process endpoint to ensure CallSid and SpeechResult are properly available.
 - Fixed call initialization issue where calls weren't being properly tracked in the voice handler's activeCalls Map, causing "No active call found" errors during SMS consent handling. Now initializes calls in both WebSocket server and voice handler to ensure proper tracking.
+- Updated call ending message from casual "Have a great day" to more empathetic "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe." to better reflect the sensitive nature of domestic violence support calls.
+- Fixed WebSocket server null reference error in call summary generation. The system now properly initializes the WebSocket server in the voice handler and provides a fallback summary when the WebSocket server is unavailable.
 
 ### Removed
 - Obsolete tests and unused files
