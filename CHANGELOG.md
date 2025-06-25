@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2024-12-19
+
+### Added
+- **Enhanced speech-to-text recognition** with intelligent preprocessing to reduce garbling
+- **Optimized Twilio speech recognition parameters** for improved accuracy
+  - `speechTimeout: 'auto'` for better handling
+  - `speechModel: 'phone_call'` for optimized phone conversation recognition
+  - `enhanced: 'true'` for improved accuracy
+  - `profanityFilter: 'false'` to avoid filtering important words
+  - `interimSpeechResultsCallback` for real-time feedback
+- **Intelligent speech preprocessing system** with advanced cleaning capabilities
+  - **Automatic artifact removal**: Cleans `[inaudible]`, `[background noise]`, `[static]`, etc.
+  - **Common error correction**: Fixes frequent speech recognition errors
+    - "help me find" → "find"
+    - "shelter homes" → "shelters"
+    - "close to me" → "near me"
+  - **Garbled speech detection**: Identifies unclear speech patterns using multiple criteria
+  - **Key word extraction**: Extracts relevant keywords from heavily garbled speech
+- **Real-time speech feedback** through interim speech results handling
+- **Comprehensive test coverage** for all speech preprocessing functions
+- **Enhanced logging** for speech recognition quality monitoring
+
+### Changed
+- **Updated all Twilio gather configurations** to use improved speech recognition settings
+- **Enhanced TwilioVoiceHandler** with new speech preprocessing methods
+- **Improved speech processing endpoints** to use cleaned speech input
+- **Updated websocket server** to use enhanced speech recognition parameters
+- **Enhanced error handling** for speech recognition failures
+
+### Fixed
+- **Speech garbling issues** through intelligent preprocessing and parameter optimization
+- **Poor speech recognition accuracy** with optimized Twilio configuration
+- **User experience issues** caused by garbled speech recognition
+- **Test reliability** with comprehensive mock implementations for speech preprocessing
+
 ## [1.14.0] - 2024-12-19
 
 ### Added

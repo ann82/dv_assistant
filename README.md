@@ -9,7 +9,7 @@ A real-time voice-based assistant designed to provide immediate support and info
 - WebSocket server for real-time updates
 - Comprehensive logging system
 - Error handling and monitoring
-- Test suite for all components (100% green, 314 tests)
+- Test suite for all components (319 tests passing, 98.1% success rate)
 - Cost logging for API usage tracking
 - Health check endpoint for monitoring
 - Enhanced logging and debugging capabilities
@@ -17,6 +17,52 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Customizable Tavily response formatting with required fields always present
 - **Enhanced Tavily response formatting with improved title and address extraction**
 - **Improved Railway deployment with enhanced startup script and error handling**
+- **Enhanced speech-to-text recognition with intelligent preprocessing to reduce garbling**
+
+## Enhanced Speech-to-Text Recognition
+
+The system now includes advanced speech recognition capabilities that significantly reduce garbled speech and improve user experience:
+
+### Key Improvements
+
+- **Optimized Twilio Speech Recognition**: Enhanced configuration with better parameters for improved accuracy
+  - `speechTimeout: 'auto'` for better handling
+  - `speechModel: 'phone_call'` for optimized phone conversation recognition
+  - `enhanced: 'true'` for improved accuracy
+  - `profanityFilter: 'false'` to avoid filtering important words
+  - `interimSpeechResultsCallback` for real-time feedback
+
+- **Intelligent Speech Preprocessing**: Advanced cleaning and correction system
+  - **Automatic artifact removal**: Cleans `[inaudible]`, `[background noise]`, `[static]`, etc.
+  - **Common error correction**: Fixes frequent speech recognition errors
+    - "help me find" → "find"
+    - "shelter homes" → "shelters"
+    - "close to me" → "near me"
+  - **Garbled speech detection**: Identifies and handles unclear speech patterns
+  - **Key word extraction**: Extracts relevant keywords from heavily garbled speech
+
+- **Real-time Speech Feedback**: Interim speech results handling for better accuracy
+  - Real-time processing of partial transcriptions
+  - Improved recognition through feedback mechanisms
+  - Better handling of ongoing conversations
+
+### Technical Features
+
+- **Pattern-based speech cleaning** that removes common recognition artifacts
+- **Intelligent error correction** using domain-specific phrase mappings
+- **Multi-criteria garbled speech detection** (special characters, repeated characters, short words)
+- **Keyword extraction** for domestic violence-related terms
+- **Comprehensive test coverage** for all speech preprocessing functions
+
+### Benefits
+
+- **Reduced garbling** through intelligent preprocessing
+- **Better accuracy** with optimized Twilio parameters
+- **Improved user experience** with fewer repeat requests
+- **Robust error handling** for various speech patterns
+- **Comprehensive logging** for monitoring and debugging
+
+These improvements ensure users can communicate more effectively with the system, even in challenging audio conditions or with unclear speech patterns.
 
 ## Enhanced Tavily Response Formatting
 

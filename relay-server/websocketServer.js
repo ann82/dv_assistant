@@ -156,10 +156,14 @@ export class TwilioWebSocketServer {
 <Response>
   <Play>${message.audioUrl}</Play>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="10" 
+          speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"/>
+          language="en-US"
+          speechRecognitionLanguage="en-US"
+          profanityFilter="false"
+          interimSpeechResultsCallback="/twilio/voice/interim"
+          interimSpeechResultsCallbackMethod="POST"/>
 </Response>`;
 
                 ws.send(JSON.stringify({

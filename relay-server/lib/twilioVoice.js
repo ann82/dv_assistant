@@ -107,7 +107,11 @@ export class TwilioVoiceHandler {
         speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
-        language: 'en-US'
+        language: 'en-US',
+        speechRecognitionLanguage: 'en-US',
+        profanityFilter: 'false',
+        interimSpeechResultsCallback: '/twilio/voice/interim',
+        interimSpeechResultsCallbackMethod: 'POST'
       });
       
       return twiml;
@@ -132,8 +136,11 @@ export class TwilioVoiceHandler {
       const callSid = req.body.CallSid;
       logger.info('Received speech input:', { speechResult, callSid });
 
+      // Preprocess speech input
+      const cleanedSpeechResult = this.preprocessSpeech(speechResult);
+      
       // Process the speech input
-      const processResult = await this.processSpeechInput(speechResult, callSid);
+      const processResult = await this.processSpeechInput(cleanedSpeechResult, callSid);
       
       // Extract response and shouldEndCall from processResult
       const response = typeof processResult === 'string' ? processResult : processResult.response;
@@ -153,7 +160,11 @@ export class TwilioVoiceHandler {
           speechTimeout: 'auto',
           speechModel: 'phone_call',
           enhanced: 'true',
-          language: 'en-US'
+          language: 'en-US',
+          speechRecognitionLanguage: 'en-US',
+          profanityFilter: 'false',
+          interimSpeechResultsCallback: '/twilio/voice/interim',
+          interimSpeechResultsCallbackMethod: 'POST'
         });
         
         // If no speech is detected, repeat the prompt
@@ -181,7 +192,11 @@ export class TwilioVoiceHandler {
         speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
-        language: 'en-US'
+        language: 'en-US',
+        speechRecognitionLanguage: 'en-US',
+        profanityFilter: 'false',
+        interimSpeechResultsCallback: '/twilio/voice/interim',
+        interimSpeechResultsCallbackMethod: 'POST'
       });
       
       return twiml;
@@ -882,7 +897,11 @@ export class TwilioVoiceHandler {
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"/>`;
+          language="en-US"
+          speechRecognitionLanguage="en-US"
+          profanityFilter="false"
+          interimSpeechResultsCallback="/twilio/voice/interim"
+          interimSpeechResultsCallbackMethod="POST"/>`;
     }
 
     twiml += `
@@ -1112,5 +1131,129 @@ export class TwilioVoiceHandler {
         callSid
       });
     }
+  }
+
+  /**
+   * Preprocess speech input to improve recognition accuracy
+   * @param {string} speechResult - Raw speech result from Twilio
+   * @returns {string} Cleaned speech result
+   */
+  preprocessSpeech(speechResult) {
+    if (!speechResult || typeof speechResult !== 'string') {
+      return speechResult;
+    }
+
+    let cleaned = speechResult.trim();
+
+    // Remove common speech recognition artifacts
+    const artifacts = [
+      /\[inaudible\]/gi,
+      /\[unintelligible\]/gi,
+      /\[background noise\]/gi,
+      /\[music\]/gi,
+      /\[silence\]/gi,
+      /\[crosstalk\]/gi,
+      /\[laughter\]/gi,
+      /\[applause\]/gi,
+      /\[phone ringing\]/gi,
+      /\[beep\]/gi,
+      /\[static\]/gi
+    ];
+
+    artifacts.forEach(artifact => {
+      cleaned = cleaned.replace(artifact, '');
+    });
+
+    // Fix common speech recognition errors
+    const corrections = {
+      'domestic violence': 'domestic violence',
+      'domestic abuse': 'domestic abuse',
+      'shelter home': 'shelter',
+      'shelter homes': 'shelters',
+      'help me find': 'find',
+      'I need help finding': 'find',
+      'I want to find': 'find',
+      'can you help me find': 'find',
+      'looking for': 'find',
+      'search for': 'find',
+      'near me': 'near me',
+      'close to me': 'near me',
+      'in my area': 'near me',
+      'around here': 'near me'
+    };
+
+    Object.entries(corrections).forEach(([incorrect, correct]) => {
+      const regex = new RegExp(incorrect, 'gi');
+      cleaned = cleaned.replace(regex, correct);
+    });
+
+    // Remove excessive whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+    // If the cleaned result is too short or seems garbled, try to extract key words
+    if (cleaned.length < 3 || this.isGarbled(cleaned)) {
+      const keyWords = this.extractKeyWords(speechResult);
+      if (keyWords.length > 0) {
+        cleaned = keyWords.join(' ');
+      }
+    }
+
+    logger.info('Speech preprocessing:', {
+      original: speechResult,
+      cleaned: cleaned,
+      length: cleaned.length
+    });
+
+    return cleaned;
+  }
+
+  /**
+   * Check if speech result appears to be garbled
+   * @param {string} speech - Speech text to check
+   * @returns {boolean} True if speech appears garbled
+   */
+  isGarbled(speech) {
+    if (!speech || speech.length < 3) return true;
+
+    // Check for excessive special characters
+    const specialCharRatio = (speech.match(/[^a-zA-Z0-9\s]/g) || []).length / speech.length;
+    if (specialCharRatio > 0.3) return true;
+
+    // Check for repeated characters (common in garbled speech)
+    const repeatedChars = speech.match(/(.)\1{3,}/g);
+    if (repeatedChars && repeatedChars.length > 0) return true;
+
+    // Check for very short words that might be artifacts
+    const words = speech.split(/\s+/);
+    const shortWords = words.filter(word => word.length <= 2);
+    if (shortWords.length > words.length * 0.5) return true;
+
+    return false;
+  }
+
+  /**
+   * Extract key words from potentially garbled speech
+   * @param {string} speech - Speech text to extract from
+   * @returns {Array} Array of key words
+   */
+  extractKeyWords(speech) {
+    const keyWords = [];
+    
+    // Common domestic violence related keywords
+    const keywords = [
+      'shelter', 'help', 'domestic', 'violence', 'abuse', 'safe', 'home',
+      'find', 'near', 'me', 'location', 'area', 'city', 'state',
+      'emergency', 'crisis', 'hotline', 'support', 'resource', 'service'
+    ];
+
+    const words = speech.toLowerCase().split(/\s+/);
+    words.forEach(word => {
+      const cleanWord = word.replace(/[^a-zA-Z]/g, '');
+      if (keywords.includes(cleanWord) && !keyWords.includes(cleanWord)) {
+        keyWords.push(cleanWord);
+      }
+    });
+
+    return keyWords;
   }
 }

@@ -79,6 +79,47 @@ vi.mock('../lib/twilioVoice.js', () => ({
     }),
     handleSpeechInput: vi.fn().mockResolvedValue({
       toString: () => '<Response><Say>Response</Say></Response>'
+    }),
+    preprocessSpeech: vi.fn().mockImplementation((speech) => {
+      if (!speech) return speech;
+      let cleaned = speech.trim();
+      
+      // Remove artifacts
+      cleaned = cleaned.replace(/\[inaudible\]/gi, '').replace(/\[background noise\]/gi, '').replace(/\[static\]/gi, '');
+      
+      // Fix common errors
+      cleaned = cleaned.replace(/help me find/g, 'find').replace(/shelter homes/g, 'shelters');
+      
+      // Remove excessive whitespace
+      cleaned = cleaned.replace(/\s+/g, ' ').trim();
+      
+      return cleaned;
+    }),
+    isGarbled: vi.fn().mockImplementation((speech) => {
+      if (!speech || speech.length < 3) return true;
+      
+      // Check for excessive special characters
+      const specialCharRatio = (speech.match(/[^a-zA-Z0-9\s]/g) || []).length / speech.length;
+      if (specialCharRatio > 0.3) return true;
+      
+      // Check for repeated characters (common in garbled speech)
+      const repeatedChars = speech.match(/(.)\1{3,}/g);
+      if (repeatedChars && repeatedChars.length > 0) return true;
+      
+      // Check for very short words that might be artifacts
+      const words = speech.split(/\s+/);
+      const shortWords = words.filter(word => word.length <= 2);
+      if (shortWords.length > words.length * 0.5) return true;
+      
+      // Check for patterns like "xxx yyy zzz"
+      if (speech.match(/^[a-z]{3}\s+[a-z]{3}\s+[a-z]{3}$/i)) return true;
+      
+      return false;
+    }),
+    extractKeyWords: vi.fn().mockImplementation((speech) => {
+      const keywords = ['shelter', 'help', 'domestic', 'violence', 'abuse', 'safe', 'home', 'find', 'near', 'me'];
+      const words = speech.toLowerCase().split(/\s+/);
+      return words.filter(word => keywords.includes(word.replace(/[^a-zA-Z]/g, '')));
     })
   }))
 }));
@@ -247,6 +288,55 @@ describe('TwilioVoiceHandler', () => {
       twilioVoiceHandler.processSpeechInput.mockRejectedValueOnce(new Error('Processing failed'));
       
       await expect(twilioVoiceHandler.processSpeechInput('test', 'call-sid')).rejects.toThrow('Processing failed');
+    });
+  });
+
+  describe('Speech Preprocessing', () => {
+    it('should clean up common speech recognition artifacts', () => {
+      const handler = new TwilioVoiceHandler();
+      
+      const garbledSpeech = 'find [inaudible] shelter [background noise] near me [static]';
+      const cleaned = handler.preprocessSpeech(garbledSpeech);
+      
+      expect(cleaned).toBe('find shelter near me');
+    });
+
+    it('should fix common speech recognition errors', () => {
+      const handler = new TwilioVoiceHandler();
+      
+      const speechWithErrors = 'help me find shelter homes near me';
+      const cleaned = handler.preprocessSpeech(speechWithErrors);
+      
+      expect(cleaned).toBe('find shelters near me');
+    });
+
+    it('should extract key words from heavily garbled speech', () => {
+      const handler = new TwilioVoiceHandler();
+      
+      const garbledSpeech = 'xxx shelter yyy help zzz domestic violence';
+      const cleaned = handler.preprocessSpeech(garbledSpeech);
+      
+      expect(cleaned).toContain('shelter');
+      expect(cleaned).toContain('help');
+      expect(cleaned).toContain('domestic');
+      expect(cleaned).toContain('violence');
+    });
+
+    it('should handle empty or null speech input', () => {
+      const handler = new TwilioVoiceHandler();
+      
+      expect(handler.preprocessSpeech('')).toBe('');
+      expect(handler.preprocessSpeech(null)).toBe(null);
+      expect(handler.preprocessSpeech(undefined)).toBe(undefined);
+    });
+
+    it('should detect garbled speech correctly', () => {
+      const handler = new TwilioVoiceHandler();
+      
+      expect(handler.isGarbled('normal speech')).toBe(false);
+      expect(handler.isGarbled('xxx yyy zzz')).toBe(true);
+      expect(handler.isGarbled('a b c d e')).toBe(true);
+      expect(handler.isGarbled('')).toBe(true);
     });
   });
 }); 

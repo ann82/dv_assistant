@@ -74,7 +74,11 @@ const SPEECH_CONFIG = {
   TIMEOUT: 'auto', // Let Twilio handle timeout automatically
   MODEL: 'phone_call',
   ENHANCED: 'true',
-  LANGUAGE: 'en-US'
+  LANGUAGE: 'en-US',
+  SPEECH_RECOGNITION_LANGUAGE: 'en-US',
+  PROFANITY_FILTER: 'false',
+  SPEECH_TIMEOUT: 'auto',
+  INTERIM_SPEECH_RESULTS_CALLBACK: '/twilio/voice/interim'
 };
 
 // Function to fetch and log Twilio call details
@@ -176,7 +180,9 @@ router.post('/voice', async (req, res) => {
         enhanced: 'true',
         language: 'en-US',
         speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false'
+        profanityFilter: 'false',
+        interimSpeechResultsCallback: '/twilio/voice/interim',
+        interimSpeechResultsCallbackMethod: 'POST'
       });
       
       res.type('text/xml');
@@ -222,7 +228,9 @@ router.post('/voice/process', async (req, res) => {
         enhanced: 'true',
         language: 'en-US',
         speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false'
+        profanityFilter: 'false',
+        interimSpeechResultsCallback: '/twilio/voice/interim',
+        interimSpeechResultsCallbackMethod: 'POST'
       });
       res.type('text/xml');
       return res.send(twiml.toString());
@@ -230,8 +238,12 @@ router.post('/voice/process', async (req, res) => {
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
     
+    // Preprocess speech input to improve recognition accuracy
+    const cleanedSpeechResult = twilioVoiceHandler.preprocessSpeech(SpeechResult);
+    logger.info('Cleaned speech result:', { CallSid, original: SpeechResult, cleaned: cleanedSpeechResult });
+    
     // Check if this is a consent response (yes/no to SMS question)
-    const lowerSpeech = SpeechResult.toLowerCase();
+    const lowerSpeech = cleanedSpeechResult.toLowerCase();
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
     const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
     
@@ -250,7 +262,7 @@ router.post('/voice/process', async (req, res) => {
     }
     
     // Process the speech input using the TwilioVoiceHandler
-    const response = await twilioVoiceHandler.processSpeechInput(SpeechResult, CallSid);
+    const response = await twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid);
     
     // Store the response for consent detection
     if (call) {
@@ -270,7 +282,9 @@ router.post('/voice/process', async (req, res) => {
       enhanced: 'true',
       language: 'en-US',
       speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false'
+      profanityFilter: 'false',
+      interimSpeechResultsCallback: '/twilio/voice/interim',
+      interimSpeechResultsCallbackMethod: 'POST'
     });
     
     res.type('text/xml');
@@ -291,8 +305,49 @@ router.post('/voice/process', async (req, res) => {
       enhanced: 'true',
       language: 'en-US',
       speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false'
+      profanityFilter: 'false',
+      interimSpeechResultsCallback: '/twilio/voice/interim',
+      interimSpeechResultsCallbackMethod: 'POST'
     });
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+/**
+ * Endpoint for handling interim speech results
+ * This helps improve speech recognition accuracy by providing real-time feedback
+ * 
+ * @route POST /twilio/voice/interim
+ * @param {Object} req.body.CallSid - Twilio call SID
+ * @param {Object} req.body.SpeechResult - Interim transcribed speech text
+ * @returns {string} Empty TwiML response (no action needed for interim results)
+ */
+router.post('/voice/interim', async (req, res) => {
+  try {
+    const { CallSid, SpeechResult } = req.body;
+    
+    if (CallSid && SpeechResult) {
+      logger.info('Received interim speech result:', { CallSid, SpeechResult });
+      
+      // Store interim result for potential use in final processing
+      const call = twilioVoiceHandler.activeCalls.get(CallSid);
+      if (call) {
+        call.interimSpeechResult = SpeechResult;
+        twilioVoiceHandler.activeCalls.set(CallSid, call);
+      }
+    }
+    
+    // Return empty TwiML response for interim results
+    const twiml = new twilio.twiml.VoiceResponse();
+    res.type('text/xml');
+    res.send(twiml.toString());
+    
+  } catch (error) {
+    logger.error('Error handling interim speech result:', error);
+    
+    // Return empty TwiML response even on error
+    const twiml = new twilio.twiml.VoiceResponse();
     res.type('text/xml');
     res.send(twiml.toString());
   }
