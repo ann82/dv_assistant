@@ -17,6 +17,17 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Customizable Tavily response formatting with required fields always present
 - **Improved Railway deployment with enhanced startup script and error handling**
 
+## Intent Classification and Off-Topic Detection
+
+The assistant uses a robust intent classification system:
+
+- **On-topic detection:** Only queries containing domestic violence-related keywords (e.g., shelter, abuse, legal, counseling, protection, etc.) are considered on-topic and classified into specific support intents (find_shelter, legal_services, counseling_services, etc.).
+- **Off-topic detection:** All other queries (including medical, entertainment, weather, sports, jokes, and general help requests without context) are automatically classified as `off_topic`.
+- **Fallback logic:** If the OpenAI API is unavailable, a pattern-matching fallback classifier is used, ensuring reliability.
+- **Comprehensive test coverage:** The system includes tests for medical, entertainment, and generic queries to ensure only relevant queries are handled as on-topic.
+
+See the test suite and intentClassifier.js for details.
+
 ## Railway Deployment
 
 The system is optimized for Railway deployment with enhanced error handling and startup procedures:
@@ -109,6 +120,7 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **Enhanced Error Handling:** Added fallback intent classification using pattern matching when OpenAI API is unavailable, ensuring system reliability.
 - **Custom Tavily Response Formatting (v1.0.13):** New flexible formatting system with multiple format options (simple, detailed, minimal, custom) for different use cases. Enhanced phone number extraction, title cleaning, and metadata calculation with comprehensive test coverage.
 - **See CHANGELOG for more details**
+- **Simplified intent classification and off-topic detection:** Only queries with domestic violence-related keywords are considered on-topic; all others are classified as off-topic. This approach is robust, easier to maintain, and fully covered by tests.
 
 ## Custom Tavily Response Formatting
 

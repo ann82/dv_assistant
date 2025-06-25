@@ -367,6 +367,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated response formatting to be more concise and user-friendly
 - Improved error messages for better user experience
 - Enhanced test coverage for response processing
+- **Simplified intent classification and off-topic detection:** Only queries containing domestic violence-related keywords (e.g., shelter, abuse, legal, counseling, protection, etc.) are considered on-topic and classified into support intents. All other queries (including medical, entertainment, weather, sports, jokes, and generic help requests without context) are now classified as `off_topic`.
+- **Improved fallback logic:** Pattern-matching fallback classifier ensures reliability if OpenAI API is unavailable.
+- **Expanded test coverage:** Added tests for medical, entertainment, and generic queries to ensure robust off-topic detection.
 
 ### Removed
 - Obsolete tests and unused files

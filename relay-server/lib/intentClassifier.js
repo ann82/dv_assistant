@@ -233,10 +233,12 @@ export async function getIntent(query) {
     // Log API key format for debugging (without exposing the full key)
     const apiKeyPrefix = config.OPENAI_API_KEY.substring(0, 7);
     const apiKeyLength = config.OPENAI_API_KEY.length;
+    const isValidFormat = (apiKeyPrefix === 'sk-' || apiKeyPrefix === 'sk-proj') && apiKeyLength > 20;
+    
     logger.info('OpenAI API key check:', { 
       prefix: apiKeyPrefix, 
       length: apiKeyLength,
-      isValidFormat: apiKeyPrefix === 'sk-' && apiKeyLength > 20
+      isValidFormat
     });
 
     const prompt = `Classify the following user query into one of these predefined intents for a domestic violence support assistant:
@@ -249,7 +251,9 @@ Available intents:
 - general_information: For general questions about domestic violence, resources, or support
 - other_resources: For requests about financial assistance, job training, childcare, or other support services
 - end_conversation: For requests to end the call, hang up, or stop the conversation
-- off_topic: For requests unrelated to domestic violence support (jokes, weather, sports, etc.)
+- off_topic: For requests unrelated to domestic violence support
+
+IMPORTANT: If the query is about ANY topic other than domestic violence support (medical questions, entertainment, weather, sports, jokes, personal problems, etc.), classify it as "off_topic". Only classify as one of the other intents if the query is specifically about domestic violence support, shelters, legal help, counseling, or related resources.
 
 User query: "${query}"
 
@@ -333,7 +337,39 @@ function classifyIntentFallback(query) {
 
   const lowerQuery = query.toLowerCase();
   
-  // Pattern matching for different intents
+  // First check for domestic violence related keywords
+  const domesticViolenceKeywords = [
+    'domestic', 'violence', 'abuse', 'shelter', 'safe', 'refuge', 'protection',
+    'restraining order', 'legal', 'lawyer', 'attorney', 'court', 'divorce', 'custody',
+    'counseling', 'therapy', 'therapist', 'mental health', 'emotional support',
+    'emergency', 'urgent', 'danger', 'unsafe', 'resources',
+    'housing', 'home', 'place to stay', 'financial', 'job training', 'childcare'
+  ];
+  
+  // More specific check - look for word boundaries to avoid false positives
+  const hasDomesticViolenceKeywords = domesticViolenceKeywords.some(keyword => {
+    // Use word boundary regex to avoid partial matches
+    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+    return regex.test(lowerQuery);
+  });
+  
+  // Also check for "help" but only in domestic violence context
+  const hasHelpInContext = lowerQuery.includes('help') && (
+    lowerQuery.includes('domestic') || 
+    lowerQuery.includes('violence') || 
+    lowerQuery.includes('abuse') || 
+    lowerQuery.includes('shelter') || 
+    lowerQuery.includes('legal') || 
+    lowerQuery.includes('counseling') ||
+    lowerQuery.includes('support')
+  );
+  
+  // If no domestic violence keywords and no help in context, it's off-topic
+  if (!hasDomesticViolenceKeywords && !hasHelpInContext) {
+    return 'off_topic';
+  }
+  
+  // Pattern matching for specific intents (only for domestic violence related queries)
   if (/\b(shelter|home|housing|place to stay|safe place|refuge)\b/i.test(lowerQuery)) {
     return 'find_shelter';
   }
@@ -354,11 +390,7 @@ function classifyIntentFallback(query) {
     return 'end_conversation';
   }
   
-  if (/\b(weather|sports|joke|funny|music|movie|food|restaurant|shopping)\b/i.test(lowerQuery)) {
-    return 'off_topic';
-  }
-  
-  // Default to general information for queries that don't match specific patterns
+  // Default to general information for domestic violence related queries
   return 'general_information';
 }
 
@@ -420,7 +452,29 @@ export const intentHandlers = {
       };
     }
     
-    // Handle general off-topic queries with gentle redirection
+    // Check for medical queries specifically
+    if (/\b(chemo|chemotherapy|cancer|treatment|medicine|medical|doctor|hospital|disease|illness|symptoms|diagnosis|prescription|medication|drug|pharmacy)\b/i.test(queryLower)) {
+      return {
+        type: 'medical_redirection',
+        intent: 'off_topic',
+        voiceResponse: "I'm specifically designed to help with domestic violence support and resources. For medical questions about chemotherapy, cancer treatment, or other health concerns, please consult with your healthcare provider or call a medical information line. If you're experiencing domestic violence and need support, I'm here to help with that.",
+        smsResponse: "I'm here for domestic violence support. For medical questions, please consult your healthcare provider.",
+        shouldRedirect: true
+      };
+    }
+    
+    // Handle entertainment and other off-topic queries
+    if (/\b(weather|sports|joke|funny|music|movie|food|restaurant|shopping|game|entertainment)\b/i.test(queryLower)) {
+      return {
+        type: 'entertainment_redirection',
+        intent: 'off_topic',
+        voiceResponse: "I'm specifically designed to help with domestic violence support and resources. For entertainment, weather, sports, or other general topics, you might want to try a different service. If you have questions about domestic violence support, I'm here to help with that.",
+        smsResponse: "I'm here for domestic violence support. For other topics, please try a different service.",
+        shouldRedirect: true
+      };
+    }
+    
+    // Generic off-topic response
     return {
       type: 'off_topic_redirection',
       intent: 'off_topic',

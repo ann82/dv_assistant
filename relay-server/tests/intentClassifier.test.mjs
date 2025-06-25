@@ -78,12 +78,13 @@ describe('Intent Classification', () => {
     });
 
     it('should handle API errors gracefully', async () => {
+      // Mock OpenAI API to throw an error
       const { OpenAI } = await import('openai');
       const openaiInstance = new OpenAI();
       openaiInstance.chat.completions.create.mockRejectedValue(new Error('API Error'));
 
       const intent = await getIntent('I need help');
-      expect(intent).toBe('general_information');
+      expect(intent).toBe('off_topic'); // "I need help" without context is off-topic
     });
   });
 
@@ -173,6 +174,53 @@ describe('Intent Classification', () => {
       const result = await rewriteQuery('DOMESTIC VIOLENCE shelter', 'find_shelter');
       expect(result).toContain('DOMESTIC VIOLENCE shelter');
       expect(result).toContain('site:org OR site:gov');
+    });
+  });
+
+  describe('Off-topic Detection', () => {
+    it('should classify medical queries as off-topic', async () => {
+      const medicalQueries = [
+        'Can you give me the chemo? Detail about it.',
+        'I need information about cancer treatment',
+        'What are the symptoms of diabetes?',
+        'Tell me about chemotherapy',
+        'I need a prescription refill'
+      ];
+
+      for (const query of medicalQueries) {
+        const intent = await getIntent(query);
+        expect(intent).toBe('off_topic');
+      }
+    });
+
+    it('should classify entertainment queries as off-topic', async () => {
+      const entertainmentQueries = [
+        'Tell me a joke',
+        'What\'s the weather like?',
+        'Who won the game?',
+        'Play some music',
+        'What movie should I watch?'
+      ];
+
+      for (const query of entertainmentQueries) {
+        const intent = await getIntent(query);
+        expect(intent).toBe('off_topic');
+      }
+    });
+
+    it('should still classify domestic violence queries correctly', async () => {
+      const domesticViolenceQueries = [
+        'I need shelter',
+        'Help with legal services',
+        'I need counseling',
+        'Emergency help',
+        'Domestic violence resources'
+      ];
+
+      for (const query of domesticViolenceQueries) {
+        const intent = await getIntent(query);
+        expect(intent).not.toBe('off_topic');
+      }
     });
   });
 }); 
