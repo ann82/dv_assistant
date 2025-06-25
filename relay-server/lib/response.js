@@ -660,6 +660,41 @@ export class ResponseGenerator {
   static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3) {
     // Handle missing or empty results
     if (!tavilyResponse || !tavilyResponse.results || !Array.isArray(tavilyResponse.results) || tavilyResponse.results.length === 0) {
+      // Check if there's useful information in the answer field
+      if (tavilyResponse && tavilyResponse.answer && tavilyResponse.answer.trim()) {
+        const answer = tavilyResponse.answer.trim();
+        
+        // Extract phone number from answer if present
+        const phoneMatch = answer.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
+        const phone = phoneMatch ? phoneMatch[1] : null;
+        
+        // Extract organization name (look for patterns like "X provides" or "X operates")
+        const orgMatch = answer.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\'s)?(?:\s+[A-Z][a-z]+)*)\s+(?:provides|operates|offers|supports)/);
+        const orgName = orgMatch ? orgMatch[1] : "a shelter";
+        
+        // Create a response from the answer
+        const voiceResponse = `I found ${orgName}: ${answer}`;
+        const smsResponse = phone ? 
+          `${answer} Phone: ${phone}` : 
+          answer;
+        
+        return {
+          voiceResponse,
+          smsResponse,
+          summary: answer,
+          shelters: [{
+            name: orgName,
+            phone: phone,
+            description: answer,
+            score: 0.8, // High score since it came from Tavily's answer
+            url: null,
+            hasMultipleResources: false,
+            allResources: null
+          }]
+        };
+      }
+      
+      // If no answer field or empty answer, return the default no results message
       return {
         voiceResponse: "I'm sorry, I couldn't find any shelters in that area. Would you like me to search for resources in a different location?",
         smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",

@@ -631,3 +631,5 @@ All custom format functions return consistent error responses with appropriate s
 
 - Updated `esbuild` and `@types/node` to the latest versions (June 2024)
 - No breaking changes expected; all tests pass after update.
+
+- **Robust fallback for shelter search**: If no structured results are found but the AI provides a direct answer (e.g., shelter name and phone), the system will now extract and present this information to the user.
