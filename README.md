@@ -30,6 +30,9 @@ A real-time voice-based assistant designed to provide immediate support and info
 - **Enhanced Tavily response formatting with improved title and address extraction**
 - **Improved Railway deployment with enhanced startup script and error handling**
 - **Enhanced speech-to-text recognition with intelligent preprocessing to reduce garbling**
+- Voice responses never include HTTP/HTTPS URLs; users are offered to receive details (including address and link) via text message for location/address queries
+- Robust follow-up detection, even if OpenAI API key is missing
+- Improved user experience for follow-up and location/address queries
 
 ## Enhanced Speech-to-Text Recognition
 
@@ -187,25 +190,6 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **Updated enhanced query rewriter and location detector logic for better test consistency and robustness**
 - **Fixed test mocks and edge cases for query rewriting and location extraction**
 - **Updated test suite for more robust edge case handling**
-- **Updated test suite for more robust edge case handling**
-- **Updated deployment configuration**
-- **Improved conversational filler removal: Now removes all consecutive leading fillers, including those with punctuation, and is consistent across modules**
-- **Location extraction now consistently returns lowercase locations to match test expectations**
-- **Enhanced query rewriting uses the improved filler removal and location extraction logic**
-- **Fixed async handling and response formatting in query handler and speech processor**
-- **Simplified module imports using index.js**
-- **Updated package.json with proper module exports**
-- **Removed unnecessary build step from deployment**
-- **Improved conversational filler removal: Now removes all consecutive leading fillers, including those with punctuation, and is consistent across modules**
-- **Location extraction now consistently returns lowercase locations to match test expectations**
-- **Enhanced query rewriting uses the improved filler removal and location extraction logic**
-- **Fixed async handling and response formatting in query handler and speech processor**
-- **Updated test expectations and logic for consistency**
-- **Defensive type checking and logging for rewritten queries before Tavily API calls to prevent invalid query errors (422 Unprocessable Entity)**
-- **Improved error handling and logging for Tavily API integration**
-- **Updated enhanced query rewriter and location detector logic for better test consistency and robustness**
-- **Fixed test mocks and edge cases for query rewriting and location extraction**
-- **Updated test suite for more robust edge case handling**
 - **Fixed bug where voice response would say 'undefined and undefined' if no shelters were found. Now, a clear message is given when no results pass the Tavily score threshold.**
 - **Clarified Tavily score threshold:** Only results with a score >= 0.2 are included in responses by default. If you want to include more results, you can lower this threshold in the code.
 - **Enhanced AI Model Confidence Score Logging:** Added comprehensive logging of AI model confidence scores for intent classification, including confidence levels (High/Medium/Low), response times, and token usage metrics.
@@ -215,6 +199,10 @@ The system includes comprehensive logging throughout the request-response lifecy
 - **See CHANGELOG for more details**
 - **Simplified intent classification and off-topic detection:** Only queries with domestic violence-related keywords are considered on-topic; all others are classified as off-topic. This approach is robust, easier to maintain, and fully covered by tests.
 - **Improved follow-up question handling:** The system now correctly interprets queries like "tell me more about the last one" or "the first one", mapping them to the correct Tavily result and providing detailed information from the content. Fully covered by tests.
+- **Voice responses no longer include HTTP/HTTPS URLs; users are offered to receive details (including address and link) via text message**
+- **Follow-up detection logic is now robust even if the OpenAI API key is missing, and works reliably for vague queries like "tell me more about the first one"**
+- **All tests pass, including new tests for follow-up detection and conversational flow**
+- **Improved user experience for follow-up and location/address queries**
 
 ## Custom Tavily Response Formatting
 

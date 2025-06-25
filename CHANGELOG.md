@@ -641,3 +641,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Speech garbling and follow-up context issues
 - Node.js punycode deprecation warning in logs
+
+## [1.17.0] - 2024-06-27
+
+### Added
+- Robust follow-up detection logic, even if OpenAI API key is missing
+- New tests for follow-up detection and conversational flow
+- Improved user experience for follow-up and location/address queries
+
+### Changed
+- Voice responses no longer include HTTP/HTTPS URLs; users are offered to receive details (including address and link) via text message for location/address queries
+- Pattern matching for follow-up detection is now more comprehensive and reliable
+
+### Fixed
+- No more URLs read out in voice responses
+- Follow-up questions are no longer classified as off-topic
