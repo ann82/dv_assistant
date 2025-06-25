@@ -247,10 +247,25 @@ router.post('/voice/process', async (req, res) => {
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
     const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
     
-    // Check if the last response was asking for consent
+    // Check if the last response was asking for consent - make this more robust
     const call = twilioVoiceHandler.activeCalls.get(CallSid);
     const lastResponse = call?.lastResponse;
-    const wasAskingForConsent = lastResponse && lastResponse.includes('text message') && lastResponse.includes('yes or no');
+    const wasAskingForConsent = lastResponse && (
+      lastResponse.includes('text message') || 
+      lastResponse.includes('summary') || 
+      lastResponse.includes('yes or no') ||
+      lastResponse.includes('receive a summary')
+    );
+    
+    logger.info('Consent detection check:', {
+      CallSid,
+      SpeechResult,
+      cleanedSpeechResult,
+      isConsentResponse,
+      lastResponse,
+      wasAskingForConsent,
+      consentKeywords: consentKeywords.filter(keyword => lowerSpeech.includes(keyword))
+    });
     
     if (isConsentResponse && wasAskingForConsent) {
       logger.info('Detected consent response, routing to consent endpoint:', { CallSid, SpeechResult });
@@ -263,6 +278,15 @@ router.post('/voice/process', async (req, res) => {
     
     // Process the speech input using the TwilioVoiceHandler
     const response = await twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid);
+    
+    // Check if processSpeechInput detected a consent response
+    if (response && typeof response === 'object' && response.shouldRedirectToConsent) {
+      logger.info('processSpeechInput detected consent response, redirecting to consent endpoint:', { CallSid, SpeechResult });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.redirect('/twilio/consent');
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
     
     // Store the response for consent detection
     if (call) {

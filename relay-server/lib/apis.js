@@ -45,7 +45,7 @@ export async function callTavilyAPI(query) {
         search_depth: 'advanced',
         include_answer: true,
         include_results: true,
-        include_raw_content: true,
+        include_raw_content: false,
         include_domains: [],
         exclude_domains: filterConfig.excludeDomains,
         include_images: false,

@@ -24,7 +24,7 @@ export class EnhancedTavilyService {
           search_depth: 'advanced',
           include_answer: true,
           include_results: true,
-          include_raw_content: true,
+          include_raw_content: false,
           max_results: 5
         })
       });

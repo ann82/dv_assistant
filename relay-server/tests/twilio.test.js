@@ -72,7 +72,32 @@ vi.mock('fs/promises', () => ({
 // Mock the current TwilioVoiceHandler dependencies
 vi.mock('../lib/twilioVoice.js', () => ({
   TwilioVoiceHandler: vi.fn().mockImplementation(() => ({
-    processSpeechInput: vi.fn().mockResolvedValue('test response'),
+    activeCalls: new Map(),
+    processSpeechInput: vi.fn().mockImplementation(async (speechResult, callSid) => {
+      // Mock the consent detection logic
+      const lowerSpeech = speechResult.toLowerCase();
+      const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
+      const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
+      
+      // Get the mock call data
+      const mockCall = this.activeCalls?.get(callSid);
+      const lastResponse = mockCall?.lastResponse;
+      const wasAskingForConsent = lastResponse && (
+        lastResponse.includes('text message') || 
+        lastResponse.includes('summary') || 
+        lastResponse.includes('yes or no') ||
+        lastResponse.includes('receive a summary')
+      );
+      
+      if (isConsentResponse && wasAskingForConsent) {
+        return {
+          response: "Redirecting to consent endpoint",
+          shouldRedirectToConsent: true
+        };
+      }
+      
+      return 'test response';
+    }),
     validateTwilioRequest: vi.fn().mockReturnValue(true),
     handleIncomingCall: vi.fn().mockResolvedValue({
       toString: () => '<Response><Say>Welcome</Say></Response>'

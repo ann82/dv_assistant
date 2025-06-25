@@ -640,7 +640,7 @@ export function ConsolePage() {
               search_depth: 'advanced',
               max_results: 10,
               include_answer: true,
-              include_raw_content: true
+              include_raw_content: false
             })
           });
 

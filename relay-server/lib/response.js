@@ -603,7 +603,7 @@ export class ResponseGenerator {
             search_depth: 'advanced',
             include_answer: true,
             include_results: true,
-            include_raw_content: true,
+            include_raw_content: false,
             include_domains: [],
             exclude_domains: []
           })
@@ -1373,7 +1373,7 @@ export class ResponseGenerator {
           search_depth: 'advanced',
           include_answer: true,
           include_results: true,
-          include_raw_content: true,
+          include_raw_content: false,
           include_domains: [],
           exclude_domains: ['yelp.com', 'maddiesfund.org'], // Exclude irrelevant domains
           max_results: 5

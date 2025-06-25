@@ -285,6 +285,32 @@ export class TwilioVoiceHandler {
         speechResult
       });
 
+      // Check if this might be a consent response that wasn't caught by the route handler
+      const lowerSpeech = speechResult.toLowerCase();
+      const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
+      const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
+      const lastResponse = callSid ? this.activeCalls.get(callSid)?.lastResponse : null;
+      const wasAskingForConsent = lastResponse && (
+        lastResponse.includes('text message') || 
+        lastResponse.includes('summary') || 
+        lastResponse.includes('yes or no') ||
+        lastResponse.includes('receive a summary')
+      );
+      
+      // If this looks like a consent response, redirect to consent endpoint
+      if (isConsentResponse && wasAskingForConsent) {
+        logger.info('Detected consent response in processSpeechInput, redirecting to consent endpoint:', {
+          requestId,
+          callSid,
+          speechResult,
+          lastResponse
+        });
+        return {
+          response: "Redirecting to consent endpoint",
+          shouldRedirectToConsent: true
+        };
+      }
+
       // Manage conversation flow based on intent
       const conversationFlow = manageConversationFlow(intent, speechResult, context);
       logger.info('Conversation flow management:', {

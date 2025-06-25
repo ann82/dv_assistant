@@ -426,6 +426,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Expanded test coverage:** Added tests for medical, entertainment, and generic queries to ensure robust off-topic detection.
 - **Improved follow-up question handling:** The system now correctly interprets queries like "tell me more about the last one" or "the first one", mapping them to the correct Tavily result and providing detailed information from the content. This logic is fully covered by the test suite.
 - The system now recognizes 'thank you', 'thanks', and similar gratitude phrases as a signal to end the call and deliver the end message. This works for both the main and fallback intent classification logic, and is covered by automated tests.
+- Set `include_raw_content` to `false` in Tavily API requests to reduce response size and improve performance.
 
 ### Removed
 - Obsolete tests and unused files
