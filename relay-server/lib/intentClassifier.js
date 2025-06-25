@@ -440,7 +440,9 @@ export const intentHandlers = {
         intent: 'end_conversation',
         voiceResponse: "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.",
         smsResponse: null,
-        shouldEndCall: true
+        shouldEndCall: false, // Don't end immediately, ask for SMS consent first
+        shouldReengage: false,
+        redirectionMessage: "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no."
       };
     }
     
@@ -1335,9 +1337,9 @@ export function manageConversationFlow(intent, query, context = {}) {
     if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
         queryLower.includes('end call') || queryLower.includes('hang up') ||
         queryLower.includes('thank you') || queryLower.includes('thanks')) {
-      response.shouldEndCall = true;
+      response.shouldEndCall = false; // Don't end immediately, ask for SMS consent first
       response.shouldContinue = false;
-      response.redirectionMessage = "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.";
+      response.redirectionMessage = "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
       return response;
     }
     
@@ -1356,9 +1358,9 @@ export function manageConversationFlow(intent, query, context = {}) {
 
   // Handle end conversation intent
   if (intent === 'end_conversation') {
-    response.shouldEndCall = true;
+    response.shouldEndCall = false; // Don't end immediately, ask for SMS consent first
     response.shouldContinue = false;
-    response.redirectionMessage = "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.";
+    response.redirectionMessage = "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
     return response;
   }
 

@@ -428,6 +428,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The system now recognizes 'thank you', 'thanks', and similar gratitude phrases as a signal to end the call and deliver the end message. This works for both the main and fallback intent classification logic, and is covered by automated tests.
 - Set `include_raw_content` to `false` in Tavily API requests to reduce response size and improve performance.
 - Fixed call ending issue where the system wasn't playing the goodbye message when users said "thank you" or similar phrases. The conversation flow management now correctly handles end conversation intents without being overridden by intent-specific handling.
+- Fixed SMS consent flow to properly ask for consent before ending calls when users say "thank you" or similar phrases. The system now asks "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no." and properly handles the consent response.
 
 ### Removed
 - Obsolete tests and unused files

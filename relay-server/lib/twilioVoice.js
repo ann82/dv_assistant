@@ -337,6 +337,22 @@ export class TwilioVoiceHandler {
         };
       }
 
+      // Handle SMS consent request
+      if (conversationFlow.redirectionMessage && 
+          conversationFlow.redirectionMessage.includes('summary') && 
+          conversationFlow.redirectionMessage.includes('text message')) {
+        logger.info('Requesting SMS consent:', {
+          requestId,
+          callSid,
+          intent,
+          speechResult
+        });
+        return {
+          response: conversationFlow.redirectionMessage,
+          shouldRedirectToConsent: true
+        };
+      }
+
       // Handle re-engagement attempts
       if (conversationFlow.shouldReengage) {
         logger.info('Re-engaging conversation:', {
