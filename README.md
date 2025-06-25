@@ -253,3 +253,38 @@ See the relay-server README for detailed documentation and examples.
 
 1. Clone the repository:
 ```
+
+## Follow-up Question Support
+
+The assistant now supports comprehensive follow-up question handling, allowing users to ask vague or context-dependent questions after an initial query. This includes:
+
+- **Conversation context tracking**: Remembers the last query, intent, location, and results for 5 minutes.
+- **Vague query detection**: Recognizes follow-ups like "What's the address?", "Where is that located?", "What's the number?", or "Can you send that to me?".
+- **Specific follow-up handlers**: Provides targeted responses for address, phone, and details requests, using cached results.
+- **Timeout safety**: Automatically clears context after 5 minutes to prevent stale responses.
+- **Improved user experience**: Users can ask natural follow-up questions without repeating themselves.
+
+**Example usage:**
+- User: "Find me a shelter in San Francisco"
+- Assistant: "I found 2 shelters in San Francisco: ... Would you like me to send you the details?"
+- User: "What's the address?"
+- Assistant: "Here are the locations: ... Would you like me to send you the complete details?"
+
+See `FOLLOW_UP_IMPLEMENTATION.md` for technical details.
+
+## Node.js Deprecation Warnings
+
+If you see a warning about the `punycode` module being deprecated in Node.js 14+:
+
+```
+(node:14) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+```
+
+This is caused by dependencies like Vite or esbuild. The project now:
+- Suppresses deprecation warnings in npm scripts using `--no-deprecation`
+- Updates dependencies to minimize deprecation issues
+- Adds `.node-version` and `.nvmrc` files to specify Node.js 18.19.0
+
+**You can safely ignore this warning.**
+
+See `DEPRECATION_WARNINGS.md` for more details.

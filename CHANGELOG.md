@@ -618,3 +618,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Clarified Tavily score threshold: Only results with a score >= 0.2 are included in responses by default. If you want to include more results, you can lower this threshold in the code.
+
+## [1.16.0] - 2024-06-25
+
+### Added
+- Comprehensive follow-up question support: context tracking, vague query detection, and specific handlers for address, phone, and details follow-ups
+- 5-minute timeout for follow-up context to prevent stale responses
+- Enhanced speech-to-text recognition: new Twilio parameters, speech preprocessing (artifact removal, error correction, garbled speech detection, keyword extraction)
+- Real-time interim speech results endpoint for improved feedback
+- Node.js deprecation warning suppression and documentation, updated dependencies, and version management files
+
+### Changed
+- Updated Twilio, intent classifier, and websocket server to use new speech and follow-up logic
+- Improved logging and error handling for speech and follow-up flows
+
+### Fixed
+- Speech garbling and follow-up context issues
+- Node.js punycode deprecation warning in logs
