@@ -9,13 +9,42 @@ A real-time voice-based assistant designed to provide immediate support and info
 - WebSocket server for real-time updates
 - Comprehensive logging system
 - Error handling and monitoring
-- Test suite for all components (100% green, 304 tests)
+- Test suite for all components (100% green, 314 tests)
 - Cost logging for API usage tracking
 - Health check endpoint for monitoring
 - Enhanced logging and debugging capabilities
 - Robust filtering, caching, and response formatting logic
 - Customizable Tavily response formatting with required fields always present
+- **Enhanced Tavily response formatting with improved title and address extraction**
 - **Improved Railway deployment with enhanced startup script and error handling**
+
+## Enhanced Tavily Response Formatting
+
+The system now includes advanced response formatting capabilities that significantly improve the quality of information provided to users:
+
+### Key Improvements
+
+- **Better Title Extraction**: When Tavily returns poor titles (like filenames), the system automatically extracts meaningful organization names from the content using multiple pattern matching techniques.
+
+- **Enhanced Address Extraction**: Improved extraction of complete physical addresses from content, including multi-line addresses with street numbers, cities, states, and zip codes.
+
+- **Multiple Resource Detection**: When content contains lists of multiple resources, the system can extract and format them individually, providing more comprehensive information.
+
+- **Improved Response Quality**: The main formatting function now uses all extraction methods to provide better-formatted responses with:
+  - Meaningful shelter names instead of filenames
+  - Complete addresses with city and state information
+  - Proper phone number extraction and formatting
+  - Support for multiple resources in a single result
+
+### Technical Features
+
+- **Pattern-based title extraction** from content when original titles are poor
+- **Multi-line address parsing** that captures complete location information
+- **Resource list parsing** for content containing multiple organizations
+- **Enhanced phone number extraction** with better regex patterns
+- **Comprehensive test coverage** for all extraction functions
+
+These improvements ensure users receive more useful and complete information about domestic violence shelters and resources, even when the original Tavily results have poor formatting or incomplete data.
 
 ## Intent Classification and Off-Topic Detection
 

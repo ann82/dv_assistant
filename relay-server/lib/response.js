@@ -678,19 +678,47 @@ export class ResponseGenerator {
     // Extract location from user query for context
     const location = this.extractLocationFromQuery(userQuery);
 
-    // Create voice response
-    const voiceResponse = this.createVoiceResponse(sortedResults, location);
-    // Create SMS response with clickable links
-    const smsResponse = this.createSMSResponse(sortedResults, location);
+    // Process results with improved title and address extraction
+    const processedResults = sortedResults.map(result => {
+      // Extract better title from content if original title is poor
+      const betterTitle = this.extractBetterTitle(result.content, result.title);
+      
+      // Extract physical address from content
+      const physicalAddress = this.extractPhysicalAddress(result.content);
+      
+      // Check if content contains multiple resources
+      const multipleResources = this.extractMultipleResources(result.content);
+      
+      return {
+        ...result,
+        processedTitle: betterTitle,
+        physicalAddress: physicalAddress,
+        multipleResources: multipleResources,
+        hasMultipleResources: multipleResources.length > 1
+      };
+    });
 
-    // Extract shelter info for web/summary
-    const shelters = sortedResults.map(result => ({
-      name: this.cleanTitleForSMS(result.title),
-      address: result.url,
-      phone: this.extractPhone(result.content),
-      description: result.content,
-      score: result.score
-    }));
+    // Create voice response
+    const voiceResponse = this.createVoiceResponse(processedResults, location);
+    // Create SMS response with clickable links
+    const smsResponse = this.createSMSResponse(processedResults, location);
+
+    // Extract shelter info for web/summary with improved data
+    const shelters = processedResults.map(result => {
+      // If result has multiple resources, use the first one as primary
+      const primaryResource = result.multipleResources.length > 0 ? result.multipleResources[0] : null;
+      
+      return {
+        name: primaryResource ? primaryResource.name : result.processedTitle,
+        address: primaryResource ? primaryResource.address : result.physicalAddress,
+        phone: primaryResource ? primaryResource.phone : this.extractPhone(result.content),
+        description: primaryResource ? primaryResource.description : result.content,
+        score: result.score,
+        url: result.url,
+        hasMultipleResources: result.hasMultipleResources,
+        allResources: result.multipleResources.length > 0 ? result.multipleResources : null
+      };
+    });
 
     // Compose summary for web
     const summary = `I found ${shelters.length} shelters${location ? ' in ' + location : ''}:
@@ -814,11 +842,21 @@ export class ResponseGenerator {
     
     if (results.length === 1) {
       const result = results[0];
-      const title = this.cleanTitleForVoice(result.title);
+      const title = result.processedTitle || this.cleanTitleForVoice(result.title);
+      
+      // If result has multiple resources, mention it
+      if (result.hasMultipleResources && result.multipleResources.length > 0) {
+        const resourceCount = result.multipleResources.length;
+        return `I found ${resourceCount} shelters${locationText} including ${title}. How else can I help you today?`;
+      }
+      
       return `I found a shelter${locationText}: ${title}. How else can I help you today?`;
     }
     
-    const organizationNames = results.map(result => this.cleanTitleForVoice(result.title));
+    const organizationNames = results.map(result => {
+      return result.processedTitle || this.cleanTitleForVoice(result.title);
+    });
+    
     let response = `I found ${results.length} shelters${locationText}`;
     
     if (organizationNames.length === 2) {
@@ -839,12 +877,36 @@ export class ResponseGenerator {
   static createSMSResponse(results, location) {
     const locationText = location ? ` in ${location}` : '';
     let smsResponse = `Shelters${locationText}:\n\n`;
+    
     results.forEach((result, index) => {
-      const title = this.cleanTitleForSMS(result.title);
+      const title = result.processedTitle || this.cleanTitleForSMS(result.title);
       const url = result.url;
+      
       smsResponse += `${index + 1}. ${title}\n`;
+      
+      // If result has multiple resources, list them
+      if (result.hasMultipleResources && result.multipleResources.length > 0) {
+        result.multipleResources.forEach((resource, resourceIndex) => {
+          if (resourceIndex > 0) { // Skip first one as it's already shown as the main title
+            smsResponse += `   - ${resource.name}\n`;
+            if (resource.address !== 'Not available') {
+              smsResponse += `     Address: ${resource.address}\n`;
+            }
+            if (resource.phone !== 'Not available') {
+              smsResponse += `     Phone: ${resource.phone}\n`;
+            }
+          }
+        });
+      } else {
+        // Show address if available
+        if (result.physicalAddress && result.physicalAddress !== 'Not available') {
+          smsResponse += `   Address: ${result.physicalAddress}\n`;
+        }
+      }
+      
       smsResponse += `   ${url}\n\n`;
     });
+    
     smsResponse += "For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233";
     return smsResponse;
   }
@@ -871,6 +933,27 @@ export class ResponseGenerator {
 
   static cleanTitleForSMS(title) {
     if (!title) return '';
+    
+    // Handle filename-style titles
+    if (/\.(txt|pdf|doc|html?)$/i.test(title)) {
+      // Try to extract meaningful name from filename
+      const nameMatch = title.match(/^([a-z-]+)/i);
+      if (nameMatch) {
+        const extracted = nameMatch[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (extracted.length > 3) {
+          return extracted;
+        }
+      }
+    }
+    
+    // Handle all-lowercase or all-uppercase titles
+    if (/^[a-z-]+$/i.test(title)) {
+      const cleaned = title.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      if (cleaned.length > 3) {
+        return cleaned;
+      }
+    }
+    
     // Remove common site/branding suffixes and focus on the main DV/shelter part
     let cleaned = title.replace(/\s*-\s*THE BEST.*$/i, '')
       .replace(/\s*-\s*Yelp.*$/i, '')
@@ -887,8 +970,13 @@ export class ResponseGenerator {
       .replace(/\s*\|\s*.*$/i, '')
       .replace(/\s*\(.*\)\s*$/, '')
       .trim();
+    
     // If the cleaned title is empty, fallback to the original
     if (!cleaned) cleaned = title;
+    
+    // Capitalize properly
+    cleaned = cleaned.replace(/\b\w/g, l => l.toUpperCase());
+    
     return cleaned;
   }
 
@@ -1618,6 +1706,222 @@ export class ResponseGenerator {
           timestamp: new Date().toISOString()
         };
     }
+  }
+
+  /**
+   * Extract meaningful organization names from content when title is poor
+   * @param {string} content - The content to extract from
+   * @param {string} originalTitle - The original title
+   * @returns {string} Better title extracted from content
+   */
+  static extractBetterTitle(content, originalTitle) {
+    if (!content) return originalTitle || 'Unknown Organization';
+    
+    // If original title is clearly a filename or poor, try to extract from content
+    const isPoorTitle = /\.(txt|pdf|doc|html?)$/i.test(originalTitle) || 
+                       /^[a-z-]+$/i.test(originalTitle) ||
+                       originalTitle.length < 10;
+    
+    if (!isPoorTitle) {
+      return this.cleanTitleForSMS(originalTitle);
+    }
+    
+    // Look for organization names in content
+    const contentLines = content.split('\n').filter(line => line.trim().length > 0);
+    
+    // Pattern 1: Look for bracketed organization names [Organization Name]
+    const bracketPattern = /\[([A-Z][A-Za-z\s&]+(?:Center|Shelter|Mission|House|Services|Program|Coalition|Alliance|Network|Foundation|Association|Organization|Refuge|Haven|Sanctuary)[^]]*)\]/;
+    for (const line of contentLines) {
+      const match = line.match(bracketPattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        if (extracted.length > 5 && extracted.length < 100) {
+          return this.cleanTitleForSMS(extracted);
+        }
+      }
+    }
+    
+    // Pattern 2: Look for lines that look like organization names
+    const orgPatterns = [
+      /^([A-Z][A-Za-z\s&]+(?:Center|Shelter|Mission|House|Services|Program|Coalition|Alliance|Network|Foundation|Association|Organization|Refuge|Haven|Sanctuary))/,
+      /^([A-Z][A-Za-z\s&]+(?:Women|Family|Community|Crisis|Emergency|Domestic|Violence|Support|Help|Safe|Protection))/,
+      /^([A-Z][A-Za-z\s&]+(?:Gospel|Mission|House|Center|Shelter))/
+    ];
+    
+    for (const line of contentLines) {
+      for (const pattern of orgPatterns) {
+        const match = line.match(pattern);
+        if (match && match[1]) {
+          const extracted = match[1].trim();
+          if (extracted.length > 5 && extracted.length < 100) {
+            return this.cleanTitleForSMS(extracted);
+          }
+        }
+      }
+    }
+    
+    // Pattern 3: Look for lines with addresses that might have organization names
+    const addressPattern = /^([A-Z][A-Za-z\s&]+)\s*\n\s*(\d+[^,\n]+(?:,\s*[^,\n]+)*)/;
+    for (const line of contentLines) {
+      const match = line.match(addressPattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        if (extracted.length > 5 && extracted.length < 100) {
+          return this.cleanTitleForSMS(extracted);
+        }
+      }
+    }
+    
+    // Pattern 4: Look for phone numbers with organization names
+    const phonePattern = /^([A-Z][A-Za-z\s&]+)\s*\n\s*Phone:\s*(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/;
+    for (const line of contentLines) {
+      const match = line.match(phonePattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        if (extracted.length > 5 && extracted.length < 100) {
+          return this.cleanTitleForSMS(extracted);
+        }
+      }
+    }
+    
+    // Fallback: return cleaned original title
+    return this.cleanTitleForSMS(originalTitle);
+  }
+
+  /**
+   * Extract physical addresses from content
+   * @param {string} content - The content to extract from
+   * @returns {string} Physical address or 'Not available'
+   */
+  static extractPhysicalAddress(content) {
+    if (!content) return 'Not available';
+    
+    const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Pattern 1: Look for lines starting with numbers (street addresses)
+      const streetMatch = line.match(/^(\d+[^,\n]+(?:,\s*[^,\n]+)*)/);
+      if (streetMatch) {
+        let address = streetMatch[1].trim();
+        // Append all consecutive lines that are not phone/fax/email or blank
+        for (let j = i + 1; j < lines.length; j++) {
+          const nextLine = lines[j];
+          if (/^(Phone|Fax|Email|Contact|Website)[:\s]/i.test(nextLine)) break;
+          if (!nextLine) break;
+          address += ' ' + nextLine;
+        }
+        if (address.length > 10) {
+          return address;
+        }
+      }
+      // Pattern 2: Look for "Address:" prefix
+      const addressPrefixMatch = line.match(/Address:\s*([^,\n]+(?:,\s*[^,\n]+)*)/i);
+      if (addressPrefixMatch) {
+        const address = addressPrefixMatch[1].trim();
+        if (address.length > 10) {
+          return address;
+        }
+      }
+      // Pattern 3: Look for "Located at:" prefix
+      const locatedMatch = line.match(/Located at:\s*([^,\n]+(?:,\s*[^,\n]+)*)/i);
+      if (locatedMatch) {
+        const address = locatedMatch[1].trim();
+        if (address.length > 10) {
+          return address;
+        }
+      }
+    }
+    return 'Not available';
+  }
+
+  /**
+   * Extract multiple resources from content when it contains lists
+   * @param {string} content - The content to extract from
+   * @returns {Array} Array of extracted resources
+   */
+  static extractMultipleResources(content) {
+    if (!content) return [];
+    
+    const resources = [];
+    const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    let currentResource = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Look for organization name patterns
+      const orgPatterns = [
+        /^([A-Z][A-Za-z\s&]+(?:Center|Shelter|Mission|House|Services|Program|Coalition|Alliance|Network|Foundation|Association|Organization|Refuge|Haven|Sanctuary))/,
+        /^([A-Z][A-Za-z\s&]+(?:Women|Family|Community|Crisis|Emergency|Domestic|Violence|Support|Help|Safe|Protection))/,
+        /^([A-Z][A-Za-z\s&]+(?:Gospel|Mission|House|Center|Shelter))/
+      ];
+      
+      let orgMatch = null;
+      for (const pattern of orgPatterns) {
+        orgMatch = line.match(pattern);
+        if (orgMatch) break;
+      }
+      
+      if (orgMatch) {
+        // Save previous resource if exists
+        if (currentResource && currentResource.name) {
+          resources.push(currentResource);
+        }
+        
+        // Start new resource
+        currentResource = {
+          name: this.cleanTitleForSMS(orgMatch[1]),
+          address: 'Not available',
+          phone: 'Not available',
+          description: ''
+        };
+      } else if (currentResource) {
+        // Look for address (lines starting with numbers)
+        const addressMatch = line.match(/^(\d+[^,\n]+(?:,\s*[^,\n]+)*)/);
+        if (addressMatch && currentResource.address === 'Not available') {
+          let address = addressMatch[1].trim();
+          
+          // Try to get additional address lines
+          for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+            const nextLine = lines[j];
+            // If next line looks like part of address (contains city, state, zip)
+            if (nextLine.match(/[A-Z]{2}\s*\d{5}/) || nextLine.match(/[A-Z][a-z]+,\s*[A-Z]{2}/)) {
+              address += ' ' + nextLine;
+            } else if (nextLine.match(/^P\.?\s*O\.?\s*Box/i)) {
+              // Handle P.O. Box
+              address += ' ' + nextLine;
+            } else {
+              break;
+            }
+          }
+          
+          currentResource.address = address;
+        }
+        
+        // Look for phone
+        const phoneMatch = line.match(/Phone:\s*(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/i);
+        if (phoneMatch && currentResource.phone === 'Not available') {
+          currentResource.phone = phoneMatch[1];
+        }
+        
+        // Add to description (but not if it's just address or phone info)
+        if (line.length > 0 && 
+            !line.match(/^(Phone|Address|Fax):/i) && 
+            !line.match(/^(\d+[^,\n]+(?:,\s*[^,\n]+)*)/) &&
+            !line.match(/^P\.?\s*O\.?\s*Box/i)) {
+          currentResource.description += (currentResource.description ? ' ' : '') + line;
+        }
+      }
+    }
+    
+    // Add the last resource
+    if (currentResource && currentResource.name) {
+      resources.push(currentResource);
+    }
+    
+    return resources;
   }
 }
 

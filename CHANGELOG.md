@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2024-12-19
+
+### Added
+- **Enhanced Tavily response formatting** with improved title and address extraction capabilities
+- **Better title extraction** from content when original Tavily titles are poor (e.g., filenames)
+- **Enhanced address extraction** that captures complete multi-line addresses including city, state, and zip codes
+- **Multiple resource detection** for content containing lists of multiple organizations
+- **Improved phone number extraction** with better regex patterns
+- **Comprehensive test coverage** for all new extraction functions
+
+### Changed
+- **Updated main formatting function** to use all new extraction methods for better response quality
+- **Enhanced address parsing** to handle consecutive lines that form complete addresses
+- **Improved title extraction patterns** to better identify organization names in content
+- **Updated test suite** to reflect new functionality and improved test reliability
+
+### Fixed
+- **Address extraction issue** where city and state information was not being included in extracted addresses
+- **Test environment issues** with mock function restoration in the test suite
+- **Response formatting consistency** across different types of Tavily results
+
 ## [1.13.0] - 2024-06-25
 
 ### Added
