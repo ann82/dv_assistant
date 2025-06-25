@@ -89,9 +89,9 @@ vi.mock('../lib/enhancedQueryRewriter.js', () => ({
   })
 }));
 
-// Mock the Tavily processor
-vi.mock('../lib/tavilyProcessor.js', () => ({
-  processTavilyQuery: vi.fn(async (query, options) => {
+// Mock the APIs module with the correct function name
+vi.mock('../lib/apis.js', () => ({
+  callTavilyAPI: vi.fn(async (query, options) => {
     return {
       success: true,
       results: [
@@ -111,7 +111,7 @@ vi.mock('../lib/tavilyProcessor.js', () => ({
 import { processSpeechResult } from '../lib/speechProcessor.js';
 import { extractLocationFromQuery } from '../lib/enhancedLocationDetector.js';
 import { rewriteQuery, cleanConversationalFillers } from '../lib/enhancedQueryRewriter.js';
-import { processTavilyQuery } from '../lib/tavilyProcessor.js';
+import { callTavilyAPI } from '../lib/apis.js';
 
 describe('Speech Processor', () => {
   beforeEach(() => {
@@ -129,7 +129,7 @@ describe('Speech Processor', () => {
       expect(cleanConversationalFillers).toHaveBeenCalledWith('Hey! I need help in San Francisco');
       expect(extractLocationFromQuery).toHaveBeenCalled();
       expect(rewriteQuery).toHaveBeenCalled();
-      expect(processTavilyQuery).toHaveBeenCalled();
+      expect(callTavilyAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
 
@@ -139,7 +139,7 @@ describe('Speech Processor', () => {
       expect(cleanConversationalFillers).toHaveBeenCalledWith('I need help');
       expect(extractLocationFromQuery).toHaveBeenCalled();
       expect(rewriteQuery).toHaveBeenCalled();
-      expect(processTavilyQuery).toHaveBeenCalled();
+      expect(callTavilyAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
 
@@ -170,7 +170,7 @@ describe('Speech Processor', () => {
       expect(cleanConversationalFillers).toHaveBeenCalledWith('Hi, I need shelter in Oakland');
       expect(extractLocationFromQuery).toHaveBeenCalled();
       expect(rewriteQuery).toHaveBeenCalled();
-      expect(processTavilyQuery).toHaveBeenCalled();
+      expect(callTavilyAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
   });
@@ -209,16 +209,16 @@ describe('Speech Processor', () => {
     it('should process Tavily queries', async () => {
       const result = await processSpeechResult('I need shelter in Oakland', 'test-call-sid');
       
-      expect(processTavilyQuery).toHaveBeenCalled();
+      expect(callTavilyAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.results).toBeDefined();
     });
 
     it('should handle Tavily processing failures gracefully', async () => {
-      // Mock a failure
-      processTavilyQuery.mockRejectedValueOnce(new Error('Tavily API error'));
+      // Mock the API to throw an error
+      vi.mocked(callTavilyAPI).mockRejectedValueOnce(new Error('Tavily API error'));
       
-      const result = await processSpeechResult('I need help', 'test-call-sid');
+      const result = await processSpeechResult('I need shelter in Oakland', 'test-call-sid');
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('Tavily API error');

@@ -28,7 +28,7 @@ const HTTP_STATUS = {
 };
 
 export class TwilioVoiceHandler {
-  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, server) {
+  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, server, VoiceResponseClass = twilio.twiml.VoiceResponse) {
     // Handle test environment where credentials might not be available
     if (process.env.NODE_ENV === 'test') {
       this.accountSid = accountSid || 'ACtest123456789';
@@ -55,6 +55,7 @@ export class TwilioVoiceHandler {
     this.WebSocketClass = WebSocketClass;
     this.twilioClient = twilio(this.accountSid, this.authToken);
     this.processingRequests = new Map(); // Track processing requests
+    this.VoiceResponseClass = VoiceResponseClass;
     if (server) {
       this.wsServer = new TwilioWebSocketServer(server);
     } else {
@@ -89,13 +90,13 @@ export class TwilioVoiceHandler {
           url: req.originalUrl,
           method: req.method
         });
-        const twiml = new twilio.twiml.VoiceResponse();
+        const twiml = new this.VoiceResponseClass();
         twiml.say('Invalid request. Please try again.');
         return twiml;
       }
 
       // Generate welcome message
-      const twiml = new twilio.twiml.VoiceResponse();
+      const twiml = new this.VoiceResponseClass();
       twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
       
       // Add gather for speech input
@@ -119,7 +120,7 @@ export class TwilioVoiceHandler {
       });
       
       // Return error TwiML
-      const twiml = new twilio.twiml.VoiceResponse();
+      const twiml = new this.VoiceResponseClass();
       twiml.say('I encountered an error. Please try again later.');
       return twiml;
     }
@@ -139,7 +140,7 @@ export class TwilioVoiceHandler {
       const shouldEndCall = typeof processResult === 'object' && processResult.shouldEndCall;
       
       // Generate TwiML response
-      const twiml = new twilio.twiml.VoiceResponse();
+      const twiml = new this.VoiceResponseClass();
       twiml.say(response);
       
       // Only add gather if we don't want to end the call
@@ -169,7 +170,7 @@ export class TwilioVoiceHandler {
       });
       
       // Return error TwiML
-      const twiml = new twilio.twiml.VoiceResponse();
+      const twiml = new this.VoiceResponseClass();
       twiml.say('I encountered an error processing your speech. Please try again.');
       
       // Add gather to continue after error
@@ -917,7 +918,7 @@ export class TwilioVoiceHandler {
       });
       
       // Send error response
-      const errorTwiml = new twilio.twiml.VoiceResponse();
+      const errorTwiml = new this.VoiceResponseClass();
       errorTwiml.say('We encountered an error. Please try again later.');
       return res.status(500).send(errorTwiml.toString());
     }

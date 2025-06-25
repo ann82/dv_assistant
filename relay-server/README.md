@@ -311,6 +311,14 @@ The test suite uses [Vitest](https://vitest.dev/) and has been comprehensively o
 - **Async Test Handling**: Improved async/await patterns in test suites
 - **Enhanced Coverage**: Added tests for new enhanced location detection and query rewriting features
 
+### Call Ending Test Reliability (v1.0.14)
+- **Simplified Mocking Approach**: Replaced complex dynamic import mocking with simple class-level mocking
+- **Consistent Test Pattern**: Used the same mocking approach as twilio.test.js for consistency
+- **Test Coverage Maintained**: All 6 call ending tests now pass while maintaining comprehensive coverage
+- **Goodbye Intent Detection**: Tests verify proper detection of goodbye phrases and conversation ending
+- **TwiML Generation**: Tests verify correct TwiML generation with and without gather elements
+- **Response Format Validation**: Tests ensure proper response format for both goodbye and regular responses
+
 ### Test Categories
 - **Core Functionality**: Response generation, query handling, speech processing
 - **Location Detection**: Enhanced location detector with geocoding validation

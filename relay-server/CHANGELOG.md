@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.14] - 2024-12-21
+
+### Fixed
+- **Call Ending Test Reliability** - Resolved persistent test failures in call ending functionality
+  - **Simplified Mocking Approach**: Replaced complex dynamic import mocking with simple class-level mocking
+  - **Consistent Test Pattern**: Used the same mocking approach as twilio.test.js for consistency
+  - **Test Coverage Maintained**: All 6 call ending tests now pass while maintaining comprehensive coverage
+  - **Goodbye Intent Detection**: Tests verify proper detection of goodbye phrases and conversation ending
+  - **TwiML Generation**: Tests verify correct TwiML generation with and without gather elements
+  - **Response Format Validation**: Tests ensure proper response format for both goodbye and regular responses
+
+### Technical Improvements
+- **Test Infrastructure**: Improved test reliability by using proven mocking patterns
+- **Code Quality**: Eliminated complex dynamic import mocking that was causing test failures
+- **Test Consistency**: Aligned call ending tests with established test patterns in the codebase
+
 ## [1.0.13] - 2024-12-21
 
 ### Added
