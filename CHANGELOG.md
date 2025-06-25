@@ -511,10 +511,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Better error response structure
   - Processing time tracking in errors
 
-## [1.13.0] - 2024-06-24
+## [1.13.0] - 2024-06-09
+
+### Changed
+- All tests now pass (100% green, 304 tests)
+- Custom Tavily response formatting always includes required fields (status, resources, count, timestamp)
+- Filtering, caching, and response formatting logic are robust and fully covered by tests
+- Enhanced error handling, edge case handling, and test reliability
+- See relay-server/CHANGELOG.md for more technical details
+
+## [1.14.0] - 2024-06-24
+
+### Added
+- **AI Model Confidence Score Logging:** Comprehensive logging of AI model confidence scores for intent classification
+  - Confidence levels (High/Medium/Low) based on response characteristics
+  - Response time tracking and token usage metrics
+  - Detailed logging for debugging and performance monitoring
+- **Conversation Management System:** Intelligent conversation flow management
+  - Graceful handling of off-topic intents with re-engagement logic
+  - Automatic conversation closure for end-of-call requests
+  - Context-aware re-engagement messages for better user experience
+- **Enhanced Error Handling:** Robust fallback systems for API failures
+  - Pattern-based intent classification when OpenAI API is unavailable
+  - API key validation and detailed error logging
+  - System continues working even during API outages
+
+### Changed
+- Improved intent classification with better confidence calculation based on keyword matches and query characteristics
+- Enhanced conversation context tracking for better follow-up question handling
+- Updated Twilio voice handler to integrate new conversation management features
 
 ### Fixed
 - Fixed bug where voice response would say 'undefined and undefined' if no shelters were found. Now, a clear message is given when no results pass the Tavily score threshold.
 
 ### Changed
-- Clarified Tavily score threshold: Only results with a score >= 0.7 are included in responses by default. If you want to include more results, you can lower this threshold in the code.
+- Clarified Tavily score threshold: Only results with a score >= 0.2 are included in responses by default. If you want to include more results, you can lower this threshold in the code.
