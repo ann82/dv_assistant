@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 2024-12-21
+
+### Fixed
+- **Location Follow-up Detection** - Resolved issue where location statements were incorrectly classified as off-topic
+  - **Root Cause**: `hasLastQueryContext` was false after resource requests without results, preventing follow-up detection
+  - **Issue**: When users asked for help (e.g., "I need shelter") and then provided location (e.g., "I live in Santa Clara"), the system treated the location as off-topic instead of a follow-up
+  - **Fix**: Updated `updateConversationContext()` to set `lastQueryContext` for resource requests even without Tavily results
+  - **Location Detection**: Added `isLocationStatement()` function to detect location-only statements like "I live in Santa Clara"
+  - **Follow-up Logic**: Enhanced `handleFollowUp()` to recognize location statements as follow-ups to resource requests that need location
+  - **Response Generation**: Added `generateLocationFollowUpResponse()` to process location follow-ups and search for resources in the specified location
+  - **Context Management**: Added `needsLocation` flag to track when a resource request requires location information
+
+### Technical Improvements
+- **Conversation Context**: Improved context preservation for resource requests without immediate results
+- **Follow-up Detection**: Enhanced pattern matching to recognize location statements as valid follow-ups
+- **Location Extraction**: Added robust location extraction from various statement formats
+- **Response Processing**: Updated `processSpeechResult()` to handle location follow-up responses properly
+- **Test Coverage**: Added comprehensive test for location follow-up detection functionality
+
 ## [1.0.15] - 2024-12-21
 
 ### Fixed
