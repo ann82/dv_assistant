@@ -11,6 +11,7 @@ console.log('🚀 Starting Domestic Violence Support Assistant...');
 console.log('📁 Working directory:', process.cwd());
 console.log('📦 Node version:', process.version);
 console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+console.log('🔌 Port:', process.env.PORT || '3000');
 
 // Check for required environment variables
 const requiredEnvVars = [
@@ -27,6 +28,7 @@ if (missingVars.length > 0) {
   console.error('❌ Missing required environment variables:');
   missingVars.forEach(varName => console.error(`   - ${varName}`));
   console.error('💡 Please set these variables in your Railway environment.');
+  console.error('🔗 Check RAILWAY_DEPLOYMENT.md for setup instructions.');
   process.exit(1);
 }
 
@@ -48,6 +50,10 @@ server.on('error', (error) => {
 
 server.on('exit', (code) => {
   console.log(`📴 Server exited with code ${code}`);
+  if (code !== 0) {
+    console.error('💥 Server crashed or failed to start properly');
+    console.error('📋 Check Railway logs for detailed error messages');
+  }
   process.exit(code);
 });
 
@@ -60,4 +66,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('🛑 Received SIGINT, shutting down gracefully...');
   server.kill('SIGINT');
-}); 
+});
+
+// Log when the startup script is ready
+console.log('🎯 Startup script ready, server should be starting...'); 

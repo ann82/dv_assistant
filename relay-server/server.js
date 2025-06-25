@@ -105,7 +105,37 @@ app.use('/twilio', twilioRoutes);
 
 // Add health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  try {
+    // Check if server is running
+    const healthStatus = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      port: port,
+      memory: process.memoryUsage(),
+      pid: process.pid
+    };
+    
+    logger.info('Health check requested:', healthStatus);
+    res.status(200).json(healthStatus);
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Add a simple root endpoint for basic connectivity testing
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Domestic Violence Support Assistant API',
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Error handling middleware
