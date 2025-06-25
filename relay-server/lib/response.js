@@ -4,6 +4,7 @@ import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { gptCache } from './queryCache.js';
+import { voiceInstructions } from './conversationConfig.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
@@ -536,7 +537,7 @@ export class ResponseGenerator {
     const messages = [
       {
         role: 'system',
-        content: `You are an AI assistant for domestic violence support. Be kind, empathetic, and non-judgmental. Prioritize the caller's safety and privacy. If you hear keywords like "suicide," "weapons," "kill," "knife," "gun," "children," "can't move," or "killed," immediately stop and ask the caller to call 911 or offer to call 911 on their behalf. Thank the caller for trusting you. Focus on understanding their needs, providing resources, and discussing safety plans. Keep responses concise and focused.`
+        content: voiceInstructions
       },
       {
         role: 'user',

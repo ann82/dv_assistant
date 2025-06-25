@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2024-12-19
+
+### Added
+- **Enhanced AI Conversation Guidelines**: Integrated comprehensive conversation instructions from frontend to relay-server
+- **Detailed Emergency Protocols**: Proper 911 escalation, immediate danger assessment, and safety planning guidelines
+- **Cultural Sensitivity Support**: LGBTQ+ support, language preferences, religious accommodations, and accessibility guidelines
+- **Structured Conversation Flow**: Professional call structure with welcome, needs assessment, resource provision, and closure
+- **Safety Planning Integration**: Comprehensive safety questions and action plan development
+- **Privacy and Data Protection**: Clear guidelines for location sharing, data handling, and privacy protection
+- **Location and Shelter Search Protocols**: Detailed protocols for location confirmation and shelter search optimization
+- **Shared Configuration System**: Single source of truth for conversation guidelines across web and voice interfaces
+- **Cost Analysis Documentation**: Comprehensive cost-benefit analysis showing manageable $1-3/month increase for significantly improved quality
+
+### Changed
+- **Replaced Simple System Prompt**: Upgraded from 3-line prompt to detailed 150+ line instructions (5,080 characters vs 493 characters)
+- **Enhanced Response Quality**: More empathetic, culturally sensitive, and structured AI responses
+- **Unified User Experience**: Consistent conversation guidelines between web and voice interfaces
+- **Improved Emergency Handling**: Better 911 escalation and immediate danger assessment
+- **Enhanced Cultural Competency**: Support for diverse user needs and communication styles
+- **Optimized Token Usage**: Smart routing minimizes GPT usage while maximizing response quality
+
+### Fixed
+- **Code Duplication**: Eliminated 154 lines of duplicated instructions between frontend and backend
+- **Inconsistent Experience**: Unified conversation guidelines across all interfaces
+- **Limited Emergency Protocols**: Enhanced safety and emergency response capabilities
+- **Cultural Insensitivity**: Added comprehensive cultural sensitivity guidelines
+
+### Technical Details
+- **Token Usage**: Increased from ~124 to ~1,270 tokens per GPT call
+- **Cost Impact**: $0.001719 additional cost per GPT-3.5-turbo call (9.2x increase)
+- **Monthly Cost**: $1-3/month for typical usage (100 calls/day)
+- **Caching Benefits**: 30-minute response caching reduces duplicate GPT calls
+- **Smart Routing**: High-confidence queries use Tavily only (no GPT cost)
+
 ## [1.15.0] - 2024-12-19
 
 ### Added

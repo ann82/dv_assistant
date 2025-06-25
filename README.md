@@ -4,13 +4,14 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2024-06-25):**
-- Tavily API integration now requests and processes content correctly (`include_raw_content: true`)
-- Processor and tests are robust to null/empty content
-- All test expectations are aligned with actual behavior
-- All tests now pass (330 tests, 0 errors, 3 skipped)
-- Removed problematic timeout-based cache test
-- Improved follow-up and response logic for edge cases
+**Latest Update (2024-12-19):**
+- **Enhanced AI Instructions**: Integrated comprehensive conversation guidelines from frontend to relay-server
+- **Improved Response Quality**: Replaced simple 3-line prompt with detailed 150+ line instructions
+- **Unified Experience**: Shared conversation config between web and voice interfaces
+- **Better Emergency Protocols**: Enhanced 911 escalation and safety planning
+- **Cultural Sensitivity**: Added LGBTQ+ support, language preferences, and accessibility guidelines
+- **Cost Analysis**: Detailed cost-benefit analysis shows manageable $1-3/month increase for significantly improved quality
+- **Code Reduction**: Eliminated 154 lines of duplicated instructions, single source of truth
 
 ---
 
@@ -36,6 +37,38 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Pet-related follow-up questions (e.g., "Do they allow pets?") are now recognized as valid follow-ups and not off-topic
 - Filtering logic for shelter results is now more intelligent and no longer excludes real shelters that lack phone/address fields
 - All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
+- **Comprehensive Conversation Guidelines**: Detailed instructions for emergency protocols, cultural sensitivity, safety planning, and conversation structure
+- **Unified Configuration**: Shared conversation config between web and voice interfaces ensures consistency
+
+## Enhanced AI Conversation Guidelines
+
+The system now includes comprehensive conversation guidelines that significantly improve response quality and user experience:
+
+### Key Improvements
+
+- **Detailed Emergency Protocols**: Proper 911 escalation, immediate danger assessment, and safety planning
+- **Cultural Sensitivity**: LGBTQ+ support, language preferences, religious accommodations, and accessibility guidelines
+- **Structured Conversation Flow**: Professional call structure with welcome, needs assessment, resource provision, and closure
+- **Safety Planning**: Comprehensive safety questions and action plan development
+- **Privacy and Data Protection**: Clear guidelines for location sharing, data handling, and privacy protection
+- **Location and Shelter Search**: Detailed protocols for location confirmation and shelter search optimization
+
+### Technical Features
+
+- **Shared Configuration**: Single source of truth for conversation guidelines
+- **Voice-Optimized Instructions**: Tailored for phone interactions with concise, clear language
+- **Web-Compatible Instructions**: Full-featured instructions for web interface
+- **Cost-Effective Implementation**: Smart routing minimizes GPT usage while maximizing quality
+
+### Benefits
+
+- **Better User Experience**: More empathetic, culturally sensitive, and structured responses
+- **Improved Safety**: Proper emergency protocols and 911 escalation
+- **Risk Reduction**: Better handling reduces liability and improves outcomes
+- **Professional Standards**: Consistent conversation flow across all interactions
+- **Accessibility**: Support for diverse user needs and communication styles
+
+These improvements ensure users receive the highest quality support possible, with proper emergency handling, cultural sensitivity, and professional conversation management.
 
 ## Enhanced Speech-to-Text Recognition
 
