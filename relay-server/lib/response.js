@@ -1144,8 +1144,49 @@ export class ResponseGenerator {
 
   static extractPhone(content) {
     if (!content) return 'Not available';
-    const phoneMatch = content.match(/\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/);
-    return phoneMatch ? `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}` : 'Not available';
+    
+    // Multiple phone number patterns
+    const phonePatterns = [
+      // Standard US format: (123) 456-7890
+      /\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/,
+      // International format: +1-123-456-7890
+      /\+1[-.\s]?(\d{3})[-.\s]?(\d{3})[-.\s]?(\d{4})/,
+      // Toll-free: 1-800-123-4567
+      /1[-.\s]?(\d{3})[-.\s]?(\d{3})[-.\s]?(\d{4})/,
+      // Simple format: 123-456-7890
+      /(\d{3})[-.\s]?(\d{3})[-.\s]?(\d{4})/
+    ];
+    
+    // Look for "Phone:" or "Call:" prefixes first
+    const phonePrefixPatterns = [
+      /Phone:\s*\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/i,
+      /Call:\s*\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/i,
+      /Contact:\s*\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/i,
+      /Tel:\s*\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/i
+    ];
+    
+    // Try prefix patterns first (more specific)
+    for (const pattern of phonePrefixPatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        return `${match[1]}-${match[2]}-${match[3]}`;
+      }
+    }
+    
+    // Try general patterns
+    for (const pattern of phonePatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        // Handle different group counts
+        if (match.length === 4) {
+          return `${match[1]}-${match[2]}-${match[3]}`;
+        } else if (match.length === 3) {
+          return `${match[1]}-${match[2]}-${match[3]}`;
+        }
+      }
+    }
+    
+    return 'Not available';
   }
 
   static shouldUseGPT4(input, context) {

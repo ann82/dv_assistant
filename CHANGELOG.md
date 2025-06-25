@@ -433,6 +433,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed call initialization issue where calls weren't being properly tracked in the voice handler's activeCalls Map, causing "No active call found" errors during SMS consent handling. Now initializes calls in both WebSocket server and voice handler to ensure proper tracking.
 - Updated call ending message from casual "Have a great day" to more empathetic "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe." to better reflect the sensitive nature of domestic violence support calls.
 - Fixed WebSocket server null reference error in call summary generation. The system now properly initializes the WebSocket server in the voice handler and provides a fallback summary when the WebSocket server is unavailable.
+- Enhanced Tavily API queries for shelter searches to specifically request shelter names, addresses, phone numbers, and contact information. Updated query rewriting to include "shelter name", "address", "phone number", and "contact information" terms for better search results.
 
 ### Removed
 - Obsolete tests and unused files

@@ -49,7 +49,13 @@ export async function callTavilyAPI(query) {
         include_domains: [],
         exclude_domains: filterConfig.excludeDomains,
         include_images: false,
-        max_results: 10
+        max_results: 15,
+        // Add specific parameters for better shelter information
+        search_type: 'basic',
+        // Include specific content types that are likely to have contact information
+        include_sources: true,
+        // Add context to help with shelter-specific searches
+        context: cleanQuery.includes('shelter') ? 'domestic violence shelter information with contact details' : undefined
       })
     });
 

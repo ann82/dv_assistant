@@ -161,7 +161,7 @@ describe('Intent Classification', () => {
   describe('rewriteQuery', () => {
     it('should add domestic violence context to queries', async () => {
       const result = await rewriteQuery('find shelter near me', 'find_shelter');
-      expect(result).toContain('domestic violence shelter find shelter near me San Jose, California site:org OR site:gov "domestic violence"');
+      expect(result).toContain('domestic violence shelter find shelter near me San Jose, California "shelter name" "address" "phone number" "contact information" site:org OR site:gov "domestic violence"');
     });
 
     it('should handle follow-up questions with context', async () => {

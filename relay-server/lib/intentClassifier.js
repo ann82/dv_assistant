@@ -171,10 +171,13 @@ export async function rewriteQuery(query, intent, callSid = null) {
           rewrittenQuery = `${rewrittenQuery} ${locationInfo.location}`;
         }
         
+        // Add specific request for shelter information
+        rewrittenQuery += ' "shelter name" "address" "phone number" "contact information"';
+        
         // Add minimal site restrictions to focus on relevant domains
         rewrittenQuery += ' site:org OR site:gov';
         
-        // Add specific terms to improve relevance (simplified)
+        // Add specific terms to improve relevance
         rewrittenQuery += ' "domestic violence"';
       } else {
         // For other intents, just add location context
