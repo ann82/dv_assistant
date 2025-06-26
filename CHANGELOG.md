@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2024-12-19
+
+### Added
+- **Enhanced Query Rewriting**: Simplified and optimized Tavily query construction for better search results
+- **Improved Site Filtering**: Added exclusion of low-quality sites (yellowpages, city-data, tripadvisor) for better results
+- **Better Proximity Search**: Enhanced location search with "near" operator and exact phrase matching
+- **Specific Field Requests**: Requests exact fields like shelter name, address, phone number, services offered, and 24-hour hotline
+- **Comprehensive Test Coverage**: Added tests demonstrating improved query quality and site filtering
+
+### Changed
+- **Simplified Query Construction**: Replaced complex 20+ line conditional logic with clean, single-line query templates
+- **Enhanced Query Format**: Uses `"domestic violence shelter"` with quotes for precise search results
+- **Improved Site Restrictions**: 
+  - **Quality sites**: `site:.org OR site:.gov` (credible sources only)
+  - **Excluded sites**: `-site:yellowpages.com -site:city-data.com -site:tripadvisor.com` (low-quality directories)
+- **Reduced Code Complexity**: Eliminated complex regex checks and conditional logic in query rewriting
+
+### Fixed
+- **Poor Search Results**: Better query construction leads to more relevant shelter information
+- **False Positives**: Excluding low-quality directory sites reduces irrelevant results
+- **Inconsistent Queries**: Standardized format regardless of user input phrasing
+- **Maintenance Issues**: Simplified code structure for easier debugging and updates
+
+### Technical Details
+- **Query Format**: `"domestic violence shelter" near [location] "shelter name" "address" "phone number" "services offered" "24 hour hotline" site:.org OR site:.gov -site:yellowpages.com -site:city-data.com -site:tripadvisor.com`
+- **Code Reduction**: Simplified from 20+ lines of conditional logic to 1 line template
+- **Better Maintainability**: Clear, readable structure with no complex regex checks
+- **Enhanced Reliability**: Consistent query format improves search result quality
+
 ## [1.16.0] - 2024-12-19
 
 ### Added

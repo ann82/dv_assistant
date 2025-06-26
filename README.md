@@ -12,6 +12,9 @@ A real-time voice-based assistant designed to provide immediate support and info
 - **Cultural Sensitivity**: Added LGBTQ+ support, language preferences, and accessibility guidelines
 - **Cost Analysis**: Detailed cost-benefit analysis shows manageable $1-3/month increase for significantly improved quality
 - **Code Reduction**: Eliminated 154 lines of duplicated instructions, single source of truth
+- **Query Rewriting Optimization**: Simplified and improved Tavily query construction for better search results
+- **Enhanced Site Filtering**: Added exclusion of low-quality sites (yellowpages, city-data, tripadvisor) for better results
+- **Improved Location Search**: Better proximity search with "near" operator and exact phrase matching
 
 ---
 
@@ -142,6 +145,45 @@ The system now includes advanced response formatting capabilities that significa
 - **Comprehensive test coverage** for all extraction functions
 
 These improvements ensure users receive more useful and complete information about domestic violence shelters and resources, even when the original Tavily results have poor formatting or incomplete data.
+
+## Enhanced Query Rewriting
+
+The system now includes optimized query rewriting that significantly improves search result quality and relevance:
+
+### Key Improvements
+
+- **Simplified Query Construction**: Replaced complex 20+ line conditional logic with clean, single-line query templates
+- **Exact Phrase Matching**: Uses `"domestic violence shelter"` with quotes for precise search results
+- **Better Proximity Search**: Uses `near [location]` operator for more accurate local results
+- **Enhanced Site Restrictions**: 
+  - **Quality sites**: `site:.org OR site:.gov` (credible sources only)
+  - **Excluded sites**: `-site:yellowpages.com -site:city-data.com -site:tripadvisor.com` (low-quality directories)
+- **Specific Field Requests**: Requests exact fields like `"shelter name"`, `"address"`, `"phone number"`, `"services offered"`, `"24 hour hotline"`
+
+### Example Transformations
+
+| User Input | Tavily Query |
+|------------|--------------|
+| "find shelter near Seattle" | `"domestic violence shelter" near seattle "shelter name" "address" "phone number" "services offered" "24 hour hotline" site:.org OR site:.gov -site:yellowpages.com -site:city-data.com -site:tripadvisor.com` |
+| "I need shelter in San Francisco" | `"domestic violence shelter" near san francisco "shelter name" "address" "phone number" "services offered" "24 hour hotline" site:.org OR site:.gov -site:yellowpages.com -site:city-data.com -site:tripadvisor.com` |
+
+### Technical Features
+
+- **Consistent format** regardless of user input phrasing
+- **Reduced complexity** from 20+ lines to 1 line of code
+- **Better maintainability** with clear, readable structure
+- **Improved reliability** with no complex regex checks or conditional logic
+- **Enhanced filtering** to exclude low-quality directory sites
+
+### Benefits
+
+- **Better search results** through more precise queries
+- **Fewer false positives** by excluding low-quality sites
+- **More consistent** responses regardless of user input
+- **Easier debugging** with clear, readable queries
+- **Better performance** with simpler logic
+
+These improvements ensure users receive higher-quality shelter information with fewer "couldn't find any shelters" responses.
 
 ## Intent Classification and Off-Topic Detection
 

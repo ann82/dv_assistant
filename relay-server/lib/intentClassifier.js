@@ -2,6 +2,10 @@ import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
 import { detectLocationWithGeocoding } from './enhancedLocationDetector.js';
+import { encode } from 'gpt-tokenizer';
+import { patternCategories, shelterKeywords } from './patternConfig.js';
+import { gptCache } from './queryCache.js';
+import { extractLocationFromQuery as enhancedExtractLocation } from './enhancedLocationDetector.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
@@ -104,22 +108,11 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   });
 }
 
-// Helper function to extract location from query
+// Helper function to extract location from query - now uses enhanced detector
 function extractLocationFromQuery(query) {
   if (!query) return null;
-  const locationPatterns = [
-    /in\s+([^,.]+(?:,\s*[^,.]+)?)/i,
-    /near\s+([^,.]+(?:,\s*[^,.]+)?)/i,
-    /around\s+([^,.]+(?:,\s*[^,.]+)?)/i,
-    /at\s+([^,.]+(?:,\s*[^,.]+)?)/i
-  ];
-  for (const pattern of locationPatterns) {
-    const match = query.match(pattern);
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-  }
-  return null;
+  const result = enhancedExtractLocation(query);
+  return result?.location || null;
 }
 
 export function getConversationContext(callSid) {
@@ -171,28 +164,7 @@ export async function rewriteQuery(query, intent, callSid = null) {
     if (locationInfo && locationInfo.location && locationInfo.isUS) {
       // Add shelter-specific terms for shelter intent
       if (intent === 'find_shelter') {
-        // Make the query more specific to domestic violence shelters
-        if (!/\b(domestic violence|abuse|victim|survivor)\b/i.test(rewrittenQuery)) {
-          rewrittenQuery = `domestic violence shelter ${rewrittenQuery}`;
-        }
-        if (!/\bshelter\b/i.test(rewrittenQuery)) {
-          rewrittenQuery = `${rewrittenQuery} shelter`;
-        }
-        
-        // Check if location is already mentioned to avoid duplication
-        const hasLocation = new RegExp(`\\b${locationInfo.location.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rewrittenQuery);
-        if (!hasLocation) {
-          rewrittenQuery = `${rewrittenQuery} ${locationInfo.location}`;
-        }
-        
-        // Add specific request for shelter information
-        rewrittenQuery += ' "shelter name" "address" "phone number" "contact information"';
-        
-        // Add minimal site restrictions to focus on relevant domains
-        rewrittenQuery += ' site:org OR site:gov';
-        
-        // Add specific terms to improve relevance
-        rewrittenQuery += ' "domestic violence"';
+        rewrittenQuery = `"domestic violence shelter" near ${locationInfo.location} "shelter name" "address" "phone number" "services offered" "24 hour hotline" site:.org OR site:.gov -site:yellowpages.com -site:city-data.com -site:tripadvisor.com`;
       } else {
         // For other intents, just add location context
         if (!rewrittenQuery.includes(locationInfo.location)) {

@@ -802,15 +802,20 @@ export class ResponseGenerator {
       });
 
       // Increase score threshold for better quality results
-      if (score < 0.5) {
+      if (score < 0.01) {
         console.log('Filtered out due to low score:', score);
         return false;
       }
 
       // Check for DV/shelter relevance in title or content
       const isRelevant = dvKeywords.some(kw => title.includes(kw) || content.includes(kw));
-      if (!isRelevant) {
-        console.log('Filtered out due to no DV keywords');
+      
+      // Special case: government domains and city pages might have relevant info even without DV keywords
+      const isGovernmentDomain = url.includes('.gov') || url.includes('city.') || url.includes('county.') || url.includes('state.');
+      const isGovernmentOrCityPage = title.includes('city') || title.includes('commission') || title.includes('government') || title.includes('municipal');
+      
+      if (!isRelevant && !isGovernmentDomain && !isGovernmentOrCityPage) {
+        console.log('Filtered out due to no DV keywords and not government/city page');
         return false;
       }
 
@@ -840,7 +845,8 @@ export class ResponseGenerator {
         isDirectoryPage
       });
 
-      const shouldInclude = !isGenericResource && !isCityPage && !isExcludedDomain && !hasNoContactInfo && !isDirectoryPage;
+      // Allow city pages if they're not generic resources and not directory pages
+      const shouldInclude = !isGenericResource && !isExcludedDomain && !hasNoContactInfo && !isDirectoryPage;
       console.log('Final decision:', shouldInclude ? 'INCLUDE' : 'EXCLUDE');
       
       return shouldInclude;
