@@ -4,7 +4,7 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2024-12-19):**
+**Latest Update (2025-06-25):**
 - **Enhanced AI Instructions**: Integrated comprehensive conversation guidelines from frontend to relay-server
 - **Improved Response Quality**: Replaced simple 3-line prompt with detailed 150+ line instructions
 - **Unified Experience**: Shared conversation config between web and voice interfaces
@@ -15,6 +15,8 @@ A real-time voice-based assistant designed to provide immediate support and info
 - **Query Rewriting Optimization**: Simplified and improved Tavily query construction for better search results
 - **Enhanced Site Filtering**: Added exclusion of low-quality sites (yellowpages, city-data, tripadvisor) for better results
 - **Improved Location Search**: Better proximity search with "near" operator and exact phrase matching
+- **Enhanced Voice Responses (v1.19.0)**: Voice responses now include shelter name, address, and phone number when available
+- **Test Suite Updated**: All tests now align with new query rewriting, filtering, and response logic, and pass successfully
 
 ---
 
@@ -184,6 +186,44 @@ The system now includes optimized query rewriting that significantly improves se
 - **Better performance** with simpler logic
 
 These improvements ensure users receive higher-quality shelter information with fewer "couldn't find any shelters" responses.
+
+## Enhanced Voice Responses
+
+The system now provides more detailed voice responses that include essential shelter information:
+
+### Key Improvements
+
+- **Shelter Name**: Always included in voice responses for clear identification
+- **Physical Address**: Included when available from search results
+- **Phone Number**: Included when available for immediate contact
+- **Smart Formatting**: Natural-sounding responses that flow conversationally
+- **Multiple Shelters**: For multiple results, details are provided for the first shelter while listing all names
+
+### Example Voice Responses
+
+| Scenario | Voice Response |
+|----------|----------------|
+| Single shelter with details | "I found a shelter in San Jose: Safe Haven Shelter. The address is 123 Main Street, San Jose, CA. You can call them at 408-279-2962. How else can I help you today?" |
+| Single shelter without details | "I found a shelter in San Francisco: Crisis Center. How else can I help you today?" |
+| Multiple shelters | "I found 3 shelters in San Jose: Women's Crisis Shelter, Family Justice Center, and Safe House Program. Women's Crisis Shelter is located at 456 Oak Avenue, San Jose, CA. You can call them at 408-280-8800. How else can I help you today?" |
+
+### Technical Features
+
+- **Conditional Information**: Only includes address and phone when available
+- **Natural Language**: Responses sound conversational and not robotic
+- **Consistent Format**: Standardized structure across all response types
+- **Enhanced SMS**: SMS responses also include phone numbers for all shelters
+- **Fallback Handling**: Graceful handling when information is missing
+
+### Benefits
+
+- **Better User Experience**: Users get essential contact information immediately
+- **Reduced Follow-ups**: Less need to ask for specific details
+- **Improved Accessibility**: Voice users can get complete information without switching to SMS
+- **Professional Quality**: Responses sound more helpful and comprehensive
+- **Consistent Information**: Both voice and SMS provide the same level of detail
+
+These improvements ensure users receive complete shelter information through voice interactions, making the system more useful for immediate assistance.
 
 ## Intent Classification and Off-Topic Detection
 

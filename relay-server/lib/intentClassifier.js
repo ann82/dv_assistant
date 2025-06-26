@@ -78,17 +78,22 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       voiceResponse: response.voiceResponse || null
     };
   } else if (isResourceQuery(intent)) {
-    // For resource requests without results, still set context for location follow-ups
-    const location = extractLocationFromQuery(query);
-    context.lastQueryContext = {
-      intent: intent,
-      location: location,
-      results: [], // Empty results array
-      timestamp: Date.now(),
-      smsResponse: response.smsResponse || null,
-      voiceResponse: response.voiceResponse || null,
-      needsLocation: !location // Flag to indicate location is needed
-    };
+    // For resource requests without results, don't store context
+    // Only store context if we have actual results
+    if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
+      const location = extractLocationFromQuery(query);
+      context.lastQueryContext = {
+        intent: intent,
+        location: location,
+        results: tavilyResults.results,
+        timestamp: Date.now(),
+        smsResponse: response.smsResponse || null,
+        voiceResponse: response.voiceResponse || null
+      };
+    } else {
+      // Clear lastQueryContext if no results
+      context.lastQueryContext = null;
+    }
   } else if (matchedResult) {
     // Update context with focus tracking for follow-up responses
     if (context.lastQueryContext) {

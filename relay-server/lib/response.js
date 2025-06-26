@@ -1019,9 +1019,25 @@ export class ResponseGenerator {
         return `I found ${resourceCount} shelters${locationText} including ${title}. How else can I help you today?`;
       }
       
-      return `I found a shelter${locationText}: ${title}. How else can I help you today?`;
+      // Build detailed response for single shelter
+      let response = `I found a shelter${locationText}: ${title}`;
+      
+      // Add address if available
+      if (result.physicalAddress && result.physicalAddress !== 'Not available') {
+        response += `. The address is ${result.physicalAddress}`;
+      }
+      
+      // Add phone number if available
+      const phone = this.extractPhone(result.content);
+      if (phone && phone !== 'Not available') {
+        response += `. You can call them at ${phone}`;
+      }
+      
+      response += '. How else can I help you today?';
+      return response;
     }
     
+    // For multiple results, provide details for the first 2 shelters
     const organizationNames = results.map(result => {
       return result.processedTitle || this.cleanTitleForVoice(result.title);
     });
@@ -1037,6 +1053,16 @@ export class ResponseGenerator {
     } else {
       // Fallback for unexpected cases
       response += `: ${organizationNames.join(', ')}`;
+    }
+    
+    // Add details for the first shelter if available
+    const firstResult = results[0];
+    const firstPhone = this.extractPhone(firstResult.content);
+    if (firstResult.physicalAddress && firstResult.physicalAddress !== 'Not available') {
+      response += `. ${organizationNames[0]} is located at ${firstResult.physicalAddress}`;
+    }
+    if (firstPhone && firstPhone !== 'Not available') {
+      response += `. You can call them at ${firstPhone}`;
     }
     
     response += '. How else can I help you today?';
@@ -1070,6 +1096,11 @@ export class ResponseGenerator {
         // Show address if available
         if (result.physicalAddress && result.physicalAddress !== 'Not available') {
           smsResponse += `   Address: ${result.physicalAddress}\n`;
+        }
+        // Show phone number if available
+        const phone = this.extractPhone(result.content);
+        if (phone && phone !== 'Not available') {
+          smsResponse += `   Phone: ${phone}\n`;
         }
       }
       

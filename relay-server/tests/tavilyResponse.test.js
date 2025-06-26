@@ -126,13 +126,21 @@ describe('Tavily Response Formatting', () => {
     expect(formatted.shelters).toHaveLength(0);
   });
 
-  it('should filter out results with score < 0.5', () => {
+  it('should filter out results with score < 0.01', () => {
     const mockResponse = {
       results: [
-        { title: 'Domestic Violence Resource Center', content: 'High score', url: 'http://example.com/high', score: 0.85 },
-        { title: "Women's Crisis Shelter", content: 'Borderline score', url: 'http://example.com/borderline', score: 0.5 },
-        { title: 'Family Justice Center', content: 'Low score', url: 'http://example.com/low', score: 0.3 },
-        { title: 'Safe Haven Shelter', content: 'No score', url: 'http://example.com/none' }
+        {
+          title: 'High Score Result',
+          content: 'High scoring shelter result',
+          url: 'https://example.com/high',
+          score: 0.9
+        },
+        {
+          title: 'Low Score Result',
+          content: 'Low scoring result',
+          url: 'https://example.com/low',
+          score: 0.005 // Below 0.01 threshold
+        }
       ]
     };
     const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 10);
@@ -227,20 +235,19 @@ describe('Tavily Response Formatting', () => {
       const mockResponse = {
         results: [
           {
-            title: 'Domestic Violence Shelter - High Score',
-            content: 'High scoring shelter',
+            title: 'High Score Shelter',
+            content: 'High scoring shelter result',
             url: 'https://example.com/high',
             score: 0.9
           },
           {
-            title: 'Domestic Violence Shelter - Low Score',
-            content: 'Low scoring shelter',
+            title: 'Low Score Result',
+            content: 'Low scoring result',
             url: 'https://example.com/low',
-            score: 0.3
+            score: 0.005 // Below 0.01 threshold
           }
         ]
       };
-
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', 'find shelter', 3);
       // Only the high score result should be included
       expect(formatted.shelters).toHaveLength(1);

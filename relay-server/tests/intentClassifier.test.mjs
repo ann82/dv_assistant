@@ -29,7 +29,8 @@ vi.mock('../lib/enhancedLocationDetector.js', () => ({
   detectLocationWithGeocoding: vi.fn().mockResolvedValue({
     location: 'San Jose, California',
     isUS: true
-  })
+  }),
+  extractLocationFromQuery: vi.fn().mockReturnValue('San Jose, California')
 }));
 
 describe('Intent Classification', () => {
@@ -161,7 +162,9 @@ describe('Intent Classification', () => {
   describe('rewriteQuery', () => {
     it('should add domestic violence context to queries', async () => {
       const result = await rewriteQuery('find shelter near me', 'find_shelter');
-      expect(result).toContain('domestic violence shelter find shelter near me San Jose, California "shelter name" "address" "phone number" "contact information" site:org OR site:gov "domestic violence"');
+      expect(result).toContain('"domestic violence shelter" near San Jose, California');
+      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('site:.org OR site:.gov');
     });
 
     it('should handle follow-up questions with context', async () => {
@@ -174,7 +177,7 @@ describe('Intent Classification', () => {
 
     it('should add intent-specific terms', async () => {
       const shelterResult = await rewriteQuery('need housing', 'find_shelter');
-      expect(shelterResult).toContain('domestic violence shelter');
+      expect(shelterResult).toContain('"domestic violence shelter"');
 
       const legalResult = await rewriteQuery('need legal help', 'legal_services');
       expect(legalResult).toContain('legal');
@@ -187,8 +190,8 @@ describe('Intent Classification', () => {
 
     it('should handle case-insensitive matching', async () => {
       const result = await rewriteQuery('DOMESTIC VIOLENCE shelter', 'find_shelter');
-      expect(result).toContain('DOMESTIC VIOLENCE shelter');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter"');
+      expect(result).toContain('site:.org OR site:.gov');
     });
   });
 

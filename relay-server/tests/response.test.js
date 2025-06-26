@@ -840,8 +840,8 @@ domestic violence shelter`,
 
       const formatted = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', 'find shelters in San Jose');
 
-      console.log('Formatted response:', JSON.stringify(formatted, null, 2));
-
+      expect(formatted).toBeDefined();
+      expect(formatted.voiceResponse).toBeDefined();
       expect(formatted.voiceResponse).toContain("I found Women's Crisis Shelter:");
       expect(formatted.voiceResponse).toContain("408-280-8800");
       expect(formatted.smsResponse).toContain("408-280-8800");
@@ -861,6 +861,8 @@ domestic violence shelter`,
 
       const formatted = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', 'find shelters in unknown location');
 
+      expect(formatted).toBeDefined();
+      expect(formatted.voiceResponse).toBeDefined();
       expect(formatted.voiceResponse).toContain("I'm sorry, I couldn't find any shelters");
       expect(formatted.shelters).toHaveLength(0);
     });

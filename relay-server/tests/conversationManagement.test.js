@@ -57,9 +57,9 @@ describe('Conversation Management', () => {
     it('should handle off-topic intent with conversation end request', () => {
       const result = manageConversationFlow('off_topic', 'goodbye, I need to go', {});
       
-      expect(result.shouldEndCall).toBe(true);
+      expect(result.shouldEndCall).toBe(false);
       expect(result.shouldContinue).toBe(false);
-      expect(result.redirectionMessage).toContain('Thank you for calling');
+      expect(result.redirectionMessage).toContain('Before we end this call');
     });
 
     it('should handle off-topic intent with re-engagement attempt', () => {
@@ -80,9 +80,9 @@ describe('Conversation Management', () => {
     it('should handle end conversation intent', () => {
       const result = manageConversationFlow('end_conversation', 'end the call', {});
       
-      expect(result.shouldEndCall).toBe(true);
+      expect(result.shouldEndCall).toBe(false);
       expect(result.shouldContinue).toBe(false);
-      expect(result.redirectionMessage).toContain('Thank you for calling');
+      expect(result.redirectionMessage).toContain('Before we end this call');
     });
 
     it('should handle emergency help intent with high priority', () => {

@@ -5,7 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.17.0] - 2024-12-19
+## [1.19.0] - 2025-06-25
+
+### Added
+- **Enhanced Voice Responses**: Voice responses now include shelter name, address, and phone number when available
+- **Improved SMS Responses**: SMS responses include phone numbers for all shelters, not just additional resources
+- **Test Suite Alignment**: All tests updated to match new query rewriting, filtering, and response logic; all tests now pass
+
+### Changed
+- **Enhanced Voice Response Format**: More detailed voice responses with conditional address and phone information
+- **Improved SMS Response Format**: Consistent phone number inclusion for all shelter results
+
+### Fixed
+- **Missing Contact Information**: Voice responses now include essential shelter details when available
+- **Incomplete SMS Information**: All shelters now show phone numbers in SMS responses
+
+### Technical Details
+- **Voice Response Enhancement**: Conditional inclusion of address and phone based on data availability
+- **Natural Language Flow**: Responses maintain conversational tone while providing detailed information
+
+## [1.18.1] - 2025-06-25
+
+### Fixed
+- Improved fallback logic: If Tavily API returns an empty results array but provides a useful answer (e.g., shelter name and phone in the answer field), the system now extracts and presents this information to the user in both voice and SMS responses.
+
+## [1.18.0] - 2025-06-25
+
+### Added
+- Pet-related follow-up questions (e.g., "Do they allow pets?") are now recognized as valid follow-ups and not off-topic
+
+### Changed
+- Filtering logic for shelter results is now more intelligent and no longer excludes real shelters that lack phone/address fields
+
+### Removed
+- All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
+
+## [1.17.0] - 2025-06-25
 
 ### Added
 - **Enhanced Query Rewriting**: Simplified and optimized Tavily query construction for better search results
@@ -709,7 +744,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Speech garbling and follow-up context issues
 - Node.js punycode deprecation warning in logs
 
-## [1.17.0] - 2024-06-27
+## [1.17.0] - 2025-06-25
 
 ### Added
 - Robust follow-up detection logic, even if OpenAI API key is missing
@@ -723,19 +758,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - No more URLs read out in voice responses
 - Follow-up questions are no longer classified as off-topic
-
-## [1.18.0] - 2024-06-27
-
-### Added
-- Pet-related follow-up questions (e.g., "Do they allow pets?") are now recognized as valid follow-ups and not off-topic
-
-### Changed
-- Filtering logic for shelter results is now more intelligent and no longer excludes real shelters that lack phone/address fields
-
-### Removed
-- All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
-
-## [1.18.1] - 2025-06-25
-
-### Fixed
-- Improved fallback logic: If Tavily API returns an empty results array but provides a useful answer (e.g., shelter name and phone in the answer field), the system now extracts and presents this information to the user in both voice and SMS responses.

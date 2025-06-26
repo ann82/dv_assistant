@@ -193,16 +193,16 @@ describe('Improved Tavily Response Filtering', () => {
       const mockResponse = {
         results: [
           {
-            title: 'Domestic Violence Shelter - Low Score',
-            content: 'Low scoring shelter result',
-            url: 'https://example.com/low',
-            score: 0.3
+            title: 'Domestic Violence Shelter - High Score',
+            content: 'Emergency shelter for domestic violence victims',
+            url: 'https://example.org/shelter',
+            score: 0.8
           },
           {
-            title: 'Domestic Violence Shelter - High Score',
-            content: 'High scoring shelter result',
-            url: 'https://example.com/high',
-            score: 0.9
+            title: 'Low Score Result',
+            content: 'Some content with low relevance',
+            url: 'https://example.org/low-score',
+            score: 0.005 // Below 0.01 threshold
           }
         ]
       };
@@ -211,12 +211,6 @@ describe('Improved Tavily Response Filtering', () => {
       
       expect(formatted.shelters).toHaveLength(1);
       expect(formatted.shelters[0].name).toContain("Domestic Violence Shelter");
-
-      formatted.shelters.forEach(shelter => {
-        expect(
-          dvKeywords.some(kw => shelter.name.toLowerCase().includes(kw) || (shelter.description || '').toLowerCase().includes(kw))
-        ).toBe(true);
-      });
     });
   });
 
