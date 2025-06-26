@@ -149,8 +149,10 @@ app.use((req, res) => {
 const server = http.createServer(app);
 
 // Debug log to confirm server object
-console.log('DEBUG: typeof server:', typeof server);
-console.log('DEBUG: server keys:', Object.keys(server));
+logger.debug('Server object details:', { 
+  type: typeof server, 
+  keys: Object.keys(server) 
+});
 
 // Initialize WebSocket server
 const wsServer = new TwilioWebSocketServer(server);

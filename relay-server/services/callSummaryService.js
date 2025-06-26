@@ -1,5 +1,6 @@
 import { OpenAI } from 'openai';
 import { config } from '../lib/config.js';
+import logger from '../lib/logger.js';
 
 export class CallSummaryService {
   constructor(openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY })) {
@@ -46,7 +47,7 @@ Summary:`;
       const summary = response.choices[0].message.content;
       return summary;
     } catch (error) {
-      console.error('Error generating call summary:', error);
+      logger.error('Error generating call summary:', error);
       return 'Error generating call summary.';
     } finally {
       // Clean up history after generating summary

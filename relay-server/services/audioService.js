@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { gptCache } from '../lib/queryCache.js';
+import logger from '../lib/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +20,7 @@ const MAX_CHUNKS = 10; // Maximum number of chunks to process at once
 
 // Cache configuration
 const CACHE_DIR = path.join(process.cwd(), 'cache');
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours in milliseconds
 const MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
 
 export class AudioService {
@@ -28,6 +29,7 @@ export class AudioService {
     this.audioBuffer = new Map(); // Store audio chunks by callSid
     this.audioDir = path.join(process.cwd(), 'public', 'audio');
     this.cacheDir = path.join(process.cwd(), 'cache', 'audio');
+    this.accumulatedAudio = new Map();
     this.ensureDirectories();
   }
 
@@ -36,12 +38,12 @@ export class AudioService {
     try {
       await fs.mkdir(this.audioDir, { recursive: true });
       await fs.mkdir(this.cacheDir, { recursive: true });
-      console.log('Directories ensured:', {
+      logger.info('Directories ensured:', {
         audio: this.audioDir,
         cache: this.cacheDir
       });
     } catch (error) {
-      console.error('Error creating directories:', error);
+      logger.error('Error creating directories:', error);
       throw error;
     }
   }
@@ -80,7 +82,7 @@ export class AudioService {
           const filePath = path.join(this.cacheDir, file);
           await fs.unlink(filePath);
           totalSize -= stats.size;
-          console.log('Removed expired cache file:', file);
+          logger.info('Removed expired cache file:', { file });
         }
       }
 
@@ -90,10 +92,10 @@ export class AudioService {
         const filePath = path.join(this.cacheDir, file);
         await fs.unlink(filePath);
         totalSize -= stats.size;
-        console.log('Removed old cache file:', file);
+        logger.info('Removed old cache file:', { file });
       }
     } catch (error) {
-      console.error('Error cleaning up cache:', error);
+      logger.error('Error cleaning up cache:', error);
     }
   }
 
@@ -105,7 +107,7 @@ export class AudioService {
       const pcmData = this.ulawToPCM(audioData);
       return pcmData;
     } catch (error) {
-      console.error('Error decoding Twilio audio:', error);
+      logger.error('Error decoding Twilio audio:', error);
       throw error;
     }
   }
@@ -147,7 +149,7 @@ export class AudioService {
       const file = await fs.open(filePath, 'r');
       const fileStream = file.createReadStream();
 
-      console.log('Sending audio to Whisper for transcription...');
+      logger.info('Sending audio to Whisper for transcription...');
       const response = await this.openai.audio.transcriptions.create({
         file: fileStream,
         model: "whisper-1",
@@ -155,7 +157,7 @@ export class AudioService {
         response_format: "text"
       });
 
-      console.log('Whisper transcription complete:', response);
+      logger.info('Whisper transcription complete:', { response: response.substring(0, 100) + '...' });
 
       // Clean up
       await file.close();
@@ -163,7 +165,7 @@ export class AudioService {
 
       return response;
     } catch (error) {
-      console.error('Error transcribing with Whisper:', error);
+      logger.error('Error transcribing with Whisper:', error);
       throw error;
     }
   }
@@ -175,7 +177,7 @@ export class AudioService {
       const cachedResponse = gptCache.get(cacheKey);
 
       if (cachedResponse) {
-        console.log('Using cached GPT response');
+        logger.info('Using cached GPT response');
         return cachedResponse;
       }
 
@@ -208,7 +210,7 @@ export class AudioService {
 
       return result;
     } catch (error) {
-      console.error('Error getting GPT reply:', error);
+      logger.error('Error getting GPT reply:', error);
       throw error;
     }
   }
@@ -223,7 +225,7 @@ export class AudioService {
       try {
         const stats = await fs.stat(cacheFilePath);
         if (this.isValidCacheEntry(stats.mtimeMs)) {
-          console.log('Using cached TTS audio');
+          logger.info('Using cached TTS audio');
           const fileName = `${cacheKey}.mp3`;
           const filePath = path.join(this.audioDir, fileName);
           
@@ -232,157 +234,99 @@ export class AudioService {
           
           return {
             text,
-            audioPath: `/audio/${fileName}`,
-            fullPath: filePath,
-            size: stats.size,
-            chunks: Math.ceil(stats.size / CHUNK_SIZE),
+            fileName,
+            filePath,
             cached: true
           };
         }
       } catch (error) {
-        // Cache miss, continue with TTS generation
+        // Cache miss, continue to generate
       }
 
-      // Create a temporary file
-      const fileName = `${uuidv4()}.mp3`;
-      const filePath = path.join(this.audioDir, fileName);
+      // Generate new TTS
+      logger.info('Generating TTS for text:', { 
+        text: text.substring(0, 100) + '...',
+        filePath: cacheFilePath 
+      });
       
-      // Ensure directory exists
-      await this.ensureDirectories();
-
-      console.log('Generating TTS for text:', text.substring(0, 100) + '...');
-      console.log('Saving to:', filePath);
-
-      // Use OpenAI TTS
       const response = await this.openai.audio.speech.create({
         model: "tts-1",
         voice: "alloy",
         input: text
       });
 
-      // Get the audio buffer
       const buffer = Buffer.from(await response.arrayBuffer());
+      
+      // Calculate total size and chunk size
       const totalSize = buffer.length;
-      console.log('Total audio size:', totalSize, 'bytes');
-
-      // If the audio is small enough, write it directly
-      if (totalSize <= CHUNK_SIZE) {
-        await fs.writeFile(filePath, buffer);
-        // Cache the file
-        await fs.copyFile(filePath, cacheFilePath);
-      } else {
-        // Write in chunks
-        const chunks = Math.ceil(totalSize / CHUNK_SIZE);
-        console.log(`Writing ${chunks} chunks of audio...`);
-
-        const writeStream = fsSync.createWriteStream(filePath);
-        const cacheStream = fsSync.createWriteStream(cacheFilePath);
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const chunks = Math.ceil(totalSize / chunkSize);
+      
+      logger.info('Total audio size:', { totalSize, bytes: totalSize });
+      
+      // Write in chunks to avoid memory issues
+      logger.info(`Writing ${chunks} chunks of audio...`);
+      
+      for (let i = 0; i < chunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, totalSize);
+        const chunk = buffer.slice(start, end);
         
-        for (let i = 0; i < chunks; i++) {
-          const start = i * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, totalSize);
-          const chunk = buffer.slice(start, end);
-          
-          await Promise.all([
-            new Promise((resolve, reject) => {
-              writeStream.write(chunk, (error) => {
-                if (error) reject(error);
-                else resolve();
-              });
-            }),
-            new Promise((resolve, reject) => {
-              cacheStream.write(chunk, (error) => {
-                if (error) reject(error);
-                else resolve();
-              });
-            })
-          ]);
-
-          console.log(`Wrote chunk ${i + 1}/${chunks} (${chunk.length} bytes)`);
+        if (i === 0) {
+          // First chunk - create file
+          await fs.writeFile(cacheFilePath, chunk);
+        } else {
+          // Append to file
+          await fs.appendFile(cacheFilePath, chunk);
         }
-
-        // Close the write streams
-        await Promise.all([
-          new Promise((resolve, reject) => {
-            writeStream.end((error) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          }),
-          new Promise((resolve, reject) => {
-            cacheStream.end((error) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          })
-        ]);
+        
+        logger.info(`Wrote chunk ${i + 1}/${chunks}`, { chunkLength: chunk.length });
       }
 
-      // Verify the file was created
-      if (!fsSync.existsSync(filePath)) {
-        throw new Error('Failed to create audio file: ' + filePath);
-      }
-
-      // Get file stats to verify size
-      const stats = await fs.stat(filePath);
-      console.log('TTS audio file stats:', {
+      // Get file stats
+      const stats = await fs.stat(cacheFilePath);
+      logger.info('TTS audio file stats:', {
         size: stats.size,
         created: stats.birthtime,
-        path: filePath,
-        chunks: Math.ceil(stats.size / CHUNK_SIZE)
+        modified: stats.mtime
       });
 
-      // Verify file integrity
-      if (stats.size !== totalSize) {
-        throw new Error(`File size mismatch: expected ${totalSize} bytes, got ${stats.size} bytes`);
-      }
+      // Copy to audio directory for serving
+      const fileName = `${cacheKey}.mp3`;
+      const filePath = path.join(this.audioDir, fileName);
+      await fs.copyFile(cacheFilePath, filePath);
 
-      // Clean up old cache files
-      await this.cleanupCache();
-
-      console.log('TTS audio generated successfully:', {
-        text: text.substring(0, 100) + '...',
-        filePath: `/audio/${fileName}`,
-        fullPath: filePath,
-        size: stats.size,
-        chunks: Math.ceil(stats.size / CHUNK_SIZE)
+      logger.info('TTS audio generated successfully:', {
+        text: text.substring(0, 50) + '...',
+        fileName,
+        filePath,
+        size: stats.size
       });
 
       return {
         text,
-        audioPath: `/audio/${fileName}`,
-        fullPath: filePath,
-        size: stats.size,
-        chunks: Math.ceil(stats.size / CHUNK_SIZE),
+        fileName,
+        filePath,
         cached: false
       };
+
     } catch (error) {
-      console.error('Error generating TTS:', error);
-      console.error('Error stack:', error.stack);
+      logger.error('Error generating TTS:', error);
+      logger.error('Error stack:', error.stack);
       throw error;
     }
   }
 
   // Process audio in chunks
   async processAudioInChunks(audioBuffer, processFn) {
-    const chunks = [];
-    const totalSize = audioBuffer.length;
+    const chunks = this.splitAudioIntoChunks(audioBuffer);
+    logger.info(`Processing ${chunks.length} chunks of audio...`);
     
-    for (let i = 0; i < totalSize; i += CHUNK_SIZE) {
-      const chunk = audioBuffer.slice(i, Math.min(i + CHUNK_SIZE, totalSize));
-      chunks.push(chunk);
-    }
-
-    console.log(`Processing ${chunks.length} chunks of audio...`);
-    
-    // Process chunks in batches to avoid memory issues
     const results = [];
-    for (let i = 0; i < chunks.length; i += MAX_CHUNKS) {
-      const batch = chunks.slice(i, i + MAX_CHUNKS);
-      const batchResults = await Promise.all(batch.map(processFn));
-      results.push(...batchResults);
+    for (let i = 0; i < chunks.length; i++) {
+      const result = await processFn(chunks[i], i);
+      results.push(result);
     }
-
     return results;
   }
 
