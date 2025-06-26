@@ -739,6 +739,46 @@ export class ResponseGenerator {
       };
     });
 
+    // If no results after processing, but there is a useful answer field, return answer-based response
+    if (processedResults.length === 0 && tavilyResponse && tavilyResponse.answer && tavilyResponse.answer.trim()) {
+      const answer = tavilyResponse.answer.trim();
+      const phoneMatch = answer.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
+      const phone = phoneMatch ? phoneMatch[1] : null;
+      const orgMatch = answer.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:'s)?(?:\s+[A-Z][a-z]+)*)\s+(?:provides|operates|offers|supports)/);
+      const orgName = orgMatch ? orgMatch[1] : "Women's Crisis Shelter";
+      let voiceResponse = `I found ${orgName}: ${answer}`;
+      if (phone) {
+        voiceResponse += `. You can call them at ${phone}`;
+      }
+      let smsResponse = phone ? 
+        `${answer} Phone: ${phone}` : 
+        answer;
+      return {
+        voiceResponse: voiceResponse || '',
+        smsResponse: smsResponse || '',
+        summary: answer,
+        shelters: [{
+          name: orgName,
+          phone: phone,
+          description: answer,
+          score: 0.8, // High score since it came from Tavily's answer
+          url: null,
+          hasMultipleResources: false,
+          allResources: null
+        }]
+      };
+    }
+
+    // If no results after processing and no answer, return default message
+    if (processedResults.length === 0) {
+      return {
+        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+        smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
+        summary: "I'm sorry, I couldn't find any specific resources.",
+        shelters: []
+      };
+    }
+
     // Create voice response
     const voiceResponse = this.createVoiceResponse(processedResults, location);
     // Create SMS response with clickable links
@@ -766,12 +806,12 @@ export class ResponseGenerator {
 ` +
       shelters.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
 
-    // Final fallback: always return a defined object
+    // Return the processed results
     return {
-      voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
-      smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
-      summary: "I'm sorry, I couldn't find any specific resources.",
-      shelters: []
+      voiceResponse: voiceResponse || "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+      smsResponse: smsResponse || "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
+      summary: summary || "I'm sorry, I couldn't find any specific resources.",
+      shelters: shelters || []
     };
   }
 

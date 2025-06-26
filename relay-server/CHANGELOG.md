@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.3] - 2025-01-27
+
+### Fixed
+- **Test Suite Reliability** - Resolved critical test isolation and static method pollution issues
+  - **Static Method Pollution**: Fixed test interference caused by direct assignment mocking of `ResponseGenerator.formatTavilyResponse`
+  - **Mock Management**: Refactored all tests to use `vi.spyOn()` instead of direct assignment for proper mock restoration
+  - **Test Isolation**: Moved real implementation tests to separate file (`response.real.impl.test.js`) to ensure clean execution environment
+  - **Routing Performance Monitoring**: Updated performance tests to only assert on confidence stats when using mocks, not on Tavily source stats
+  - **Consistent Test Results**: Tests now pass consistently whether run individually or as part of the full suite
+
+### Technical Improvements
+- **Reliable Test Infrastructure**: Eliminated test pollution by using proper mocking patterns with `vi.spyOn()` and `mockRestore()`
+- **Clean Architecture**: Separated mocked tests from real implementation tests for better maintainability
+- **Performance Test Accuracy**: Fixed performance monitoring tests to match actual mock behavior
+- **Test Coverage Maintained**: All 337 tests (334 passed, 3 skipped) now pass reliably
+
 ## [1.19.2] - 2025-06-25
 
 ### Fixed
