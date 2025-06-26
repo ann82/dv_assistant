@@ -51,7 +51,7 @@ export async function callTavilyAPI(query, location = null) {
         search_type: 'advanced',
         include_answer: true,
         include_results: true,
-        include_raw_content: true,
+        include_raw_content: false,
         include_images: false,
         include_sources: true,
         max_results: 10,
@@ -82,55 +82,11 @@ export async function callTavilyAPI(query, location = null) {
     const data = await response.json();
     logger.info('Tavily API response received:', data);
 
-    // If answer is missing or too vague, parse raw_content with regex
-    if (!data.answer || data.answer.length < 50) {
-      logger.info('Answer missing or vague, parsing raw_content for contact info');
-      data.parsedContent = parseRawContentForContactInfo(data.results);
-    }
-
     return data;
   } catch (error) {
     logger.error('Error calling Tavily API:', error);
     throw error;
   }
-}
-
-/**
- * Parse raw content from Tavily results to extract addresses and phone numbers
- * @param {Array} results - Tavily API results
- * @returns {Object} Parsed contact information
- */
-function parseRawContentForContactInfo(results) {
-  if (!results || !Array.isArray(results)) {
-    return { addresses: [], phones: [] };
-  }
-
-  const addressRegex = /\d{1,5}\s[\w\s]+\s(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Way|Lane|Ln|Drive|Dr|Court|Ct)\b/i;
-  const phoneRegex = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
-  
-  const addresses = [];
-  const phones = [];
-
-  results.forEach(result => {
-    if (result.raw_content) {
-      // Extract addresses
-      const addressMatches = result.raw_content.match(addressRegex);
-      if (addressMatches) {
-        addresses.push(...addressMatches);
-      }
-
-      // Extract phone numbers
-      const phoneMatches = result.raw_content.match(phoneRegex);
-      if (phoneMatches) {
-        phones.push(...phoneMatches);
-      }
-    }
-  });
-
-  return {
-    addresses: [...new Set(addresses)], // Remove duplicates
-    phones: [...new Set(phones)] // Remove duplicates
-  };
 }
 
 export async function callGPT(prompt, model = 'gpt-4') {

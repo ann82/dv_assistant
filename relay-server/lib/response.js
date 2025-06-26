@@ -605,7 +605,6 @@ export class ResponseGenerator {
         query: cleanQuery,
         resultCount: data.results?.length || 0,
         hasAnswer: !!data.answer,
-        hasParsedContent: !!data.parsedContent,
         timestamp: new Date().toISOString()
       });
 
@@ -669,45 +668,6 @@ export class ResponseGenerator {
         };
       }
       
-      // Check if there's parsed content from raw_content analysis
-      if (tavilyResponse && tavilyResponse.parsedContent && 
-          (tavilyResponse.parsedContent.addresses.length > 0 || tavilyResponse.parsedContent.phones.length > 0)) {
-        
-        const addresses = tavilyResponse.parsedContent.addresses;
-        const phones = tavilyResponse.parsedContent.phones;
-        
-        let voiceResponse = "I found some contact information: ";
-        if (addresses.length > 0) {
-          voiceResponse += `Address: ${addresses[0]}. `;
-        }
-        if (phones.length > 0) {
-          voiceResponse += `Phone: ${phones[0]}.`;
-        }
-        
-        let smsResponse = "";
-        if (addresses.length > 0) {
-          smsResponse += `Address: ${addresses[0]} `;
-        }
-        if (phones.length > 0) {
-          smsResponse += `Phone: ${phones[0]}`;
-        }
-        
-        return {
-          voiceResponse: voiceResponse,
-          smsResponse: smsResponse,
-          summary: `Found ${addresses.length} addresses and ${phones.length} phone numbers`,
-          shelters: [{
-            name: "Domestic Violence Shelter",
-            address: addresses[0] || null,
-            phone: phones[0] || null,
-            description: "Contact information extracted from search results",
-            score: 0.7,
-            url: null,
-            hasMultipleResources: false,
-            allResources: null
-          }]
-        };
-      }
       
       // If no answer field or empty answer, return the default no results message
       return {
@@ -779,45 +739,6 @@ export class ResponseGenerator {
       };
     }
 
-    // If no results after processing and no answer, check for parsed content
-    if (processedResults.length === 0 && tavilyResponse && tavilyResponse.parsedContent && 
-        (tavilyResponse.parsedContent.addresses.length > 0 || tavilyResponse.parsedContent.phones.length > 0)) {
-      
-      const addresses = tavilyResponse.parsedContent.addresses;
-      const phones = tavilyResponse.parsedContent.phones;
-      
-      let voiceResponse = "I found some contact information: ";
-      if (addresses.length > 0) {
-        voiceResponse += `Address: ${addresses[0]}. `;
-      }
-      if (phones.length > 0) {
-        voiceResponse += `Phone: ${phones[0]}.`;
-      }
-      
-      let smsResponse = "";
-      if (addresses.length > 0) {
-        smsResponse += `Address: ${addresses[0]} `;
-      }
-      if (phones.length > 0) {
-        smsResponse += `Phone: ${phones[0]}`;
-      }
-      
-      return {
-        voiceResponse: voiceResponse,
-        smsResponse: smsResponse,
-        summary: `Found ${addresses.length} addresses and ${phones.length} phone numbers`,
-        shelters: [{
-          name: "Domestic Violence Shelter",
-          address: addresses[0] || null,
-          phone: phones[0] || null,
-          description: "Contact information extracted from search results",
-          score: 0.7,
-          url: null,
-          hasMultipleResources: false,
-          allResources: null
-        }]
-      };
-    }
 
     // If no results after processing and no answer, return default message
     if (processedResults.length === 0) {

@@ -415,3 +415,8 @@ This is caused by dependencies like Vite or esbuild. The project now:
 **You can safely ignore this warning.**
 
 See `DEPRECATION_WARNINGS.md` for more details.
+
+## Tavily API Integration
+- The assistant queries the Tavily API for shelter and resource information.
+- As of the latest update, `include_raw_content` is set to `false` for all Tavily API requests. Raw content is no longer parsed or used in fallback logic.
+- This change reduces response size and improves performance.
