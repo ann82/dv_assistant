@@ -4,6 +4,7 @@ import { ResponseGenerator } from './response.js';
 import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
 import logger from './logger.js';
+import { getConversationContext } from './intentClassifier.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -757,21 +758,30 @@ export class TwilioVoiceHandler {
   }
 
   setupWebSocketHandlers(ws, callSid, res) {
-    let responseTimeout;
-    let isResponding = false;
-    let lastRequestId = null;
-    let retryCount = 0;
+    // Use call-specific state management to prevent race conditions
+    const call = this.activeCalls.get(callSid);
+    if (!call) {
+      logger.error(`No call found for ${callSid} in setupWebSocketHandlers`);
+      return;
+    }
+
+    // Initialize call-specific state
+    call.responseTimeout = null;
+    call.isResponding = false;
+    call.lastRequestId = null;
+    call.retryCount = 0;
+    call.pendingRequests = new Set();
+    
     const MAX_RETRIES = 3;
-    const RESPONSE_TIMEOUT = 30000; // Reduced from 90s to 30s
-    const SPEECH_TIMEOUT = 10000; // Reduced from 15s to 10s
-    const CONNECTION_TIMEOUT = 30000; // Reduced from 60s to 30s
-    const ACTIVITY_CHECK_INTERVAL = 15000; // Reduced from 30s to 15s
+    const RESPONSE_TIMEOUT = 30000; // 30 seconds
+    const CONNECTION_TIMEOUT = 30000; // 30 seconds
+    const ACTIVITY_CHECK_INTERVAL = 15000; // 15 seconds
 
     // Set up activity monitoring
     const activityCheck = setInterval(() => {
-      const call = this.activeCalls.get(callSid);
-      if (call) {
-        const timeSinceLastActivity = Date.now() - call.lastActivity;
+      const currentCall = this.activeCalls.get(callSid);
+      if (currentCall) {
+        const timeSinceLastActivity = Date.now() - currentCall.lastActivity;
         if (timeSinceLastActivity > CONNECTION_TIMEOUT) {
           logger.error(`No activity detected for call ${callSid} for ${timeSinceLastActivity}ms`);
           clearInterval(activityCheck);
@@ -781,42 +791,55 @@ export class TwilioVoiceHandler {
     }, ACTIVITY_CHECK_INTERVAL);
 
     // Store the interval in the call's timeouts set
-    const call = this.activeCalls.get(callSid);
-    if (call) {
-      call.timeouts.add(activityCheck);
-    }
+    currentCall.timeouts.add(activityCheck);
 
     ws.on('message', async (data) => {
       try {
         const event = JSON.parse(data);
         if (event.type === 'response.text') {
-          // Update last activity time
-          const call = this.activeCalls.get(callSid);
-          if (call) {
-            call.lastActivity = Date.now();
-          }
-
-          // Check for duplicate requests
-          if (event.requestId === lastRequestId) {
-            logger.info(`Duplicate response request for call ${callSid}, ignoring`);
+          const currentCall = this.activeCalls.get(callSid);
+          if (!currentCall) {
+            logger.error(`No call found for ${callSid} in message handler`);
             return;
           }
-          lastRequestId = event.requestId;
 
-          isResponding = true;
+          // Update last activity time
+          currentCall.lastActivity = Date.now();
+
+          // Generate unique request ID with timestamp to prevent collisions
+          const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+          
+          // Check for duplicate requests with better collision detection
+          if (event.requestId === currentCall.lastRequestId && currentCall.isResponding) {
+            logger.info(`Duplicate response request for call ${callSid}, ignoring`, {
+              requestId: event.requestId,
+              isResponding: currentCall.isResponding
+            });
+            return;
+          }
+
+          // Track this request
+          currentCall.lastRequestId = event.requestId;
+          currentCall.pendingRequests.add(requestId);
+          currentCall.isResponding = true;
           
           // Clear any existing timeout
-          if (responseTimeout) {
-            clearTimeout(responseTimeout);
+          if (currentCall.responseTimeout) {
+            clearTimeout(currentCall.responseTimeout);
           }
 
           // Set a timeout for the response
-          responseTimeout = setTimeout(() => {
-            if (isResponding) {
-              logger.error(`Response timeout for call ${callSid}`);
-              if (retryCount < MAX_RETRIES) {
-                retryCount++;
-                logger.info(`Retrying response for call ${callSid} (attempt ${retryCount}/${MAX_RETRIES})`);
+          currentCall.responseTimeout = setTimeout(() => {
+            if (currentCall.isResponding) {
+              logger.error(`Response timeout for call ${callSid}`, {
+                requestId,
+                retryCount: currentCall.retryCount,
+                pendingRequests: currentCall.pendingRequests.size
+              });
+              
+              if (currentCall.retryCount < MAX_RETRIES) {
+                currentCall.retryCount++;
+                logger.info(`Retrying response for call ${callSid} (attempt ${currentCall.retryCount}/${MAX_RETRIES})`);
                 const twiml = this.generateTwiML("I'm still processing your request. Please hold on.", true);
                 this.sendTwiMLResponse(res, twiml);
               } else {
@@ -827,20 +850,41 @@ export class TwilioVoiceHandler {
           }, RESPONSE_TIMEOUT);
 
           // Store the timeout in the call's timeouts set
-          if (call) {
-            call.timeouts.add(responseTimeout);
-          }
+          currentCall.timeouts.add(currentCall.responseTimeout);
 
-          // Process the response
+          // Process the response with proper error handling
           const response = event.text;
           if (response) {
-            isResponding = false;
-            clearTimeout(responseTimeout);
-            retryCount = 0;
+            try {
+              // Update conversation context BEFORE processing to ensure follow-up detection works
+              const context = getConversationContext(callSid);
+              if (context) {
+                logger.info('Processing response with context:', {
+                  callSid,
+                  requestId,
+                  hasContext: !!context,
+                  lastIntent: context.lastIntent,
+                  hasLastQueryContext: !!context.lastQueryContext
+                });
+              }
 
-            const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+              // Process the speech input
+              const processedResponse = await this.processSpeechInput(response, callSid);
+              
+              // Clear response state
+              currentCall.isResponding = false;
+              currentCall.retryCount = 0;
+              currentCall.pendingRequests.delete(requestId);
+              
+              if (currentCall.responseTimeout) {
+                clearTimeout(currentCall.responseTimeout);
+                currentCall.responseTimeout = null;
+              }
+
+              // Generate TwiML response
+              const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Amy">${response}</Say>
+  <Say voice="Polly.Amy">${processedResponse}</Say>
   <Pause length="1"/>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
           speechTimeout="auto" 
@@ -849,7 +893,51 @@ export class TwilioVoiceHandler {
           language="en-US"/>
 </Response>`;
 
-            await this.sendTwiMLResponse(res, twiml);
+              await this.sendTwiMLResponse(res, twiml);
+              
+              logger.info('Successfully processed and sent response:', {
+                callSid,
+                requestId,
+                responseLength: processedResponse.length,
+                pendingRequests: currentCall.pendingRequests.size
+              });
+
+            } catch (error) {
+              logger.error('Error processing response:', {
+                callSid,
+                requestId,
+                error: error.message,
+                stack: error.stack
+              });
+              
+              // Clear response state on error
+              currentCall.isResponding = false;
+              currentCall.pendingRequests.delete(requestId);
+              
+              if (currentCall.responseTimeout) {
+                clearTimeout(currentCall.responseTimeout);
+                currentCall.responseTimeout = null;
+              }
+
+              // Send error response
+              const errorTwiml = this.generateTwiML("I'm sorry, I encountered an error processing your request. Please try again.", true);
+              await this.sendTwiMLResponse(res, errorTwiml);
+            }
+          } else {
+            logger.warn('Empty response received for call:', {
+              callSid,
+              requestId,
+              event
+            });
+            
+            // Clear response state
+            currentCall.isResponding = false;
+            currentCall.pendingRequests.delete(requestId);
+            
+            if (currentCall.responseTimeout) {
+              clearTimeout(currentCall.responseTimeout);
+              currentCall.responseTimeout = null;
+            }
           }
         }
       } catch (error) {

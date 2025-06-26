@@ -126,35 +126,30 @@ export async function exampleUsage() {
   const searchQuery = "domestic violence shelters South Lake Tahoe California";
   
   try {
-    console.log('🔍 Searching for shelters...');
-    console.log('User Query:', userQuery);
-    console.log('Search Query:', searchQuery);
-    console.log('');
+    logger.info('🔍 Searching for shelters...', { userQuery, searchQuery });
     
     // Get both voice and SMS responses
     const result = await tavilyService.searchShelters(searchQuery, userQuery, 3);
     
-    console.log('🎤 VOICE RESPONSE:');
-    console.log(result.voiceResponse);
-    console.log('');
-    
-    console.log('📱 SMS RESPONSE:');
-    console.log(result.smsResponse);
-    console.log('');
+    logger.info('🎤 VOICE RESPONSE:', { 
+      voiceResponse: result.voiceResponse.substring(0, 100) + '...',
+      smsResponse: result.smsResponse.substring(0, 100) + '...'
+    });
     
     // Show details of top result
     if (result.topResults.length > 0) {
-      console.log('📋 TOP RESULT DETAILS:');
       const details = tavilyService.getResultDetails(result.topResults[0]);
-      console.log('Title:', details.title);
-      console.log('URL:', details.url);
-      console.log('Score:', details.score);
-      console.log('Phone Numbers:', details.phoneNumbers);
-      console.log('Address:', details.address);
+      logger.info('📋 TOP RESULT DETAILS:', {
+        title: details.title,
+        url: details.url,
+        score: details.score,
+        phoneNumbers: details.phoneNumbers,
+        address: details.address
+      });
     }
     
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    logger.error('❌ Error in example usage:', error);
   }
 }
 

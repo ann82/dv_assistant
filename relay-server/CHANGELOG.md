@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.2] - 2025-06-25
+
+### Fixed
+- **Request/Response Synchronization** - Resolved critical synchronization issues in WebSocket handling
+  - **Race Condition Prevention**: Replaced local variables with call-specific state management to prevent race conditions
+  - **Unique Request IDs**: Implemented timestamp-based request ID generation to prevent collisions
+  - **Duplicate Request Detection**: Enhanced duplicate detection that checks both requestId and isResponding state
+  - **Context Synchronization**: Ensured conversation context is updated immediately for proper follow-up detection
+  - **Timeout Management**: Isolated timeout and retry management per call to prevent interference
+  - **Error Handling**: Comprehensive error handling with proper state cleanup and user feedback
+  - **Memory Leak Prevention**: Added pending request tracking to prevent memory leaks from abandoned requests
+
+### Technical Improvements
+- **Call State Isolation**: Each call now has isolated state management preventing cross-call interference
+- **Request Tracking**: Added pendingRequests Set to track active requests per call
+- **State Cleanup**: Proper cleanup of response state, timeouts, and pending requests on completion or error
+- **Logging Enhancement**: Improved logging for debugging synchronization issues
+- **Error Recovery**: Graceful error recovery with user-friendly error messages
+
 ## [1.19.1] - 2025-06-25
 
 ### Fixed

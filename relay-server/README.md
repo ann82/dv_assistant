@@ -2,9 +2,21 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.19.1** (Updated: June 25, 2025)
+**Current Version: 1.19.2** (Updated: June 25, 2025)
 
 ## Features
+
+### Request/Response Synchronization (v1.19.2)
+- **Race Condition Prevention**
+  - **Call-Specific State Management**: Each call has isolated state preventing cross-call interference
+  - **Unique Request IDs**: Timestamp-based request ID generation prevents collisions
+  - **Duplicate Detection**: Enhanced detection checks both requestId and isResponding state
+  - **Context Synchronization**: Immediate context updates ensure proper follow-up detection
+- **Timeout and Error Management**
+  - **Isolated Timeout Management**: Each call has isolated timeout and retry tracking
+  - **Comprehensive Error Handling**: Proper state cleanup and user-friendly error messages
+  - **Memory Leak Prevention**: Pending request tracking prevents abandoned request leaks
+  - **Graceful Recovery**: Error recovery with proper cleanup and user feedback
 
 ### Enhanced Location Detection & Query Rewriting (v1.0.12)
 - **Advanced Location Processing**

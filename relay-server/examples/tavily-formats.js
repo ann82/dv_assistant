@@ -1,4 +1,5 @@
 import { ResponseGenerator } from '../lib/response.js';
+import logger from '../lib/logger.js';
 
 // Example Tavily response (this would normally come from the Tavily API)
 const exampleTavilyResponse = {
@@ -29,19 +30,18 @@ const exampleTavilyResponse = {
   response_time: 1.94
 };
 
-console.log('=== TAVILY RESPONSE FORMAT EXAMPLES ===\n');
+logger.info('=== TAVILY RESPONSE FORMAT EXAMPLES ===');
 
 // 1. Simple Format
-console.log('1. SIMPLE FORMAT:');
+logger.info('1. SIMPLE FORMAT:');
 const simpleFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'simple', {
   query: 'find shelters in South Lake Tahoe',
   location: 'South Lake Tahoe'
 });
-console.log(JSON.stringify(simpleFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Simple format result:', simpleFormat);
 
 // 2. Detailed Format
-console.log('2. DETAILED FORMAT:');
+logger.info('2. DETAILED FORMAT:');
 const detailedFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'detailed', {
   query: 'find shelters in South Lake Tahoe',
   location: 'South Lake Tahoe',
@@ -49,17 +49,15 @@ const detailedFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavil
   minScore: 0.2,
   maxResults: 3
 });
-console.log(JSON.stringify(detailedFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Detailed format result:', detailedFormat);
 
 // 3. Minimal Format
-console.log('3. MINIMAL FORMAT:');
+logger.info('3. MINIMAL FORMAT:');
 const minimalFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'minimal');
-console.log(JSON.stringify(minimalFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Minimal format result:', minimalFormat);
 
 // 4. Custom Format - API-like structure
-console.log('4. CUSTOM FORMAT (API-like):');
+logger.info('4. CUSTOM FORMAT (API-like):');
 const customFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'custom', {
   structure: {
     status: 'status',
@@ -69,11 +67,10 @@ const customFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyR
     includeContent: false
   }
 });
-console.log(JSON.stringify(customFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Custom format result:', customFormat);
 
 // 5. Custom Format - With descriptions
-console.log('5. CUSTOM FORMAT (with descriptions):');
+logger.info('5. CUSTOM FORMAT (with descriptions):');
 const customWithContent = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'custom', {
   structure: {
     status: 'status',
@@ -83,65 +80,34 @@ const customWithContent = ResponseGenerator.formatTavilyResponseCustom(exampleTa
     includeContent: true
   }
 });
-console.log(JSON.stringify(customWithContent, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Custom with content result:', customWithContent);
 
 // 6. Filtered results (high relevance only)
-console.log('6. FILTERED RESULTS (high relevance only):');
+logger.info('6. FILTERED RESULTS (high relevance only):');
 const filteredFormat = ResponseGenerator.formatTavilyResponseCustom(exampleTavilyResponse, 'simple', {
   minScore: 0.8,
   maxResults: 2
 });
-console.log(JSON.stringify(filteredFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Filtered format result:', filteredFormat);
 
 // 7. Empty response handling
-console.log('7. EMPTY RESPONSE HANDLING:');
+logger.info('7. EMPTY RESPONSE HANDLING:');
 const emptyFormat = ResponseGenerator.formatTavilyResponseCustom({ results: [] }, 'simple');
-console.log(JSON.stringify(emptyFormat, null, 2));
-console.log('\n' + '='.repeat(50) + '\n');
+logger.info('Empty format result:', emptyFormat);
 
 // 8. Current default format (for comparison)
-console.log('8. CURRENT DEFAULT FORMAT:');
+logger.info('8. CURRENT DEFAULT FORMAT:');
 const defaultFormat = ResponseGenerator.formatTavilyResponse(exampleTavilyResponse, 'web', 'find shelters in South Lake Tahoe', 3);
-console.log(JSON.stringify(defaultFormat, null, 2));
+logger.info('Default format result:', defaultFormat);
 
-console.log('\n=== USAGE EXAMPLES ===\n');
+logger.info('=== USAGE EXAMPLES ===');
 
-console.log('To use these formats in your code:');
-console.log(`
-// Simple format for basic applications
-const simple = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'simple', {
-  query: 'user query',
-  location: 'extracted location'
-});
-
-// Detailed format for analytics and debugging
-const detailed = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'detailed', {
-  query: 'user query',
-  location: 'extracted location',
-  searchDepth: 'advanced',
-  minScore: 0.2,
-  maxResults: 5
-});
-
-// Minimal format for lightweight applications
-const minimal = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'minimal');
-
-// Custom format for specific API requirements
-const custom = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'custom', {
-  structure: {
-    status: 'status',
-    resources: 'data',
-    includeScore: true,
-    includePhone: true,
-    includeContent: false
+logger.info('To use these formats in your code:', {
+  examples: {
+    simple: 'ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, "simple", { query: "user query", location: "extracted location" })',
+    detailed: 'ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, "detailed", { query: "user query", location: "extracted location", searchDepth: "advanced", minScore: 0.2, maxResults: 5 })',
+    minimal: 'ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, "minimal")',
+    custom: 'ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, "custom", { structure: { status: "status", resources: "data", includeScore: true, includePhone: true, includeContent: false } })',
+    filtered: 'ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, "simple", { minScore: 0.8, maxResults: 3 })'
   }
-});
-
-// Filtered results for high-quality responses
-const filtered = ResponseGenerator.formatTavilyResponseCustom(tavilyResponse, 'simple', {
-  minScore: 0.8,
-  maxResults: 3
-});
-`); 
+}); 

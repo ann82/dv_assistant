@@ -799,7 +799,7 @@ export class ResponseGenerator {
       const score = result.score || 0;
 
       // Debug logging
-      console.log('Filtering result:', {
+      logger.debug('Filtering result:', {
         title: result.title,
         score,
         hasContent: !!content,
@@ -808,7 +808,7 @@ export class ResponseGenerator {
 
       // Increase score threshold for better quality results
       if (score < 0.01) {
-        console.log('Filtered out due to low score:', score);
+        logger.debug('Filtered out due to low score:', { score, title: result.title });
         return false;
       }
 
@@ -820,7 +820,7 @@ export class ResponseGenerator {
       const isGovernmentOrCityPage = title.includes('city') || title.includes('commission') || title.includes('government') || title.includes('municipal');
       
       if (!isRelevant && !isGovernmentDomain && !isGovernmentOrCityPage) {
-        console.log('Filtered out due to no DV keywords and not government/city page');
+        logger.debug('Filtered out due to no DV keywords and not government/city page', { title: result.title });
         return false;
       }
 
@@ -842,7 +842,8 @@ export class ResponseGenerator {
       // More intelligent filtering: check if this looks like a directory page vs. specific shelter
       const isDirectoryPage = this.isDirectoryPage(title, content, url);
 
-      console.log('Filter checks:', {
+      logger.debug('Filter checks:', {
+        title: result.title,
         isGenericResource,
         isCityPage,
         isExcludedDomain,
@@ -852,7 +853,10 @@ export class ResponseGenerator {
 
       // Allow city pages if they're not generic resources and not directory pages
       const shouldInclude = !isGenericResource && !isExcludedDomain && !hasNoContactInfo && !isDirectoryPage;
-      console.log('Final decision:', shouldInclude ? 'INCLUDE' : 'EXCLUDE');
+      logger.debug('Final decision:', { 
+        title: result.title,
+        decision: shouldInclude ? 'INCLUDE' : 'EXCLUDE' 
+      });
       
       return shouldInclude;
     });
