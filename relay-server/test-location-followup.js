@@ -72,4 +72,91 @@ for (const nonLocationStatement of nonLocationStatements) {
   }
 }
 
+// Test the location follow-up detection using geocoding
+async function testLocationFollowUp() {
+  console.log('Testing location follow-up detection with geocoding...\n');
+
+  // Create a mock conversation context with a previous shelter request
+  const callSid = 'test-call-sid';
+  const mockContext = {
+    intent: 'find_shelter',
+    location: null,
+    results: [
+      {
+        title: 'Austin Domestic Violence Shelter',
+        content: 'Provides shelter and support services in Austin, Texas.',
+        url: 'https://example.com/austin-shelter'
+      }
+    ],
+    timestamp: Date.now(),
+    needsLocation: true
+  };
+
+  // Update conversation context
+  updateConversationContext(callSid, 'find_shelter', 'I need a shelter', {
+    voiceResponse: 'I can help you find a shelter. What city or area are you looking for?',
+    smsResponse: null
+  }, { results: mockContext.results });
+
+  // Get the context
+  const context = getConversationContext(callSid);
+  console.log('Created context:', {
+    hasLastQueryContext: !!context?.lastQueryContext,
+    lastIntent: context?.lastIntent,
+    needsLocation: context?.lastQueryContext?.needsLocation
+  });
+
+  // Test the specific case that was failing
+  const locationStatement = "Near Austin, Texas.";
+  console.log(`\nTesting location statement: "${locationStatement}"`);
+  
+  const followUpResponse = await handleFollowUp(locationStatement, context.lastQueryContext);
+  
+  if (followUpResponse) {
+    console.log('✅ Location follow-up detected!');
+    console.log('Response type:', followUpResponse.type);
+    console.log('Voice response:', followUpResponse.voiceResponse);
+    console.log('Location extracted:', followUpResponse.location);
+  } else {
+    console.log('❌ Location follow-up NOT detected');
+  }
+
+  // Test a few other location formats
+  const testCases = [
+    "Austin, Texas",
+    "I live in Austin, Texas",
+    "Austin",
+    "Near Austin"
+  ];
+
+  console.log('\nTesting various location formats:');
+  for (const testCase of testCases) {
+    console.log(`\nTesting: "${testCase}"`);
+    const response = await handleFollowUp(testCase, context.lastQueryContext);
+    if (response) {
+      console.log('✅ Detected as follow-up');
+      console.log('Type:', response.type);
+      console.log('Location:', response.location);
+    } else {
+      console.log('❌ NOT detected as follow-up');
+    }
+  }
+
+  // Test non-location statement
+  const nonLocationStatement = "Tell me more about that shelter";
+  console.log(`\nTesting non-location statement: "${nonLocationStatement}"`);
+  
+  const nonLocationResponse = await handleFollowUp(nonLocationStatement, context.lastQueryContext);
+  
+  if (nonLocationResponse) {
+    console.log('✅ Non-location follow-up detected!');
+    console.log('Response type:', nonLocationResponse.type);
+    console.log('Voice response:', nonLocationResponse.voiceResponse);
+  } else {
+    console.log('❌ Non-location follow-up NOT detected');
+  }
+}
+
+testLocationFollowUp().catch(console.error);
+
 console.log('\n🎉 Location follow-up detection test completed!'); 

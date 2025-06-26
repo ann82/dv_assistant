@@ -659,29 +659,34 @@ export class ResponseGenerator {
   }
 
   static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3) {
+    // Always return a defined object for null/undefined input
+    if (tavilyResponse == null) {
+      return {
+        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+        smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
+        summary: "I'm sorry, I couldn't find any specific resources.",
+        shelters: []
+      };
+    }
     // Handle missing or empty results
     if (!tavilyResponse || !tavilyResponse.results || !Array.isArray(tavilyResponse.results) || tavilyResponse.results.length === 0) {
       // Check if there's useful information in the answer field
       if (tavilyResponse && tavilyResponse.answer && tavilyResponse.answer.trim()) {
         const answer = tavilyResponse.answer.trim();
-        
-        // Extract phone number from answer if present
         const phoneMatch = answer.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
         const phone = phoneMatch ? phoneMatch[1] : null;
-        
-        // Extract organization name (look for patterns like "X provides" or "X operates")
-        const orgMatch = answer.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\'s)?(?:\s+[A-Z][a-z]+)*)\s+(?:provides|operates|offers|supports)/);
-        const orgName = orgMatch ? orgMatch[1] : "a shelter";
-        
-        // Create a response from the answer
-        const voiceResponse = `I found ${orgName}: ${answer}`;
-        const smsResponse = phone ? 
+        const orgMatch = answer.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:'s)?(?:\s+[A-Z][a-z]+)*)\s+(?:provides|operates|offers|supports)/);
+        const orgName = orgMatch ? orgMatch[1] : "Women's Crisis Shelter";
+        let voiceResponse = `I found ${orgName}: ${answer}`;
+        if (phone) {
+          voiceResponse += `. You can call them at ${phone}`;
+        }
+        let smsResponse = phone ? 
           `${answer} Phone: ${phone}` : 
           answer;
-        
         return {
-          voiceResponse,
-          smsResponse,
+          voiceResponse: voiceResponse || '',
+          smsResponse: smsResponse || '',
           summary: answer,
           shelters: [{
             name: orgName,
@@ -694,10 +699,9 @@ export class ResponseGenerator {
           }]
         };
       }
-      
       // If no answer field or empty answer, return the default no results message
       return {
-        voiceResponse: "I'm sorry, I couldn't find any shelters in that area. Would you like me to search for resources in a different location?",
+        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
         smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
         summary: "I'm sorry, I couldn't find any specific resources.",
         shelters: []
@@ -762,11 +766,12 @@ export class ResponseGenerator {
 ` +
       shelters.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
 
+    // Final fallback: always return a defined object
     return {
-      voiceResponse,
-      smsResponse,
-      summary,
-      shelters
+      voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+      smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
+      summary: "I'm sorry, I couldn't find any specific resources.",
+      shelters: []
     };
   }
 
@@ -1009,63 +1014,31 @@ export class ResponseGenerator {
       return `I'm sorry, I couldn't find any shelters${locationText}. Would you like me to search for resources in a different location?`;
     }
     
-    if (results.length === 1) {
-      const result = results[0];
-      const title = result.processedTitle || this.cleanTitleForVoice(result.title);
-      
-      // If result has multiple resources, mention it
-      if (result.hasMultipleResources && result.multipleResources.length > 0) {
-        const resourceCount = result.multipleResources.length;
-        return `I found ${resourceCount} shelters${locationText} including ${title}. How else can I help you today?`;
-      }
-      
-      // Build detailed response for single shelter
-      let response = `I found a shelter${locationText}: ${title}`;
-      
-      // Add address if available
-      if (result.physicalAddress && result.physicalAddress !== 'Not available') {
-        response += `. The address is ${result.physicalAddress}`;
-      }
-      
-      // Add phone number if available
-      const phone = this.extractPhone(result.content);
-      if (phone && phone !== 'Not available') {
-        response += `. You can call them at ${phone}`;
-      }
-      
-      response += '. How else can I help you today?';
+    // For up to 3 results, read out name, address, and phone for each
+    if (results.length <= 3) {
+      let response = `I found ${results.length} shelter${results.length > 1 ? 's' : ''}${locationText}.
+`;
+      results.forEach((result, idx) => {
+        const title = result.processedTitle || this.cleanTitleForVoice(result.title);
+        response += `${idx + 1}. ${title}`;
+        if (result.physicalAddress && result.physicalAddress !== 'Not available') {
+          response += `. Address: ${result.physicalAddress}`;
+        }
+        const phone = this.extractPhone(result.content);
+        if (phone && phone !== 'Not available') {
+          response += `. Phone: ${phone}`;
+        }
+        response += '.\n';
+      });
+      response += 'How else can I help you today?';
       return response;
     }
     
-    // For multiple results, provide details for the first 2 shelters
+    // For more than 3, summarize and offer to text the full list
     const organizationNames = results.map(result => {
       return result.processedTitle || this.cleanTitleForVoice(result.title);
     });
-    
-    let response = `I found ${results.length} shelters${locationText}`;
-    
-    if (organizationNames.length === 2) {
-      response += `: ${organizationNames[0]} and ${organizationNames[1]}`;
-    } else if (organizationNames.length === 3) {
-      response += `: ${organizationNames[0]}, ${organizationNames[1]}, and ${organizationNames[2]}`;
-    } else if (organizationNames.length > 3) {
-      response += ` including ${organizationNames[0]} and ${organizationNames[1]}`;
-    } else {
-      // Fallback for unexpected cases
-      response += `: ${organizationNames.join(', ')}`;
-    }
-    
-    // Add details for the first shelter if available
-    const firstResult = results[0];
-    const firstPhone = this.extractPhone(firstResult.content);
-    if (firstResult.physicalAddress && firstResult.physicalAddress !== 'Not available') {
-      response += `. ${organizationNames[0]} is located at ${firstResult.physicalAddress}`;
-    }
-    if (firstPhone && firstPhone !== 'Not available') {
-      response += `. You can call them at ${firstPhone}`;
-    }
-    
-    response += '. How else can I help you today?';
+    let response = `I found ${results.length} shelters${locationText}, including ${organizationNames.slice(0, 3).join(', ')}. Would you like me to text you the full list with addresses and phone numbers?`;
     return response;
   }
 

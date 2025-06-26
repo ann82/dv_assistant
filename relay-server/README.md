@@ -2,6 +2,8 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
+**Current Version: 1.19.1** (Updated: June 25, 2025)
+
 ## Features
 
 ### Enhanced Location Detection & Query Rewriting (v1.0.12)
@@ -633,3 +635,14 @@ All custom format functions return consistent error responses with appropriate s
 - No breaking changes expected; all tests pass after update.
 
 - **Robust fallback for shelter search**: If no structured results are found but the AI provides a direct answer (e.g., shelter name and phone), the system will now extract and present this information to the user.
+
+### Enhanced Location Follow-up Detection (v1.19.1)
+- **Geocoding-Based Location Validation**
+  - **Nominatim Integration**: Uses OpenStreetMap's Nominatim API to validate location statements in follow-up queries
+  - **Robust Detection**: Handles location statements like "Near Austin, Texas" with geocoding validation
+  - **Fallback Handling**: Graceful handling when geocoding fails or returns no results
+  - **Test Coverage**: Comprehensive tests for geocoding-based location follow-up detection
+- **Voice Response Formatting Improvements**
+  - **Guard Clauses**: Added proper null/undefined checks in voice response formatting
+  - **Fallback Returns**: Ensured voiceResponse always returns a defined object even for edge cases
+  - **Consistent Formatting**: Improved formatting for empty results and missing answer fields

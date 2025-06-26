@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.1] - 2025-06-25
+
+### Fixed
+- **Location Follow-up Detection** - Improved detection of location statements in follow-up queries
+  - **Enhanced Detection**: Replaced restrictive location statement detection with geocoding-based validation
+  - **Nominatim Integration**: Uses OpenStreetMap's Nominatim API to validate location statements like "Near Austin, Texas"
+  - **Robust Validation**: Geocoding confirms location validity before processing as follow-up
+  - **Fallback Handling**: Graceful handling when geocoding fails or returns no results
+  - **Test Coverage**: Added comprehensive tests for geocoding-based location follow-up detection
+- **Voice Response Formatting** - Fixed undefined voiceResponse issues in edge cases
+  - **Guard Clauses**: Added proper null/undefined checks in voice response formatting
+  - **Fallback Returns**: Ensured voiceResponse always returns a defined object even for edge cases
+  - **Consistent Formatting**: Improved formatting for empty results and missing answer fields
+  - **Test Reliability**: Fixed test failures related to undefined voiceResponse objects
+
+### Technical Improvements
+- **Geocoding Service**: Integrated Nominatim API for reliable location validation
+- **Error Handling**: Improved error handling for location validation and response formatting
+- **Test Coverage**: Enhanced test coverage for location follow-up detection and response formatting
+- **Code Reliability**: Added defensive programming practices to prevent undefined returns
+
 ## [1.0.16] - 2024-12-21
 
 ### Fixed
