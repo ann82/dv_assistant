@@ -5,6 +5,7 @@ import { fallbackResponse } from './fallbackResponder.js';
 import { logQueryHandling } from './queryLogger.js';
 import logger from './logger.js';
 import { ResponseGenerator } from './response.js';
+import { callTavilyAPI } from './apis.js';
 
 // Minimum confidence score for considering Tavily results
 const MIN_CONFIDENCE_SCORE = 0.7;
@@ -56,29 +57,11 @@ export async function handleUserQuery(query) {
 
     const cleanRewrittenQuery = rewrittenQuery.trim();
 
-    // Step 3: Get Tavily results
-    const tavilyResponse = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': process.env.TAVILY_API_KEY
-      },
-      body: JSON.stringify({
-        query: cleanRewrittenQuery,
-        search_depth: 'advanced',
-        include_answer: true,
-        include_results: true,
-        include_raw_content: false,
-        include_domains: [],
-        max_results: 5
-      })
-    });
+    // Step 3: Extract location for enhanced search
+    const location = ResponseGenerator.extractLocationFromQuery(cleanRewrittenQuery);
 
-    if (!tavilyResponse.ok) {
-      throw new Error(`Tavily API error: ${tavilyResponse.statusText}`);
-    }
-
-    const tavilyData = await tavilyResponse.json();
+    // Step 4: Get Tavily results using standardized API
+    const tavilyData = await callTavilyAPI(cleanRewrittenQuery, location);
     
     // If no results, use GPT fallback
     if (!tavilyData.results || tavilyData.results.length === 0) {
@@ -96,7 +79,7 @@ export async function handleUserQuery(query) {
       return { response: gptResponse, source: 'gpt' };
     }
 
-    // Step 4: Rerank results
+    // Step 5: Rerank results
     const rerankedResults = await rerankByRelevance(cleanRewrittenQuery, tavilyData.results);
     const topScore = rerankedResults[0]?.relevanceScore || 0;
     
@@ -119,7 +102,7 @@ export async function handleUserQuery(query) {
       return { response: gptResponse, source: 'gpt' };
     }
 
-    // Step 5: Format Tavily response
+    // Step 6: Format Tavily response
     const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', cleanQuery, 3);
     
     // Log query handling

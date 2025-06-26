@@ -682,4 +682,23 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **No longer promises SMS immediately after giving locations**
-  - Ensures the system only asks for SMS consent at the end of the conversation, after the user indicates they are done. 
+  - Ensures the system only asks for SMS consent at the end of the conversation, after the user indicates they are done.
+
+## [1.19.4] - 2025-01-27
+
+### Changed
+- **Tavily API Standardization**
+  - All Tavily API calls now use a single, standardized function with consistent query structure, headers, and parameters.
+  - Query format: `List domestic violence shelters in {location}. Include name, address, phone number, services offered, and 24-hour hotline if available. Prioritize .org and .gov sources.`
+  - Unified use of `Authorization: Bearer` header and consistent exclusion of irrelevant domains.
+  - All locations and context are handled in a uniform way for better, more reliable results.
+
+### Added
+- **Raw Content Parsing**
+  - If Tavily's answer is missing or too vague, the system now parses `raw_content` using regex to extract addresses and phone numbers.
+  - Regex patterns for addresses and phones are applied to all results, and the first found contact info is included in the response.
+
+### Fixed
+- **Test Suite**
+  - All tests updated to mock the standardized Tavily API function and set the required environment variable.
+  - All 337 tests pass with the new API integration. 

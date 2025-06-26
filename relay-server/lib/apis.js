@@ -1,7 +1,7 @@
 import logger from './logger.js';
 import { filterConfig } from './filterConfig.js';
 
-export async function callTavilyAPI(query) {
+export async function callTavilyAPI(query, location = null) {
   try {
     // Validate query parameter
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -33,29 +33,38 @@ export async function callTavilyAPI(query) {
       firstChars: apiKey.substring(0, 8) + '...'
     });
 
-    // Make the API call
+    // Standardized query format for domestic violence shelters
+    const standardizedQuery = location 
+      ? `List domestic violence shelters in ${location}. Include name, address, phone number, services offered, and 24-hour hotline if available. Prioritize .org and .gov sources.`
+      : cleanQuery;
+
+    // Make the API call with standardized parameters
     const response = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`  // Changed from 'api-key' to 'Authorization: Bearer'
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        query: cleanQuery,
+        query: standardizedQuery,
         search_depth: 'advanced',
+        search_type: 'advanced',
         include_answer: true,
         include_results: true,
-        include_raw_content: false,
-        include_domains: [],
-        exclude_domains: filterConfig.excludeDomains,
+        include_raw_content: true,
         include_images: false,
-        max_results: 15,
-        // Add specific parameters for better shelter information
-        search_type: 'basic',
-        // Include specific content types that are likely to have contact information
         include_sources: true,
-        // Add context to help with shelter-specific searches
-        context: cleanQuery.includes('shelter') ? 'domestic violence shelter information with contact details' : undefined
+        max_results: 10,
+        exclude_domains: [
+          "yellowpages.com",
+          "tripadvisor.com", 
+          "city-data.com",
+          "yelp.com",
+          ...(filterConfig.excludeDomains || [])
+        ],
+        context: location 
+          ? `Return detailed contact info for domestic violence shelters in ${location}, including name, address, phone number, services offered, and 24-hour hotline.`
+          : undefined
       })
     });
 
@@ -72,11 +81,56 @@ export async function callTavilyAPI(query) {
 
     const data = await response.json();
     logger.info('Tavily API response received:', data);
+
+    // If answer is missing or too vague, parse raw_content with regex
+    if (!data.answer || data.answer.length < 50) {
+      logger.info('Answer missing or vague, parsing raw_content for contact info');
+      data.parsedContent = parseRawContentForContactInfo(data.results);
+    }
+
     return data;
   } catch (error) {
     logger.error('Error calling Tavily API:', error);
     throw error;
   }
+}
+
+/**
+ * Parse raw content from Tavily results to extract addresses and phone numbers
+ * @param {Array} results - Tavily API results
+ * @returns {Object} Parsed contact information
+ */
+function parseRawContentForContactInfo(results) {
+  if (!results || !Array.isArray(results)) {
+    return { addresses: [], phones: [] };
+  }
+
+  const addressRegex = /\d{1,5}\s[\w\s]+\s(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Way|Lane|Ln|Drive|Dr|Court|Ct)\b/i;
+  const phoneRegex = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
+  
+  const addresses = [];
+  const phones = [];
+
+  results.forEach(result => {
+    if (result.raw_content) {
+      // Extract addresses
+      const addressMatches = result.raw_content.match(addressRegex);
+      if (addressMatches) {
+        addresses.push(...addressMatches);
+      }
+
+      // Extract phone numbers
+      const phoneMatches = result.raw_content.match(phoneRegex);
+      if (phoneMatches) {
+        phones.push(...phoneMatches);
+      }
+    }
+  });
+
+  return {
+    addresses: [...new Set(addresses)], // Remove duplicates
+    phones: [...new Set(phones)] // Remove duplicates
+  };
 }
 
 export async function callGPT(prompt, model = 'gpt-4') {

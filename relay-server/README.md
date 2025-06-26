@@ -2,9 +2,22 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.19.3** (Updated: January 27, 2025)
+**Current Version: 1.19.4** (Updated: January 27, 2025)
 
 ## Features
+
+### Tavily API Standardization & Raw Content Parsing (v1.19.4)
+- **Unified Tavily API Integration**
+  - All Tavily API calls now use a single, standardized function with consistent query structure, headers, and parameters.
+  - Query format: `List domestic violence shelters in {location}. Include name, address, phone number, services offered, and 24-hour hotline if available. Prioritize .org and .gov sources.`
+  - Unified use of `Authorization: Bearer` header and consistent exclusion of irrelevant domains.
+  - All locations and context are handled in a uniform way for better, more reliable results.
+- **Raw Content Parsing**
+  - If Tavily's answer is missing or too vague, the system now parses `raw_content` using regex to extract addresses and phone numbers.
+  - Regex patterns for addresses and phones are applied to all results, and the first found contact info is included in the response.
+- **Test Suite**
+  - All tests updated to mock the standardized Tavily API function and set the required environment variable.
+  - All 337 tests pass with the new API integration.
 
 ### Test Suite Reliability (v1.19.3)
 - **Robust Test Infrastructure**

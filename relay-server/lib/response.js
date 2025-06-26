@@ -567,6 +567,9 @@ export class ResponseGenerator {
   }
 
   static async queryTavily(query) {
+    // Use the standardized Tavily API function
+    const { callTavilyAPI } = await import('./apis.js');
+    
     // Validate query parameter
     if (!query || typeof query !== 'string' || query.trim() === '') {
       logger.error('Invalid query parameter for Tavily API:', {
@@ -591,57 +594,22 @@ export class ResponseGenerator {
       return null;
     }
 
-    const callTavilyWithRetry = async function callTavily(query) {
-      try {
-        const response = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.TAVILY_API_KEY}`
-          },
-          body: JSON.stringify({
-            query: cleanQuery,
-            search_depth: 'advanced',
-            include_answer: true,
-            include_results: true,
-            include_raw_content: false,
-            include_domains: [],
-            exclude_domains: []
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          logger.error('Tavily API error', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText,
-            query: cleanQuery
-          });
-          throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        logger.info('Tavily API response', {
-          query: cleanQuery,
-          resultCount: data.results?.length || 0,
-          hasAnswer: !!data.answer,
-          timestamp: new Date().toISOString()
-        });
-
-        return data;
-      } catch (error) {
-        logger.error('Error calling Tavily API', {
-          error: error.message,
-          query: cleanQuery,
-          stack: error.stack
-        });
-        throw error;
-      }
-    };
-
     try {
-      return await callTavilyWithRetry(cleanQuery);
+      // Extract location from query for better search results
+      const location = this.extractLocationFromQuery(cleanQuery);
+      
+      // Use the standardized API call
+      const data = await callTavilyAPI(cleanQuery, location);
+      
+      logger.info('Tavily API response', {
+        query: cleanQuery,
+        resultCount: data.results?.length || 0,
+        hasAnswer: !!data.answer,
+        hasParsedContent: !!data.parsedContent,
+        timestamp: new Date().toISOString()
+      });
+
+      return data;
     } catch (error) {
       logger.error('Failed to get Tavily response', {
         error: error.message,
@@ -668,6 +636,7 @@ export class ResponseGenerator {
         shelters: []
       };
     }
+    
     // Handle missing or empty results
     if (!tavilyResponse || !tavilyResponse.results || !Array.isArray(tavilyResponse.results) || tavilyResponse.results.length === 0) {
       // Check if there's useful information in the answer field
@@ -699,6 +668,47 @@ export class ResponseGenerator {
           }]
         };
       }
+      
+      // Check if there's parsed content from raw_content analysis
+      if (tavilyResponse && tavilyResponse.parsedContent && 
+          (tavilyResponse.parsedContent.addresses.length > 0 || tavilyResponse.parsedContent.phones.length > 0)) {
+        
+        const addresses = tavilyResponse.parsedContent.addresses;
+        const phones = tavilyResponse.parsedContent.phones;
+        
+        let voiceResponse = "I found some contact information: ";
+        if (addresses.length > 0) {
+          voiceResponse += `Address: ${addresses[0]}. `;
+        }
+        if (phones.length > 0) {
+          voiceResponse += `Phone: ${phones[0]}.`;
+        }
+        
+        let smsResponse = "";
+        if (addresses.length > 0) {
+          smsResponse += `Address: ${addresses[0]} `;
+        }
+        if (phones.length > 0) {
+          smsResponse += `Phone: ${phones[0]}`;
+        }
+        
+        return {
+          voiceResponse: voiceResponse,
+          smsResponse: smsResponse,
+          summary: `Found ${addresses.length} addresses and ${phones.length} phone numbers`,
+          shelters: [{
+            name: "Domestic Violence Shelter",
+            address: addresses[0] || null,
+            phone: phones[0] || null,
+            description: "Contact information extracted from search results",
+            score: 0.7,
+            url: null,
+            hasMultipleResources: false,
+            allResources: null
+          }]
+        };
+      }
+      
       // If no answer field or empty answer, return the default no results message
       return {
         voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
@@ -762,6 +772,46 @@ export class ResponseGenerator {
           phone: phone,
           description: answer,
           score: 0.8, // High score since it came from Tavily's answer
+          url: null,
+          hasMultipleResources: false,
+          allResources: null
+        }]
+      };
+    }
+
+    // If no results after processing and no answer, check for parsed content
+    if (processedResults.length === 0 && tavilyResponse && tavilyResponse.parsedContent && 
+        (tavilyResponse.parsedContent.addresses.length > 0 || tavilyResponse.parsedContent.phones.length > 0)) {
+      
+      const addresses = tavilyResponse.parsedContent.addresses;
+      const phones = tavilyResponse.parsedContent.phones;
+      
+      let voiceResponse = "I found some contact information: ";
+      if (addresses.length > 0) {
+        voiceResponse += `Address: ${addresses[0]}. `;
+      }
+      if (phones.length > 0) {
+        voiceResponse += `Phone: ${phones[0]}.`;
+      }
+      
+      let smsResponse = "";
+      if (addresses.length > 0) {
+        smsResponse += `Address: ${addresses[0]} `;
+      }
+      if (phones.length > 0) {
+        smsResponse += `Phone: ${phones[0]}`;
+      }
+      
+      return {
+        voiceResponse: voiceResponse,
+        smsResponse: smsResponse,
+        summary: `Found ${addresses.length} addresses and ${phones.length} phone numbers`,
+        shelters: [{
+          name: "Domestic Violence Shelter",
+          address: addresses[0] || null,
+          phone: phones[0] || null,
+          description: "Contact information extracted from search results",
+          score: 0.7,
           url: null,
           hasMultipleResources: false,
           allResources: null
@@ -1441,46 +1491,16 @@ export class ResponseGenerator {
 
   static async searchWithTavily(query) {
     try {
-      // Validate query parameter
-      if (!query || typeof query !== 'string' || query.trim() === '') {
-        logger.error('Invalid query parameter for Tavily search:', {
-          query,
-          type: typeof query,
-          isNull: query === null,
-          isUndefined: query === undefined,
-          isEmpty: query === '',
-          isWhitespace: query && query.trim() === ''
-        });
-        throw new Error('Invalid query parameter: query must be a non-empty string');
-      }
-
-      const cleanQuery = query.trim();
-      // Enhance the query to focus on domestic violence shelters
-      const enhancedQuery = `domestic violence shelter ${cleanQuery}`;
+      logger.info('Searching with Tavily:', { query });
       
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': config.TAVILY_API_KEY
-        },
-        body: JSON.stringify({
-          query: enhancedQuery,
-          search_depth: 'advanced',
-          include_answer: true,
-          include_results: true,
-          include_raw_content: false,
-          include_domains: [],
-          exclude_domains: ['yelp.com', 'maddiesfund.org'], // Exclude irrelevant domains
-          max_results: 5
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Tavily API error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Use the standardized Tavily API function
+      const { callTavilyAPI } = await import('./apis.js');
+      
+      // Extract location from query for better search results
+      const location = this.extractLocationFromQuery(query);
+      
+      // Use the standardized API call
+      const data = await callTavilyAPI(query, location);
       
       // Filter and validate results
       const validResults = data.results.filter(result => {

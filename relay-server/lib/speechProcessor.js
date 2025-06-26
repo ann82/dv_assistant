@@ -189,8 +189,8 @@ export async function processSpeechResult(speechInput, callSid) {
     const rewrittenQuery = await rewriteQuery(cleanedInput, 'find_shelter', callSid);
     logger.info('Query rewritten:', { original: cleanedInput, rewritten: rewrittenQuery, callSid });
 
-    // Process with Tavily
-    const tavilyResult = await callTavilyAPI(rewrittenQuery);
+    // Process with Tavily using standardized API with location
+    const tavilyResult = await callTavilyAPI(rewrittenQuery, locationInfo.location);
 
     logger.info('Tavily processing complete:', { 
       success: tavilyResult.success, 

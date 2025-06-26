@@ -19,12 +19,16 @@ vi.mock('../lib/queryLogger.js', () => ({
   logQueryHandling: vi.fn()
 }));
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock the standardized Tavily API function
+vi.mock('../lib/apis.js', () => ({
+  callTavilyAPI: vi.fn()
+}));
 
 describe('Query Handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set up environment variable for tests
+    process.env.TAVILY_API_KEY = 'test-tavily-key';
   });
 
   it('should process query through Tavily when results are good', async () => {
@@ -34,17 +38,15 @@ describe('Query Handler', () => {
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily response with test data that will be filtered
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        results: [
-          {
-            title: 'Local Shelter',
-            summary: 'Emergency shelter services',
-            url: 'https://example.com'
-          }
-        ]
-      })
+    const { callTavilyAPI } = await import('../lib/apis.js');
+    callTavilyAPI.mockResolvedValue({
+      results: [
+        {
+          title: 'Local Shelter',
+          summary: 'Emergency shelter services',
+          url: 'https://example.com'
+        }
+      ]
     });
 
     // Mock relevance scoring
@@ -81,17 +83,15 @@ describe('Query Handler', () => {
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily response
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        results: [
-          {
-            title: 'Unrelated Result',
-            summary: 'Not relevant',
-            url: 'https://example.com'
-          }
-        ]
-      })
+    const { callTavilyAPI } = await import('../lib/apis.js');
+    callTavilyAPI.mockResolvedValue({
+      results: [
+        {
+          title: 'Unrelated Result',
+          summary: 'Not relevant',
+          url: 'https://example.com'
+        }
+      ]
     });
 
     // Mock relevance scoring with low score
@@ -131,11 +131,9 @@ describe('Query Handler', () => {
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock empty Tavily response
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        results: []
-      })
+    const { callTavilyAPI } = await import('../lib/apis.js');
+    callTavilyAPI.mockResolvedValue({
+      results: []
     });
 
     // Mock GPT fallback
@@ -164,10 +162,8 @@ describe('Query Handler', () => {
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
     // Mock Tavily error
-    global.fetch.mockResolvedValue({
-      ok: false,
-      statusText: 'API Error'
-    });
+    const { callTavilyAPI } = await import('../lib/apis.js');
+    callTavilyAPI.mockRejectedValue(new Error('Tavily API error: API Error'));
 
     // Mock GPT fallback
     const { fallbackResponse } = await import('../lib/fallbackResponder.js');

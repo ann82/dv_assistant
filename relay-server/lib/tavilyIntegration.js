@@ -7,33 +7,16 @@ import logger from './logger.js';
 export class EnhancedTavilyService {
   
   /**
-   * Call Tavily API directly
+   * Call Tavily API directly using the standardized function
    * @param {string} query - Search query
+   * @param {string} location - Optional location for enhanced search
    * @returns {Object} Tavily API response
    */
-  async callTavilyAPI(query) {
+  async callTavilyAPI(query, location = null) {
     try {
-      const response = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': process.env.TAVILY_API_KEY
-        },
-        body: JSON.stringify({
-          query,
-          search_depth: 'advanced',
-          include_answer: true,
-          include_results: true,
-          include_raw_content: false,
-          max_results: 5
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Tavily API error: ${response.statusText}`);
-      }
-
-      return await response.json();
+      // Use the standardized Tavily API function
+      const { callTavilyAPI } = await import('./apis.js');
+      return await callTavilyAPI(query, location);
     } catch (error) {
       logger.error('Error calling Tavily API:', error);
       throw error;
@@ -51,8 +34,11 @@ export class EnhancedTavilyService {
     try {
       logger.info('Enhanced Tavily search:', { query, userQuery, maxResults });
       
-      // Get raw Tavily response
-      const tavilyResponse = await this.callTavilyAPI(query);
+      // Extract location from query for better search results
+      const location = this.extractLocationFromQuery(query);
+      
+      // Get raw Tavily response using standardized API
+      const tavilyResponse = await this.callTavilyAPI(query, location);
       
       // Process the response using the new processor
       const processedResponse = processTavilyResponse(tavilyResponse, userQuery, maxResults);
@@ -79,6 +65,31 @@ export class EnhancedTavilyService {
         topResults: []
       };
     }
+  }
+
+  /**
+   * Extract location from query string
+   * @param {string} query - Search query
+   * @returns {string|null} Extracted location or null
+   */
+  extractLocationFromQuery(query) {
+    if (!query) return null;
+    
+    // Simple location extraction - can be enhanced with more sophisticated parsing
+    const locationPatterns = [
+      /(?:in|near|at|around)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*[A-Z]{2}/i,
+      /\d{5}/ // ZIP codes
+    ];
+    
+    for (const pattern of locationPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        return match[1] || match[0];
+      }
+    }
+    
+    return null;
   }
   
   /**
