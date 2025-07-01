@@ -5,6 +5,9 @@ import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
 import logger from './logger.js';
 import { getConversationContext } from './intentClassifier.js';
+import { AudioService } from '../services/audioService.js';
+import path from 'path';
+import fs from 'fs/promises';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -58,6 +61,12 @@ export class TwilioVoiceHandler {
     this.processingRequests = new Map(); // Track processing requests
     this.VoiceResponseClass = VoiceResponseClass;
     this.wsServer = null; // Initialize as null, will be set later via setWebSocketServer
+    
+    // Initialize AudioService for OpenAI TTS
+    this.audioService = new AudioService();
+    
+    // Schedule periodic cleanup of old audio files
+    this.scheduleAudioCleanup();
   }
 
   setWebSocketServer(wsServer) {
@@ -93,24 +102,9 @@ export class TwilioVoiceHandler {
         return twiml;
       }
 
-      // Generate welcome message
-      const twiml = new this.VoiceResponseClass();
-      twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
-      
-      // Add gather for speech input
-      const gather = twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: 'auto',
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false',
-        interimSpeechResultsCallback: '/twilio/voice/interim',
-        interimSpeechResultsCallbackMethod: 'POST'
-      });
+      // Generate welcome message using OpenAI TTS
+      const welcomeMessage = 'Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?';
+      const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true);
       
       return twiml;
     } catch (error) {
@@ -121,7 +115,7 @@ export class TwilioVoiceHandler {
         body: req.body
       });
       
-      // Return error TwiML
+      // Return error TwiML using fallback Polly
       const twiml = new this.VoiceResponseClass();
       twiml.say('I encountered an error. Please try again later.');
       return twiml;
@@ -140,34 +134,29 @@ export class TwilioVoiceHandler {
       // Process the speech input
       const processResult = await this.processSpeechInput(cleanedSpeechResult, callSid);
       
-      // Extract response and shouldEndCall from processResult
+      // Extract response and flags from processResult
       const response = typeof processResult === 'string' ? processResult : processResult.response;
       const shouldEndCall = typeof processResult === 'object' && processResult.shouldEndCall;
+      const shouldRedirectToConsent = typeof processResult === 'object' && processResult.shouldRedirectToConsent;
       
-      // Generate TwiML response
-      const twiml = new this.VoiceResponseClass();
-      twiml.say(response);
+      // Handle consent redirect
+      if (shouldRedirectToConsent) {
+        logger.info('Redirecting to consent endpoint:', { callSid, speechResult });
+        const twiml = new this.VoiceResponseClass();
+        twiml.say(response);
+        twiml.redirect('/twilio/consent');
+        return twiml;
+      }
+      
+      // Generate TwiML response using OpenAI TTS
+      const twiml = await this.generateTTSBasedTwiML(response, !shouldEndCall);
       
       // Only add gather if we don't want to end the call
       if (!shouldEndCall) {
-        // Add gather to continue the conversation
-        const gather = twiml.gather({
-          input: 'speech',
-          action: '/twilio/voice/process',
-          method: 'POST',
-          speechTimeout: 'auto',
-          speechModel: 'phone_call',
-          enhanced: 'true',
-          language: 'en-US',
-          speechRecognitionLanguage: 'en-US',
-          profanityFilter: 'false',
-          interimSpeechResultsCallback: '/twilio/voice/interim',
-          interimSpeechResultsCallbackMethod: 'POST'
-        });
-        
         // If no speech is detected, repeat the prompt
-        twiml.say("I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.");
-        twiml.redirect('/twilio/voice/process');
+        const noSpeechMessage = "I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.";
+        const noSpeechTwiml = await this.generateTTSBasedTwiML(noSpeechMessage, true);
+        // Note: The gather is already included in the main response, so we just return it
       }
       
       return twiml;
@@ -178,7 +167,7 @@ export class TwilioVoiceHandler {
         speechResult: req.body.SpeechResult
       });
       
-      // Return error TwiML
+      // Return error TwiML using fallback Polly
       const twiml = new this.VoiceResponseClass();
       twiml.say('I encountered an error processing your speech. Please try again.');
       
@@ -882,16 +871,7 @@ export class TwilioVoiceHandler {
               }
 
               // Generate TwiML response
-              const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Amy">${processedResponse}</Say>
-  <Pause length="1"/>
-  <Gather input="speech" action="/twilio/voice/process" method="POST" 
-          speechTimeout="auto" 
-          speechModel="phone_call"
-          enhanced="true"
-          language="en-US"/>
-</Response>`;
+              const twiml = await this.generateTTSBasedTwiML(processedResponse, true);
 
               await this.sendTwiMLResponse(res, twiml);
               
@@ -959,14 +939,14 @@ export class TwilioVoiceHandler {
 
   async handleCallTimeout(callSid, res) {
     logger.error(`Call timeout for ${callSid}`);
-    const twiml = this.generateTwiML("I'm having trouble processing your request. Please try again.", true);
+    const twiml = await this.generateTTSBasedTwiML("I'm having trouble processing your request. Please try again.", true);
     await this.sendTwiMLResponse(res, twiml);
     this.cleanupCall(callSid);
   }
 
   async handleCallError(callSid, res, error) {
     logger.error(`Call error for ${callSid}:`, error);
-    const twiml = this.generateTwiML("I encountered an error. Please try again.", true);
+    const twiml = await this.generateTTSBasedTwiML("I encountered an error. Please try again.", true);
     await this.sendTwiMLResponse(res, twiml);
     this.cleanupCall(callSid);
   }
@@ -1012,17 +992,70 @@ export class TwilioVoiceHandler {
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"
-          speechRecognitionLanguage="en-US"
-          profanityFilter="false"
-          interimSpeechResultsCallback="/twilio/voice/interim"
-          interimSpeechResultsCallbackMethod="POST"/>`;
+          language="en-US"/>`;
     }
 
     twiml += `
 </Response>`;
 
     return twiml;
+  }
+
+  /**
+   * Generate TTS audio using OpenAI and create TwiML with Play instead of Say
+   * @param {string} text - Text to convert to speech
+   * @param {boolean} shouldGather - Whether to add Gather element
+   * @returns {Promise<string>} TwiML response with Play element
+   */
+  async generateTTSBasedTwiML(text, shouldGather = true) {
+    try {
+      logger.info('Generating TTS-based TwiML for text:', { 
+        textLength: text.length,
+        textPreview: text.substring(0, 100) + '...'
+      });
+
+      // Generate TTS audio using OpenAI
+      const ttsResult = await this.audioService.generateTTS(text);
+      
+      // Create audio URL for Twilio
+      const audioUrl = `/audio/${ttsResult.fileName}`;
+      
+      logger.info('TTS audio generated successfully:', {
+        fileName: ttsResult.fileName,
+        audioUrl,
+        cached: ttsResult.cached
+      });
+
+      // Generate TwiML with Play instead of Say
+      let twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Play>${audioUrl}</Play>`;
+
+      // Only add Gather if we expect a response
+      if (shouldGather) {
+        twiml += `
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
+          speechTimeout="auto" 
+          speechModel="phone_call"
+          enhanced="true"
+          language="en-US"
+          speechRecognitionLanguage="en-US"
+          profanityFilter="false"
+          interimSpeechResultsCallback="/twilio/voice/interim"
+          interimSpeechResultsCallbackMethod="POST"/>`;
+      }
+
+      twiml += `
+</Response>`;
+
+      return twiml;
+    } catch (error) {
+      logger.error('Error generating TTS-based TwiML:', error);
+      
+      // Fallback to Polly if TTS fails
+      logger.info('Falling back to Polly TTS due to error');
+      return this.generateTwiML(text, shouldGather);
+    }
   }
 
   escapeXML(text) {
@@ -1116,22 +1149,6 @@ export class TwilioVoiceHandler {
           startTime: call.startTime,
           duration: Date.now() - call.startTime,
         });
-
-        // Ask for consent before ending the call
-        if (!call.hasConsent) {
-          const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Amy">Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.</Say>
-  <Gather input="speech" action="/twilio/consent" method="POST" 
-          speechTimeout="auto" 
-          speechModel="phone_call"
-          enhanced="true"
-          language="en-US"/>
-</Response>`;
-
-          await this.sendTwiMLResponse(res, twiml);
-          return; // Wait for consent response before proceeding
-        }
 
         // Send SMS if consent was given
         if (call.hasConsent) {
@@ -1376,5 +1393,49 @@ export class TwilioVoiceHandler {
     });
 
     return keyWords;
+  }
+
+  /**
+   * Clean up old audio files to prevent disk space issues
+   * @param {number} maxAge - Maximum age of files in milliseconds (default: 24 hours)
+   */
+  async cleanupOldAudioFiles(maxAge = 24 * 60 * 60 * 1000) {
+    try {
+      const audioDir = path.join(process.cwd(), 'public', 'audio');
+      const files = await fs.readdir(audioDir);
+      const now = Date.now();
+      let cleanedCount = 0;
+
+      for (const file of files) {
+        if (file.endsWith('.mp3')) {
+          const filePath = path.join(audioDir, file);
+          const stats = await fs.stat(filePath);
+          
+          if (now - stats.mtimeMs > maxAge) {
+            await fs.unlink(filePath);
+            cleanedCount++;
+            logger.info('Cleaned up old audio file:', { file });
+          }
+        }
+      }
+
+      if (cleanedCount > 0) {
+        logger.info(`Cleaned up ${cleanedCount} old audio files`);
+      }
+    } catch (error) {
+      logger.error('Error cleaning up old audio files:', error);
+    }
+  }
+
+  /**
+   * Schedule periodic cleanup of old audio files
+   */
+  scheduleAudioCleanup() {
+    // Clean up every 6 hours
+    setInterval(() => {
+      this.cleanupOldAudioFiles();
+    }, 6 * 60 * 60 * 1000);
+    
+    logger.info('Scheduled audio file cleanup every 6 hours');
   }
 }

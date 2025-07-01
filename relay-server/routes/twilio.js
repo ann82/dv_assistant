@@ -225,11 +225,15 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
   const call = twilioVoiceHandler.activeCalls.get(CallSid);
   if (!call) {
     logger.error(`No active call found for CallSid: ${CallSid}`);
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm sorry, I encountered an error. The call will now end.");
-    twiml.hangup();
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
+    if (audioUrl) {
+      twimlResponse.play(audioUrl);
+    }
+    twimlResponse.hangup();
     res.type('text/xml');
-    return res.send(twiml.toString());
+    return res.send(twimlResponse.toString());
   }
 
   // Process consent response (check if user said "yes")
@@ -244,14 +248,22 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
   }
 
   // End the call with appropriate message
-  const twiml = new twilio.twiml.VoiceResponse();
-  twiml.say(hasConsent ? 
+  const finalMessage = hasConsent ? 
     "Thank you. You will receive a text message with the summary and resources shortly." :
-    "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.");
-  twiml.hangup();
+    "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.";
+  
+  const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(finalMessage, false);
+  
+  // Create a new TwiML response with hangup
+  const twimlResponse = new twilio.twiml.VoiceResponse();
+  const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
+  if (audioUrl) {
+    twimlResponse.play(audioUrl);
+  }
+  twimlResponse.hangup();
 
   res.type('text/xml');
-  res.send(twiml.toString());
+  res.send(twimlResponse.toString());
 
   // Clean up call data
   await twilioVoiceHandler.cleanupCall(CallSid);
@@ -274,23 +286,9 @@ router.post('/voice/process', async (req, res) => {
     
     if (!CallSid || !SpeechResult) {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("I didn't catch that. Could you please repeat?");
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: 'auto',
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false',
-        interimSpeechResultsCallback: '/twilio/voice/interim',
-        interimSpeechResultsCallbackMethod: 'POST'
-      });
+      const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I didn't catch that. Could you please repeat?", true);
       res.type('text/xml');
-      return res.send(twiml.toString());
+      return res.send(twiml);
     }
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
@@ -364,46 +362,18 @@ router.post('/voice/process', async (req, res) => {
     }
     
     // Generate TwiML response
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(response);
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: 'auto',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false',
-      interimSpeechResultsCallback: '/twilio/voice/interim',
-      interimSpeechResultsCallbackMethod: 'POST'
-    });
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(response, true);
     
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.send(twiml);
     
   } catch (error) {
     logger.error('Error processing speech:', error);
     
-    // Fallback response
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm sorry, I encountered an error. Please try again.");
-    twiml.gather({
-      input: 'speech',
-      action: '/twilio/voice/process',
-      method: 'POST',
-      speechTimeout: 'auto',
-      speechModel: 'phone_call',
-      enhanced: 'true',
-      language: 'en-US',
-      speechRecognitionLanguage: 'en-US',
-      profanityFilter: 'false',
-      interimSpeechResultsCallback: '/twilio/voice/interim',
-      interimSpeechResultsCallbackMethod: 'POST'
-    });
+    // Fallback response using TTS
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I'm sorry, I encountered an error. Please try again.", true);
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.send(twiml);
   }
 });
 
@@ -572,7 +542,15 @@ router.post('/consent', async (req, res) => {
     const call = twilioVoiceHandler.activeCalls.get(CallSid);
     if (!call) {
       logger.error(`No active call found for CallSid: ${CallSid}`);
-      return res.status(404).send('Call not found');
+      const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+      const twimlResponse = new twilio.twiml.VoiceResponse();
+      const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
+      if (audioUrl) {
+        twimlResponse.play(audioUrl);
+      }
+      twimlResponse.hangup();
+      res.type('text/xml');
+      return res.send(twimlResponse.toString());
     }
 
     // Process consent response (check if user said "yes")
@@ -587,24 +565,36 @@ router.post('/consent', async (req, res) => {
     }
 
     // End the call with appropriate message
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say(hasConsent ? 
+    const finalMessage = hasConsent ? 
       "Thank you. You will receive a text message with the summary and resources shortly." :
-      "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.");
-    twiml.hangup();
+      "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.";
+    
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(finalMessage, false);
+    
+    // Create a new TwiML response with hangup
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
+    if (audioUrl) {
+      twimlResponse.play(audioUrl);
+    }
+    twimlResponse.hangup();
 
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.send(twimlResponse.toString());
 
     // Clean up call data
     await twilioVoiceHandler.cleanupCall(CallSid);
   } catch (error) {
     logger.error('Error processing consent response:', error);
-    const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say("I'm sorry, I encountered an error. The call will now end.");
-    twiml.hangup();
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
+    if (audioUrl) {
+      twimlResponse.play(audioUrl);
+    }
+    twimlResponse.hangup();
     res.type('text/xml');
-    res.send(twiml.toString());
+    res.send(twimlResponse.toString());
   }
 });
 

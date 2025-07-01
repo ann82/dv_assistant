@@ -553,6 +553,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed error handling in Tavily response formatting
 - Resolved test suite dependencies by adding supertest package
 - Improved test assertions for better reliability
+- Call ending SMS consent flow: Fixed issue where the summary offer message "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no." was not being sent when users said "thank you" or similar phrases. The system now properly detects end conversation intents and redirects to the consent endpoint.
 
 ## [1.0.0] - 2024-03-19
 
