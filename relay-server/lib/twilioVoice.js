@@ -1014,26 +1014,40 @@ export class TwilioVoiceHandler {
         textPreview: text.substring(0, 100) + '...'
       });
 
-      // Generate TTS audio using OpenAI
-      const ttsResult = await this.audioService.generateTTS(text);
-      
-      // Create audio URL for Twilio
-      const audioUrl = `/audio/${ttsResult.fileName}`;
-      
-      logger.info('TTS audio generated successfully:', {
-        fileName: ttsResult.fileName,
-        audioUrl,
-        cached: ttsResult.cached
-      });
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, config.TTS_TIMEOUT + 2000); // Add 2s buffer for TwiML generation
 
-      // Generate TwiML with Play instead of Say
-      let twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      try {
+        // Generate TTS audio using OpenAI with timeout
+        const ttsResult = await Promise.race([
+          this.audioService.generateTTS(text),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('TTS timeout')), config.TTS_TIMEOUT + 2000)
+          )
+        ]);
+        
+        clearTimeout(timeoutId);
+        
+        // Create audio URL for Twilio
+        const audioUrl = `/audio/${ttsResult.fileName}`;
+        
+        logger.info('TTS audio generated successfully:', {
+          fileName: ttsResult.fileName,
+          audioUrl,
+          cached: ttsResult.cached
+        });
+
+        // Generate TwiML with Play instead of Say
+        let twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Play>${audioUrl}</Play>`;
 
-      // Only add Gather if we expect a response
-      if (shouldGather) {
-        twiml += `
+        // Only add Gather if we expect a response
+        if (shouldGather) {
+          twiml += `
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
           speechTimeout="auto" 
           speechModel="phone_call"
@@ -1043,12 +1057,22 @@ export class TwilioVoiceHandler {
           profanityFilter="false"
           interimSpeechResultsCallback="/twilio/voice/interim"
           interimSpeechResultsCallbackMethod="POST"/>`;
-      }
+        }
 
-      twiml += `
+        twiml += `
 </Response>`;
 
-      return twiml;
+        return twiml;
+      } catch (ttsError) {
+        clearTimeout(timeoutId);
+        logger.error('TTS generation failed, falling back to Polly:', {
+          error: ttsError.message,
+          text: text.substring(0, 100) + '...'
+        });
+        
+        // Fallback to Polly if TTS fails
+        return this.generateTwiML(text, shouldGather);
+      }
     } catch (error) {
       logger.error('Error generating TTS-based TwiML:', error);
       

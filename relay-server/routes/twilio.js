@@ -281,7 +281,7 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
 router.post('/voice/process', async (req, res) => {
   logger.info('Received speech processing request');
   
-  // Set a timeout for this specific request
+  // Set a timeout for this specific request - reduced from 90s to 45s
   const requestTimeout = setTimeout(() => {
     if (!res.headersSent) {
       logger.error('Voice process request timeout:', {
@@ -298,7 +298,7 @@ router.post('/voice/process', async (req, res) => {
           language="en-US"/>
 </Response>`);
     }
-  }, 90000); // 90 second timeout
+  }, 45000); // Reduced from 90s to 45s
   
   try {
     const { CallSid, SpeechResult } = req.body;
@@ -334,19 +334,24 @@ router.post('/voice/process', async (req, res) => {
     const lowerSpeech = cleanedSpeechResult.toLowerCase();
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
     
-    // Process the speech input with timeout handling
+    // Process the speech input with timeout handling - reduced from 60s to 30s
     const processedResponse = await Promise.race([
       twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Processing timeout')), 60000)
+        setTimeout(() => reject(new Error('Processing timeout')), 30000)
       )
     ]);
     
     // Clear the request timeout since we got a response
     clearTimeout(requestTimeout);
     
-    // Generate TwiML response
-    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(processedResponse, true);
+    // Generate TwiML response with timeout handling
+    const twiml = await Promise.race([
+      twilioVoiceHandler.generateTTSBasedTwiML(processedResponse, true),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TwiML generation timeout')), 15000)
+      )
+    ]);
     
     res.type('text/xml');
     res.send(twiml);

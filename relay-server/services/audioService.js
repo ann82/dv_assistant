@@ -218,6 +218,12 @@ export class AudioService {
   // Generate TTS with caching
   async generateTTS(text) {
     try {
+      // Check if TTS is enabled
+      if (!config.ENABLE_TTS) {
+        logger.info('TTS is disabled, throwing error to trigger fallback');
+        throw new Error('TTS is disabled');
+      }
+
       const cacheKey = this.generateCacheKey(text);
       const cacheFilePath = path.join(this.cacheDir, `tts_${cacheKey}.mp3`);
 
@@ -243,72 +249,97 @@ export class AudioService {
         // Cache miss, continue to generate
       }
 
-      // Generate new TTS
+      // Generate new TTS with timeout
       logger.info('Generating TTS for text:', { 
         text: text.substring(0, 100) + '...',
-        filePath: cacheFilePath 
+        filePath: cacheFilePath,
+        voice: config.TTS_VOICE,
+        timeout: config.TTS_TIMEOUT
       });
       
-      const response = await this.openai.audio.speech.create({
-        model: "tts-1",
-        voice: "alloy",
-        input: text
-      });
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, config.TTS_TIMEOUT);
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      
-      // Calculate total size and chunk size
-      const totalSize = buffer.length;
-      const chunkSize = 1024 * 1024; // 1MB chunks
-      const chunks = Math.ceil(totalSize / chunkSize);
-      
-      logger.info('Total audio size:', { totalSize, bytes: totalSize });
-      
-      // Write in chunks to avoid memory issues
-      logger.info(`Writing ${chunks} chunks of audio...`);
-      
-      for (let i = 0; i < chunks; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, totalSize);
-        const chunk = buffer.slice(start, end);
+      try {
+        const response = await this.openai.audio.speech.create({
+          model: "tts-1",
+          voice: config.TTS_VOICE,
+          input: text
+        }, {
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        const buffer = Buffer.from(await response.arrayBuffer());
         
-        if (i === 0) {
-          // First chunk - create file
-          await fs.writeFile(cacheFilePath, chunk);
-        } else {
-          // Append to file
-          await fs.appendFile(cacheFilePath, chunk);
+        // Calculate total size and chunk size
+        const totalSize = buffer.length;
+        const chunkSize = 1024 * 1024; // 1MB chunks
+        const chunks = Math.ceil(totalSize / chunkSize);
+        
+        logger.info('Total audio size:', { totalSize, bytes: totalSize });
+        
+        // Write in chunks to avoid memory issues
+        logger.info(`Writing ${chunks} chunks of audio...`);
+        
+        for (let i = 0; i < chunks; i++) {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, totalSize);
+          const chunk = buffer.slice(start, end);
+          
+          if (i === 0) {
+            // First chunk - create file
+            await fs.writeFile(cacheFilePath, chunk);
+          } else {
+            // Append to file
+            await fs.appendFile(cacheFilePath, chunk);
+          }
+          
+          logger.info(`Wrote chunk ${i + 1}/${chunks}`, { chunkLength: chunk.length });
+        }
+
+        // Get file stats
+        const stats = await fs.stat(cacheFilePath);
+        logger.info('TTS audio file stats:', {
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime
+        });
+
+        // Copy to audio directory for serving
+        const fileName = `${cacheKey}.mp3`;
+        const filePath = path.join(this.audioDir, fileName);
+        await fs.copyFile(cacheFilePath, filePath);
+
+        logger.info('TTS audio generated successfully:', {
+          text: text.substring(0, 50) + '...',
+          fileName,
+          filePath,
+          size: stats.size,
+          voice: config.TTS_VOICE
+        });
+
+        return {
+          text,
+          fileName,
+          filePath,
+          cached: false
+        };
+
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          logger.error(`TTS generation timed out after ${config.TTS_TIMEOUT}ms`);
+          throw new Error('TTS generation timed out');
         }
         
-        logger.info(`Wrote chunk ${i + 1}/${chunks}`, { chunkLength: chunk.length });
+        throw fetchError;
       }
-
-      // Get file stats
-      const stats = await fs.stat(cacheFilePath);
-      logger.info('TTS audio file stats:', {
-        size: stats.size,
-        created: stats.birthtime,
-        modified: stats.mtime
-      });
-
-      // Copy to audio directory for serving
-      const fileName = `${cacheKey}.mp3`;
-      const filePath = path.join(this.audioDir, fileName);
-      await fs.copyFile(cacheFilePath, filePath);
-
-      logger.info('TTS audio generated successfully:', {
-        text: text.substring(0, 50) + '...',
-        fileName,
-        filePath,
-        size: stats.size
-      });
-
-      return {
-        text,
-        fileName,
-        filePath,
-        cached: false
-      };
 
     } catch (error) {
       logger.error('Error generating TTS:', error);

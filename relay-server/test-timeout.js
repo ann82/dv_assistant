@@ -5,7 +5,7 @@ import logger from './lib/logger.js';
 
 const BASE_URL = process.env.TEST_URL || 'https://dvvoiceagent-production.up.railway.app';
 
-async function testEndpoint(endpoint, timeout = 30000) {
+async function testEndpoint(endpoint, timeout = 30000, body = null) {
   const url = `${BASE_URL}${endpoint}`;
   const startTime = Date.now();
   
@@ -15,20 +15,20 @@ async function testEndpoint(endpoint, timeout = 30000) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     
-    const response = await fetch(url, {
+    const options = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-Twilio-Signature': 'test-signature'
       },
-      body: new URLSearchParams({
-        CallSid: 'test-call-sid',
-        SpeechResult: 'test speech input',
-        From: '+1234567890',
-        To: '+0987654321'
-      }),
       signal: controller.signal
-    });
+    };
+    
+    if (body) {
+      options.body = new URLSearchParams(body);
+    }
+    
+    const response = await fetch(url, options);
     
     clearTimeout(timeoutId);
     const duration = Date.now() - startTime;
@@ -71,23 +71,39 @@ async function runTests() {
   logger.info('\n=== Testing Twilio Voice Endpoint ===');
   const voiceResult = await testEndpoint('/twilio/voice', 60000);
   
-  // Test Twilio voice process endpoint
+  // Test Twilio voice process endpoint with realistic speech input
   logger.info('\n=== Testing Twilio Voice Process Endpoint ===');
-  const processResult = await testEndpoint('/twilio/voice/process', 90000);
+  const processResult = await testEndpoint('/twilio/voice/process', 60000, {
+    CallSid: 'test-call-sid-' + Date.now(),
+    SpeechResult: 'I need help finding a domestic violence shelter in Oakland California',
+    From: '+1234567890',
+    To: '+0987654321'
+  });
+  
+  // Test with a longer speech input that might trigger TTS
+  logger.info('\n=== Testing Twilio Voice Process Endpoint (Long Input) ===');
+  const longProcessResult = await testEndpoint('/twilio/voice/process', 60000, {
+    CallSid: 'test-call-sid-long-' + Date.now(),
+    SpeechResult: 'I am in an emergency situation and need to find a safe place to stay tonight. I have children with me and we need immediate assistance. Can you help me find a domestic violence shelter in the San Francisco Bay Area that can accommodate us?',
+    From: '+1234567890',
+    To: '+0987654321'
+  });
   
   // Summary
   logger.info('\n=== Test Summary ===');
   logger.info(`Health endpoint: ${voiceResult.success ? '✅ PASS' : '❌ FAIL'}`);
   logger.info(`Voice endpoint: ${voiceResult.success ? '✅ PASS' : '❌ FAIL'}`);
   logger.info(`Process endpoint: ${processResult.success ? '✅ PASS' : '❌ FAIL'}`);
+  logger.info(`Process endpoint (long): ${longProcessResult.success ? '✅ PASS' : '❌ FAIL'}`);
   
-  if (!processResult.success) {
+  if (!processResult.success || !longProcessResult.success) {
     logger.error('🔍 The process endpoint is experiencing issues. Check Railway logs for more details.');
     logger.info('💡 Possible solutions:');
     logger.info('   1. Check Railway service logs');
     logger.info('   2. Verify environment variables are set');
     logger.info('   3. Check if Tavily API is responding');
     logger.info('   4. Monitor memory usage');
+    logger.info('   5. Check TTS generation timeout');
   }
 }
 
