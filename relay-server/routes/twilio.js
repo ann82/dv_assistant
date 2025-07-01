@@ -281,11 +281,31 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
 router.post('/voice/process', async (req, res) => {
   logger.info('Received speech processing request');
   
+  // Set a timeout for this specific request
+  const requestTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.error('Voice process request timeout:', {
+        CallSid: req.body.CallSid,
+        SpeechResult: req.body.SpeechResult?.substring(0, 100)
+      });
+      res.status(408).type('text/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Amy">I'm sorry, the request is taking too long. Please try again.</Say>
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
+          speechTimeout="auto" 
+          speechModel="phone_call"
+          enhanced="true"
+          language="en-US"/>
+</Response>`);
+    }
+  }, 90000); // 90 second timeout
+  
   try {
     const { CallSid, SpeechResult } = req.body;
     
     if (!CallSid || !SpeechResult) {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
+      clearTimeout(requestTimeout);
       const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I didn't catch that. Could you please repeat?", true);
       res.type('text/xml');
       return res.send(twiml);
@@ -313,67 +333,47 @@ router.post('/voice/process', async (req, res) => {
     // Check if this is a consent response (yes/no to SMS question)
     const lowerSpeech = cleanedSpeechResult.toLowerCase();
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
-    const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
     
-    // Check if the last response was asking for consent - make this more robust
-    const call = twilioVoiceHandler.activeCalls.get(CallSid);
-    const lastResponse = call?.lastResponse;
-    const wasAskingForConsent = lastResponse && (
-      lastResponse.includes('text message') || 
-      lastResponse.includes('summary') || 
-      lastResponse.includes('yes or no') ||
-      lastResponse.includes('receive a summary')
-    );
+    // Process the speech input with timeout handling
+    const processedResponse = await Promise.race([
+      twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Processing timeout')), 60000)
+      )
+    ]);
     
-    logger.info('Consent detection check:', {
-      CallSid,
-      SpeechResult,
-      cleanedSpeechResult,
-      isConsentResponse,
-      lastResponse,
-      wasAskingForConsent,
-      consentKeywords: consentKeywords.filter(keyword => lowerSpeech.includes(keyword))
-    });
-    
-    if (isConsentResponse && wasAskingForConsent) {
-      logger.info('Detected consent response, handling consent directly:', { CallSid, SpeechResult });
-      
-      // Handle consent directly instead of redirecting
-      await handleSMSConsent(CallSid, SpeechResult, res);
-      return;
-    }
-    
-    // Process the speech input using the TwilioVoiceHandler
-    const response = await twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid);
-    
-    // Check if processSpeechInput detected a consent response
-    if (response && typeof response === 'object' && response.shouldRedirectToConsent) {
-      logger.info('processSpeechInput detected consent response, handling consent directly:', { CallSid, SpeechResult });
-      
-      // Handle consent directly instead of redirecting
-      await handleSMSConsent(CallSid, SpeechResult, res);
-      return;
-    }
-    
-    // Store the response for consent detection
-    if (call) {
-      call.lastResponse = response;
-      twilioVoiceHandler.activeCalls.set(CallSid, call);
-    }
+    // Clear the request timeout since we got a response
+    clearTimeout(requestTimeout);
     
     // Generate TwiML response
-    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(response, true);
+    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(processedResponse, true);
     
     res.type('text/xml');
     res.send(twiml);
+    
+    logger.info('Successfully processed speech:', { CallSid, responseLength: processedResponse.length });
     
   } catch (error) {
-    logger.error('Error processing speech:', error);
+    clearTimeout(requestTimeout);
+    logger.error('Error processing speech:', {
+      error: error.message,
+      stack: error.stack,
+      CallSid: req.body.CallSid
+    });
     
-    // Fallback response using TTS
-    const twiml = await twilioVoiceHandler.generateTTSBasedTwiML("I'm sorry, I encountered an error. Please try again.", true);
+    // Send error response
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Amy">I'm sorry, I encountered an error processing your request. Please try again.</Say>
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
+          speechTimeout="auto" 
+          speechModel="phone_call"
+          enhanced="true"
+          language="en-US"/>
+</Response>`;
+    
     res.type('text/xml');
-    res.send(twiml);
+    res.send(errorTwiml);
   }
 });
 
@@ -835,5 +835,15 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
     throw error;
   }
 }
+
+// Add method to get active calls count for health monitoring
+router.getActiveCallsCount = () => {
+  return twilioVoiceHandler ? twilioVoiceHandler.activeCalls.size : 0;
+};
+
+// Add method to get WebSocket server for health monitoring
+router.getWebSocketServer = () => {
+  return wsServer;
+};
 
 export default router;

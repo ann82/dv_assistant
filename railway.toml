@@ -5,10 +5,10 @@ buildCommand = "cd relay-server && npm install --legacy-peer-deps"
 [deploy]
 startCommand = "cd relay-server && node start.js"
 healthcheckPath = "/health"
-healthcheckTimeout = 600
+healthcheckTimeout = 1200
 restartPolicyType = "always"
 
 [deploy.env]
 NODE_ENV = "production"
 PORT = "3000"
-NODE_OPTIONS = "--experimental-modules" 
+NODE_OPTIONS = "--experimental-modules --max-old-space-size=2048" 

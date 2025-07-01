@@ -325,4 +325,18 @@ export class TwilioWebSocketServer {
       call.conversationHistory.push(message);
     }
   }
+
+  // Add method to get connection count for health monitoring
+  getConnectionCount() {
+    return this.activeCalls.size;
+  }
+
+  // Add method to get WebSocket server status
+  getStatus() {
+    return {
+      activeConnections: this.activeCalls.size,
+      serverRunning: !!this.wss,
+      port: this.port
+    };
+  }
 } 

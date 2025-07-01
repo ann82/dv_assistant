@@ -555,6 +555,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved test assertions for better reliability
 - Call ending SMS consent flow: Fixed issue where the summary offer message "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no." was not being sent when users said "thank you" or similar phrases. The system now properly detects end conversation intents and redirects to the consent endpoint.
 
+### Fixed
+- **Timeout Issues**: Resolved timeout problems with Twilio voice processing endpoint
+  - Increased server timeout from 60s to 120s for Railway deployment
+  - Added request-specific timeout handling (90s) for voice process endpoint
+  - Implemented Promise.race with timeout for speech processing
+  - Enhanced error handling with proper timeout responses
+  - Added Railway-specific configuration with increased health check timeout (1200s)
+  - Improved memory allocation with `--max-old-space-size=2048`
+  - Enhanced health check endpoint with detailed diagnostics
+  - Added timeout diagnostic test script (`test-timeout.js`)
+
+### Added
+- **Timeout Diagnostics**: New test script to diagnose endpoint timeout issues
+- **Enhanced Health Monitoring**: Health check now includes Railway info, timeout config, and connection counts
+- **Better Error Handling**: Improved timeout error responses with proper TwiML formatting
+
+### Changed
+- **Railway Configuration**: Updated `railway.toml` with better timeout and memory settings
+- **Server Configuration**: Enhanced timeout handling with detailed logging and error responses
+
 ## [1.0.0] - 2024-03-19
 
 ### Added

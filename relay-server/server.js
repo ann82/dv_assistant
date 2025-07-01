@@ -55,8 +55,32 @@ app.use(express.urlencoded({
 
 // Increase timeout for Twilio requests
 app.use((req, res, next) => {
-  req.setTimeout(60000); // 60 seconds
-  res.setTimeout(60000); // 60 seconds
+  // Increase timeouts for Railway deployment
+  req.setTimeout(120000); // 2 minutes
+  res.setTimeout(120000); // 2 minutes
+  
+  // Add timeout error handling
+  req.on('timeout', () => {
+    logger.error('Request timeout:', {
+      url: req.originalUrl,
+      method: req.method,
+      headers: req.headers
+    });
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Request timeout' });
+    }
+  });
+  
+  res.on('timeout', () => {
+    logger.error('Response timeout:', {
+      url: req.originalUrl,
+      method: req.method
+    });
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Response timeout' });
+    }
+  });
+  
   next();
 });
 
@@ -104,7 +128,24 @@ app.get('/health', (req, res) => {
       environment: process.env.NODE_ENV || 'development',
       port: port,
       memory: process.memoryUsage(),
-      pid: process.pid
+      pid: process.pid,
+      // Add Railway-specific info
+      railway: {
+        staticUrl: process.env.RAILWAY_STATIC_URL,
+        serviceId: process.env.RAILWAY_SERVICE_ID,
+        environment: process.env.RAILWAY_ENVIRONMENT
+      },
+      // Add timeout configuration
+      timeouts: {
+        requestTimeout: 120000,
+        responseTimeout: 120000,
+        healthCheckTimeout: 1200
+      },
+      // Add active connections info
+      connections: {
+        activeCalls: twilioRoutes.getActiveCallsCount ? twilioRoutes.getActiveCallsCount() : 'unknown',
+        wsConnections: wsServer ? wsServer.getConnectionCount() : 'unknown'
+      }
     };
     
     logger.info('Health check requested:', healthStatus);
