@@ -9,6 +9,7 @@ import { AudioService } from '../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { getLanguageConfig, DEFAULT_LANGUAGE } from './languageConfig.js';
+import { detectLocation } from './enhancedLocationDetector.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -525,7 +526,7 @@ export class TwilioVoiceHandler {
       // For resource-related intents (shelter, legal, counseling), extract location
       if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
         // Extract location from speech using enhanced location detector
-        const { extractLocationFromQuery, detectUSLocation } = await import('./enhancedLocationDetector.js');
+        const { extractLocationFromQuery, detectLocation } = await import('./enhancedLocationDetector.js');
         const locationInfo = extractLocationFromQuery(speechResult);
         
         logger.info('Extracted location info:', {
@@ -574,7 +575,7 @@ export class TwilioVoiceHandler {
             callSid,
             requestId
           });
-          return "I found a location, but I need more specific information to help you effectively. Could you please include the state or province and country? For example, instead of just 'San Francisco', please say 'San Francisco, California, USA'.";
+          return this.getLocalizedPrompt(languageCode, 'moreSpecificLocation');
         }
 
         // Rewrite query with context
@@ -646,18 +647,18 @@ export class TwilioVoiceHandler {
 
       // For emergency help, provide immediate assistance
       if (intent === 'emergency_help') {
-        return "This is an emergency situation. Please call 911 immediately. You can also call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance. They are available 24/7 and can help you with safety planning and emergency resources.";
+        return this.getLocalizedPrompt(languageCode, 'emergency');
       }
 
       // Default fallback for unknown intents
-      return "I'm sorry, I didn't understand your request. Could you please rephrase that or ask for help finding shelters, legal services, or general information about domestic violence?";
+      return this.getLocalizedPrompt(languageCode, 'fallback');
     } catch (error) {
       logger.error('Error processing speech input:', {
         error: error.message,
         stack: error.stack,
         speechResult
       });
-      return "I'm sorry, I encountered an error processing your request. Please try again.";
+      return this.getLocalizedPrompt(languageCode, 'processingError');
     }
   }
 
