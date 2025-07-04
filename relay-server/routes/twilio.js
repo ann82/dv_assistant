@@ -17,6 +17,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 import { filterConfig, matchesPattern, cleanTitle } from '../lib/filterConfig.js';
 import { ResponseGenerator } from '../lib/response.js';
+import { config } from '../lib/config.js';
+import { welcomeMessage } from '../lib/conversationConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,27 +186,11 @@ router.post('/voice', async (req, res) => {
         logger.info('Initialized call in voice handler:', { CallSid, from: req.body.From });
       }
       
-      // Generate welcome message without complex validation
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say('Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?');
-      
-      // Add gather for speech input with improved speech recognition
-      twiml.gather({
-        input: 'speech',
-        action: '/twilio/voice/process',
-        method: 'POST',
-        speechTimeout: 'auto',
-        speechModel: 'phone_call',
-        enhanced: 'true',
-        language: 'en-US',
-        speechRecognitionLanguage: 'en-US',
-        profanityFilter: 'false',
-        interimSpeechResultsCallback: '/twilio/voice/interim',
-        interimSpeechResultsCallbackMethod: 'POST'
-      });
+      // Generate welcome message using conversation config
+      const twiml = await twilioVoiceHandler.generateTTSBasedTwiML(welcomeMessage, true);
       
       res.type('text/xml');
-      res.send(twiml.toString());
+      res.send(twiml);
     }
     
   } catch (error) {

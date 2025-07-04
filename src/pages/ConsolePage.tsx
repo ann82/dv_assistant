@@ -4,7 +4,7 @@ import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { SpeechHandler } from '../lib/speech';
-import { instructions } from '../utils/conversation_config.js';
+import { instructions, welcomeMessage } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
 import { Button } from '../components/button/Button';
@@ -277,7 +277,7 @@ export function ConsolePage() {
       client.sendUserMessageContent([
         {
           type: `input_text`,
-          text: `Hello! I am an AI assistant trained to help you and your information is protected. How can I help you?`,
+          text: welcomeMessage,
         },
       ]);
     } catch (error) {

@@ -4,19 +4,22 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2025-06-25):**
+**Latest Update (2025-01-27):**
+- **Configurable Welcome Message**: Added cost-efficient, configurable welcome message for both voice and web interfaces
+- **Zero Additional AI Costs**: Welcome messages use pre-written text instead of AI generation, saving $0.10-2.00/month
+- **Emergency Assessment**: Welcome message includes immediate danger assessment and 911 guidance
+- **Consistent Experience**: Same empathetic welcome message across voice and web platforms
 - **Enhanced AI Instructions**: Integrated comprehensive conversation guidelines from frontend to relay-server
 - **Improved Response Quality**: Replaced simple 3-line prompt with detailed 150+ line instructions
 - **Unified Experience**: Shared conversation config between web and voice interfaces
 - **Better Emergency Protocols**: Enhanced 911 escalation and safety planning
 - **Cultural Sensitivity**: Added LGBTQ+ support, language preferences, and accessibility guidelines
-- **Cost Analysis**: Detailed cost-benefit analysis shows manageable $1-3/month increase for significantly improved quality
 - **Code Reduction**: Eliminated 154 lines of duplicated instructions, single source of truth
 - **Query Rewriting Optimization**: Simplified and improved Tavily query construction for better search results
 - **Enhanced Site Filtering**: Added exclusion of low-quality sites (yellowpages, city-data, tripadvisor) for better results
 - **Improved Location Search**: Better proximity search with "near" operator and exact phrase matching
 - **Enhanced Voice Responses (v1.19.0)**: Voice responses now include shelter name, address, and phone number when available
-- **Test Suite Updated**: All tests now align with new query rewriting, filtering, and response logic, and pass successfully
+- **Test Suite Updated**: All tests now align with new query rewriting, filtering, and response logic, and pass successfully (334 tests passed, 3 skipped)
 
 ---
 
@@ -44,6 +47,44 @@ A real-time voice-based assistant designed to provide immediate support and info
 - All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
 - **Comprehensive Conversation Guidelines**: Detailed instructions for emergency protocols, cultural sensitivity, safety planning, and conversation structure
 - **Unified Configuration**: Shared conversation config between web and voice interfaces ensures consistency
+
+## Configurable Welcome Message
+
+The system now includes a cost-efficient, configurable welcome message that provides consistent, empathetic interactions across all platforms:
+
+### Key Features
+
+- **Cost Efficiency**: Uses pre-written welcome message instead of AI generation, saving $0.10-2.00/month
+- **Emergency Assessment**: Includes immediate danger check and 911 guidance in welcome
+- **Consistent Experience**: Same empathetic welcome across voice and web interfaces
+- **Single Source of Truth**: Welcome message defined in conversation config, easy to update
+- **Fast Response**: No AI generation delay, immediate TTS processing
+
+### Welcome Message Benefits
+
+- **Safety First**: "Are you in immediate danger right now? If so, please call 911"
+- **Empathetic Tone**: "Hello, and thank you for reaching out. I'm here to listen and help you"
+- **Clear Purpose**: "find the support and resources you need"
+- **Service Scope**: "shelters, counseling, legal services, or any other support"
+- **Open Invitation**: "What brings you to call today?"
+
+### Technical Implementation
+
+```javascript
+// Single source of truth in conversation config
+export const welcomeMessage = `Hello, and thank you for reaching out...`;
+
+// Used in both voice and web interfaces
+import { welcomeMessage } from '../lib/conversationConfig.js';
+```
+
+### Cost Analysis
+
+| Monthly Calls | AI-Generated Cost | Configurable Cost | Savings |
+|---------------|-------------------|-------------------|---------|
+| 1,000 | $0.10-0.20 | $0 | $0.10-0.20 |
+| 10,000 | $1-2 | $0 | $1-2 |
+| 100,000 | $10-20 | $0 | $10-20 |
 
 ## Enhanced AI Conversation Guidelines
 

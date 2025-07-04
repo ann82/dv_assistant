@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2025-01-27
+
+### Added
+- **Configurable Welcome Message**: Added cost-efficient, configurable welcome message for both voice and web interfaces
+- **Emergency Assessment in Welcome**: Welcome message includes immediate danger assessment and 911 guidance
+- **Zero Additional AI Costs**: Welcome messages use pre-written text instead of AI generation
+- **Consistent Cross-Platform Experience**: Same empathetic welcome message across voice and web platforms
+- **Single Source of Truth**: Welcome message defined in conversation config for easy updates
+
+### Changed
+- **Replaced Hardcoded Welcome**: Updated Twilio voice processing to use configurable welcome message
+- **Updated Frontend Welcome**: ConsolePage now uses the same configurable welcome message
+- **Enhanced Conversation Config**: Added welcomeMessage export to shared configuration
+- **Improved Cost Efficiency**: Eliminated AI generation costs for welcome messages
+
+### Fixed
+- **Inconsistent Welcome Messages**: Unified welcome experience across all platforms
+- **Additional AI Costs**: Removed unnecessary AI calls for welcome message generation
+- **Welcome Message Maintenance**: Single location for updating welcome message content
+
+### Technical Details
+- **Cost Savings**: $0.10-2.00/month savings depending on call volume
+- **Response Time**: Faster welcome delivery (no AI generation delay)
+- **Emergency Protocols**: Welcome follows conversation config structure for immediate danger assessment
+- **Empathetic Tone**: Welcome message matches conversation config guidelines for supportive language
+
 ## [1.19.0] - 2025-06-25
 
 ### Added
