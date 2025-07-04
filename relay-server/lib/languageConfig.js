@@ -12,6 +12,7 @@ export const SUPPORTED_LANGUAGES = {
   'en-US': {
     name: 'English (US)',
     twilioVoice: 'Polly.Amy',
+    openaiVoice: 'nova',
     twilioLanguage: 'en-US',
     twilioSpeechRecognitionLanguage: 'en-US',
     fallback: null,
@@ -30,6 +31,7 @@ export const SUPPORTED_LANGUAGES = {
   'es-ES': {
     name: 'Español (España)',
     twilioVoice: 'Polly.Conchita',
+    openaiVoice: 'shimmer',
     twilioLanguage: 'es-ES',
     twilioSpeechRecognitionLanguage: 'es-ES',
     fallback: 'en-US',
@@ -48,6 +50,7 @@ export const SUPPORTED_LANGUAGES = {
   'fr-FR': {
     name: 'Français (France)',
     twilioVoice: 'Polly.Celine',
+    openaiVoice: 'echo',
     twilioLanguage: 'fr-FR',
     twilioSpeechRecognitionLanguage: 'fr-FR',
     fallback: 'en-US',
@@ -66,6 +69,7 @@ export const SUPPORTED_LANGUAGES = {
   'de-DE': {
     name: 'Deutsch (Deutschland)',
     twilioVoice: 'Polly.Marlene',
+    openaiVoice: 'onyx',
     twilioLanguage: 'de-DE',
     twilioSpeechRecognitionLanguage: 'de-DE',
     fallback: 'en-US',

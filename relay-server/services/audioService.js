@@ -252,7 +252,7 @@ export class AudioService {
       // Get language-specific voice
       const { getLanguageConfig } = await import('../lib/languageConfig.js');
       const langConfig = getLanguageConfig(languageCode);
-      const voice = langConfig?.twilioVoice?.replace('Polly.', '') || config.TTS_VOICE;
+      const voice = langConfig?.openaiVoice || config.TTS_VOICE;
       
       // Generate new TTS with timeout
       logger.info('Generating TTS for text:', { 

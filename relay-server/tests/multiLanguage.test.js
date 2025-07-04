@@ -11,6 +11,7 @@ describe('Multi-Language Support', () => {
       const config = getLanguageConfig('en-US');
       expect(config.name).toBe('English (US)');
       expect(config.twilioVoice).toBe('Polly.Amy');
+      expect(config.openaiVoice).toBe('nova');
       expect(config.twilioLanguage).toBe('en-US');
       expect(config.twilioSpeechRecognitionLanguage).toBe('en-US');
     });
@@ -19,6 +20,7 @@ describe('Multi-Language Support', () => {
       const config = getLanguageConfig('es-ES');
       expect(config.name).toBe('Español (España)');
       expect(config.twilioVoice).toBe('Polly.Conchita');
+      expect(config.openaiVoice).toBe('shimmer');
       expect(config.twilioLanguage).toBe('es-ES');
       expect(config.twilioSpeechRecognitionLanguage).toBe('es-ES');
     });
@@ -27,6 +29,7 @@ describe('Multi-Language Support', () => {
       const config = getLanguageConfig('fr-FR');
       expect(config.name).toBe('Français (France)');
       expect(config.twilioVoice).toBe('Polly.Celine');
+      expect(config.openaiVoice).toBe('echo');
       expect(config.twilioLanguage).toBe('fr-FR');
       expect(config.twilioSpeechRecognitionLanguage).toBe('fr-FR');
     });
@@ -35,6 +38,7 @@ describe('Multi-Language Support', () => {
       const config = getLanguageConfig('de-DE');
       expect(config.name).toBe('Deutsch (Deutschland)');
       expect(config.twilioVoice).toBe('Polly.Marlene');
+      expect(config.openaiVoice).toBe('onyx');
       expect(config.twilioLanguage).toBe('de-DE');
       expect(config.twilioSpeechRecognitionLanguage).toBe('de-DE');
     });
@@ -43,6 +47,7 @@ describe('Multi-Language Support', () => {
       const config = getLanguageConfig('zh-CN');
       expect(config.name).toBe('English (US)');
       expect(config.twilioVoice).toBe('Polly.Amy');
+      expect(config.openaiVoice).toBe('nova');
     });
 
     it('should handle language-only codes', () => {
