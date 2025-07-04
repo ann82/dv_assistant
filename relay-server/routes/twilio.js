@@ -17,7 +17,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 import { filterConfig, matchesPattern, cleanTitle } from '../lib/filterConfig.js';
 import { ResponseGenerator } from '../lib/response.js';
-import { config } from '../lib/config.js';
 import { welcomeMessage } from '../lib/conversationConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
