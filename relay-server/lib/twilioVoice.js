@@ -102,8 +102,8 @@ export class TwilioVoiceHandler {
         return twiml;
       }
 
-      // Generate welcome message using OpenAI TTS
-      const welcomeMessage = 'Welcome to the Domestic Violence Support Assistant. I can help you find shelter homes and resources in your area. How can I help you today?';
+      // Generate welcome message using conversation config
+      const { welcomeMessage } = await import('./conversationConfig.js');
       const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true);
       
       return twiml;
@@ -981,9 +981,12 @@ export class TwilioVoiceHandler {
   }
 
   generateTwiML(text, shouldGather = true) {
+    // Ensure text is a string
+    const textString = typeof text === 'string' ? text : String(text || '');
+    
     let twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Amy">${this.escapeXML(text)}</Say>`;
+  <Say voice="Polly.Amy">${this.escapeXML(textString)}</Say>`;
 
     // Only add Gather if we expect a response
     if (shouldGather) {
@@ -1009,9 +1012,12 @@ export class TwilioVoiceHandler {
    */
   async generateTTSBasedTwiML(text, shouldGather = true) {
     try {
+      // Ensure text is a string
+      const textString = typeof text === 'string' ? text : String(text || '');
+      
       logger.info('Generating TTS-based TwiML for text:', { 
-        textLength: text.length,
-        textPreview: text.substring(0, 100) + '...'
+        textLength: textString.length,
+        textPreview: textString.substring(0, 100) + '...'
       });
 
       // Create AbortController for timeout handling
@@ -1023,7 +1029,7 @@ export class TwilioVoiceHandler {
       try {
         // Generate TTS audio using OpenAI with timeout
         const ttsResult = await Promise.race([
-          this.audioService.generateTTS(text),
+          this.audioService.generateTTS(textString),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('TTS timeout')), config.TTS_TIMEOUT + 2000)
           )
@@ -1067,23 +1073,26 @@ export class TwilioVoiceHandler {
         clearTimeout(timeoutId);
         logger.error('TTS generation failed, falling back to Polly:', {
           error: ttsError.message,
-          text: text.substring(0, 100) + '...'
+          text: textString.substring(0, 100) + '...'
         });
         
         // Fallback to Polly if TTS fails
-        return this.generateTwiML(text, shouldGather);
+        return this.generateTwiML(textString, shouldGather);
       }
     } catch (error) {
       logger.error('Error generating TTS-based TwiML:', error);
       
       // Fallback to Polly if TTS fails
       logger.info('Falling back to Polly TTS due to error');
-      return this.generateTwiML(text, shouldGather);
+      return this.generateTwiML(textString, shouldGather);
     }
   }
 
   escapeXML(text) {
-    return text
+    // Ensure text is a string
+    const textString = typeof text === 'string' ? text : String(text || '');
+    
+    return textString
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
