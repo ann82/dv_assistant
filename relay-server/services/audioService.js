@@ -215,8 +215,8 @@ export class AudioService {
     }
   }
 
-  // Generate TTS with caching
-  async generateTTS(text) {
+  // Generate TTS with caching and language support
+  async generateTTS(text, languageCode = 'en-US') {
     try {
       // Check if TTS is enabled
       if (!config.ENABLE_TTS) {
@@ -224,7 +224,7 @@ export class AudioService {
         throw new Error('TTS is disabled');
       }
 
-      const cacheKey = this.generateCacheKey(text);
+      const cacheKey = this.generateCacheKey(`${text}_${languageCode}`);
       const cacheFilePath = path.join(this.cacheDir, `tts_${cacheKey}.mp3`);
 
       // Check cache first
@@ -249,11 +249,17 @@ export class AudioService {
         // Cache miss, continue to generate
       }
 
+      // Get language-specific voice
+      const { getLanguageConfig } = await import('../lib/languageConfig.js');
+      const langConfig = getLanguageConfig(languageCode);
+      const voice = langConfig?.twilioVoice?.replace('Polly.', '') || config.TTS_VOICE;
+      
       // Generate new TTS with timeout
       logger.info('Generating TTS for text:', { 
         text: text.substring(0, 100) + '...',
         filePath: cacheFilePath,
-        voice: config.TTS_VOICE,
+        voice,
+        languageCode,
         timeout: config.TTS_TIMEOUT
       });
       
@@ -266,7 +272,7 @@ export class AudioService {
       try {
         const response = await this.openai.audio.speech.create({
           model: "tts-1",
-          voice: config.TTS_VOICE,
+          voice: voice,
           input: text
         }, {
           signal: controller.signal
@@ -320,7 +326,8 @@ export class AudioService {
           fileName,
           filePath,
           size: stats.size,
-          voice: config.TTS_VOICE
+          voice,
+          languageCode
         });
 
         return {

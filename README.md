@@ -461,3 +461,43 @@ See `DEPRECATION_WARNINGS.md` for more details.
 - The assistant queries the Tavily API for shelter and resource information.
 - As of the latest update, `include_raw_content` is set to `false` for all Tavily API requests. Raw content is no longer parsed or used in fallback logic.
 - This change reduces response size and improves performance.
+
+## Multi-Language Voice Support
+
+The Domestic Violence Support Assistant now supports multiple languages for voice calls.
+
+### Supported Languages
+- English (US)
+- Spanish (Spain)
+- French (France)
+- German (Germany)
+
+You can add more languages by editing `relay-server/lib/languageConfig.js`.
+
+### How It Works
+- The system detects the caller's language from request headers, explicit selection, or speech content.
+- All prompts and responses are localized based on the detected language.
+- Twilio TTS/ASR and OpenAI TTS use the correct language and voice for each call.
+- Prompts for each language are defined in `languageConfig.js`.
+
+### Customizing Prompts
+- To customize or add translations, edit the `prompts` section for each language in `relay-server/lib/languageConfig.js`.
+- You can add new languages by copying an existing entry and updating the language codes and translations.
+
+### Example
+```js
+export const SUPPORTED_LANGUAGES = {
+  'en-US': { ... },
+  'es-ES': { ... },
+  // Add more here
+};
+```
+
+### Adding a New Language
+1. Add a new entry to `SUPPORTED_LANGUAGES` in `languageConfig.js`.
+2. Specify the Twilio voice, language codes, and all required prompts.
+3. Restart the server to apply changes.
+
+### Notes
+- If a language is not detected, the system defaults to English (US).
+- All TTS and ASR operations are now language-aware for improved accessibility and user experience.

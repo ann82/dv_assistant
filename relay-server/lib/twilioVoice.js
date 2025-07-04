@@ -8,6 +8,7 @@ import { getConversationContext } from './intentClassifier.js';
 import { AudioService } from '../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
+import { getLanguageConfig, DEFAULT_LANGUAGE } from './languageConfig.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -69,6 +70,90 @@ export class TwilioVoiceHandler {
     this.scheduleAudioCleanup();
   }
 
+  /**
+   * Detect language from speech input or request headers
+   * @param {Object} req - Express request object
+   * @param {string} speechResult - Speech input text
+   * @returns {string} Language code
+   */
+  detectLanguage(req, speechResult = '') {
+    try {
+      // Check if language is explicitly set in request
+      const explicitLanguage = req.body?.Language || req.headers['accept-language'];
+      if (explicitLanguage) {
+        const langConfig = getLanguageConfig(explicitLanguage);
+        if (langConfig) {
+          logger.info('Language detected from request:', { language: explicitLanguage, config: langConfig.name });
+          return explicitLanguage;
+        }
+      }
+
+      // Try to detect language from speech content
+      if (speechResult) {
+        const detectedLang = this.detectLanguageFromText(speechResult);
+        if (detectedLang) {
+          logger.info('Language detected from speech:', { language: detectedLang, text: speechResult.substring(0, 50) });
+          return detectedLang;
+        }
+      }
+
+      // Default to English
+      logger.info('Using default language:', DEFAULT_LANGUAGE);
+      return DEFAULT_LANGUAGE;
+    } catch (error) {
+      logger.error('Error detecting language:', error);
+      return DEFAULT_LANGUAGE;
+    }
+  }
+
+  /**
+   * Detect language from text content using simple heuristics
+   * @param {string} text - Text to analyze
+   * @returns {string|null} Language code or null if not detected
+   */
+  detectLanguageFromText(text) {
+    if (!text) return null;
+
+    const normalizedText = text.toLowerCase();
+    
+    // Spanish detection
+    const spanishWords = ['hola', 'gracias', 'por favor', 'ayuda', 'necesito', 'donde', 'como', 'que', 'el', 'la', 'de', 'en', 'con', 'para', 'por', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'hacia', 'según', 'durante', 'mediante', 'excepto', 'salvo', 'además', 'también', 'pero', 'sin embargo', 'aunque', 'si', 'cuando', 'donde', 'porque', 'como', 'que', 'quien', 'cual', 'cuyo', 'cuanto'];
+    const spanishCount = spanishWords.filter(word => normalizedText.includes(word)).length;
+    
+    // French detection
+    const frenchWords = ['bonjour', 'merci', 's\'il vous plaît', 'aide', 'besoin', 'où', 'comment', 'quoi', 'le', 'la', 'de', 'en', 'avec', 'pour', 'par', 'sans', 'sur', 'entre', 'jusqu\'à', 'depuis', 'vers', 'selon', 'pendant', 'par', 'sauf', 'sauf', 'aussi', 'également', 'mais', 'cependant', 'bien que', 'si', 'quand', 'où', 'parce que', 'comme', 'que', 'qui', 'quel', 'dont', 'combien'];
+    const frenchCount = frenchWords.filter(word => normalizedText.includes(word)).length;
+    
+    // German detection
+    const germanWords = ['hallo', 'danke', 'bitte', 'hilfe', 'brauche', 'wo', 'wie', 'was', 'der', 'die', 'das', 'von', 'in', 'mit', 'für', 'durch', 'ohne', 'über', 'zwischen', 'bis', 'seit', 'nach', 'laut', 'während', 'durch', 'außer', 'außer', 'auch', 'ebenfalls', 'aber', 'jedoch', 'obwohl', 'wenn', 'wann', 'wo', 'weil', 'wie', 'dass', 'wer', 'welcher', 'dessen', 'wie viel'];
+    const germanCount = germanWords.filter(word => normalizedText.includes(word)).length;
+
+    // Threshold for detection (at least 2 words)
+    const threshold = 2;
+    
+    if (spanishCount >= threshold) return 'es-ES';
+    if (frenchCount >= threshold) return 'fr-FR';
+    if (germanCount >= threshold) return 'de-DE';
+    
+    return null;
+  }
+
+  /**
+   * Get language-specific prompt
+   * @param {string} languageCode - Language code
+   * @param {string} promptKey - Prompt key (e.g., 'welcome', 'incompleteLocation')
+   * @returns {string} Localized prompt
+   */
+  getLocalizedPrompt(languageCode, promptKey) {
+    try {
+      const langConfig = getLanguageConfig(languageCode);
+      return langConfig.prompts[promptKey] || langConfig.prompts.fallback || 'I\'m sorry, I didn\'t understand your request.';
+    } catch (error) {
+      logger.error('Error getting localized prompt:', { languageCode, promptKey, error: error.message });
+      return 'I\'m sorry, I didn\'t understand your request.';
+    }
+  }
+
   setWebSocketServer(wsServer) {
     // Accept the WebSocket server instance directly instead of creating a new one
     this.wsServer = wsServer;
@@ -102,9 +187,12 @@ export class TwilioVoiceHandler {
         return twiml;
       }
 
-      // Generate welcome message using conversation config
-      const { welcomeMessage } = await import('./conversationConfig.js');
-      const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true);
+      // Detect language from request
+      const languageCode = this.detectLanguage(req);
+      
+      // Get localized welcome message
+      const welcomeMessage = this.getLocalizedPrompt(languageCode, 'welcome');
+      const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true, languageCode);
       
       return twiml;
     } catch (error) {
@@ -128,11 +216,15 @@ export class TwilioVoiceHandler {
       const callSid = req.body.CallSid;
       logger.info('Received speech input:', { speechResult, callSid });
 
+      // Detect language from speech input
+      const languageCode = this.detectLanguage(req, speechResult);
+      logger.info('Language detected for speech input:', { languageCode, callSid });
+
       // Preprocess speech input
       const cleanedSpeechResult = this.preprocessSpeech(speechResult);
       
-      // Process the speech input
-      const processResult = await this.processSpeechInput(cleanedSpeechResult, callSid);
+      // Process the speech input with language context
+      const processResult = await this.processSpeechInput(cleanedSpeechResult, callSid, languageCode);
       
       // Extract response and flags from processResult
       const response = typeof processResult === 'string' ? processResult : processResult.response;
@@ -148,14 +240,14 @@ export class TwilioVoiceHandler {
         return twiml;
       }
       
-      // Generate TwiML response using OpenAI TTS
-      const twiml = await this.generateTTSBasedTwiML(response, !shouldEndCall);
+      // Generate TwiML response using OpenAI TTS with language support
+      const twiml = await this.generateTTSBasedTwiML(response, !shouldEndCall, languageCode);
       
       // Only add gather if we don't want to end the call
       if (!shouldEndCall) {
         // If no speech is detected, repeat the prompt
-        const noSpeechMessage = "I didn't hear anything. Please let me know if you need more information about these resources or if you'd like to search for resources in a different location.";
-        const noSpeechTwiml = await this.generateTTSBasedTwiML(noSpeechMessage, true);
+        const noSpeechMessage = this.getLocalizedPrompt(languageCode, 'fallback');
+        const noSpeechTwiml = await this.generateTTSBasedTwiML(noSpeechMessage, true, languageCode);
         // Note: The gather is already included in the main response, so we just return it
       }
       
@@ -167,11 +259,14 @@ export class TwilioVoiceHandler {
         speechResult: req.body.SpeechResult
       });
       
-      // Return error TwiML using fallback Polly
+      // Return error TwiML using fallback Polly with language support
+      const languageCode = this.detectLanguage(req);
+      const errorMessage = this.getLocalizedPrompt(languageCode, 'error');
       const twiml = new this.VoiceResponseClass();
-      twiml.say('I encountered an error processing your speech. Please try again.');
+      twiml.say(errorMessage);
       
-      // Add gather to continue after error
+      // Add gather to continue after error with language support
+      const langConfig = getLanguageConfig(languageCode);
       const gather = twiml.gather({
         input: 'speech',
         action: '/twilio/voice/process',
@@ -179,8 +274,8 @@ export class TwilioVoiceHandler {
         speechTimeout: 'auto',
         speechModel: 'phone_call',
         enhanced: 'true',
-        language: 'en-US',
-        speechRecognitionLanguage: 'en-US',
+        language: langConfig.twilioLanguage,
+        speechRecognitionLanguage: langConfig.twilioSpeechRecognitionLanguage,
         profanityFilter: 'false',
         interimSpeechResultsCallback: '/twilio/voice/interim',
         interimSpeechResultsCallbackMethod: 'POST'
@@ -190,7 +285,7 @@ export class TwilioVoiceHandler {
     }
   }
 
-  async processSpeechInput(speechResult, callSid = null) {
+  async processSpeechInput(speechResult, callSid = null, languageCode = DEFAULT_LANGUAGE) {
     const requestId = Math.random().toString(36).substring(7);
 
     try {
@@ -198,6 +293,7 @@ export class TwilioVoiceHandler {
         requestId,
         callSid,
         speechResult,
+        languageCode,
         requestType: 'twilio',
         timestamp: new Date().toISOString()
       });
@@ -444,9 +540,21 @@ export class TwilioVoiceHandler {
           logger.info('Incomplete location query detected, asking for specific location:', {
             requestId,
             callSid,
-            speechResult
+            speechResult,
+            languageCode
           });
-          return "I'd be happy to help you find shelter. Could you please tell me which city or area you're looking for? For example, you could say 'near San Francisco' or 'in New York'.";
+          return this.getLocalizedPrompt(languageCode, 'incompleteLocation');
+        }
+
+        // Check for current location queries
+        if (locationInfo.scope === 'current-location') {
+          logger.info('Current location query detected, asking for specific location:', {
+            requestId,
+            callSid,
+            speechResult,
+            languageCode
+          });
+          return this.getLocalizedPrompt(languageCode, 'currentLocation');
         }
 
         if (!locationInfo.location) {
@@ -458,15 +566,15 @@ export class TwilioVoiceHandler {
           return generateLocationPrompt();
         }
 
-        // Enhanced: Check if location is US or not
-        const usLocationInfo = await detectUSLocation(locationInfo.location);
-        if (usLocationInfo && usLocationInfo.isUS === false) {
-          logger.info('Non-US location detected, informing user:', { 
+        // Check if location is complete (has state/province and country)
+        const locationData = await detectLocation(locationInfo.location);
+        if (locationData && !locationData.isComplete) {
+          logger.info('Incomplete location detected, asking for more specific location:', { 
             location: locationInfo.location, 
             callSid,
             requestId
           });
-          return "I'm sorry, we are currently available only for US cities.";
+          return "I found a location, but I need more specific information to help you effectively. Could you please include the state or province and country? For example, instead of just 'San Francisco', please say 'San Francisco, California, USA'.";
         }
 
         // Rewrite query with context
@@ -980,13 +1088,16 @@ export class TwilioVoiceHandler {
     }
   }
 
-  generateTwiML(text, shouldGather = true) {
+  generateTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
     // Ensure text is a string
     const textString = typeof text === 'string' ? text : String(text || '');
     
+    // Get language configuration
+    const langConfig = getLanguageConfig(languageCode);
+    
     let twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Amy">${this.escapeXML(textString)}</Say>`;
+  <Say voice="${langConfig.twilioVoice}" language="${langConfig.twilioLanguage}">${this.escapeXML(textString)}</Say>`;
 
     // Only add Gather if we expect a response
     if (shouldGather) {
@@ -995,7 +1106,8 @@ export class TwilioVoiceHandler {
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"/>`;
+          language="${langConfig.twilioLanguage}"
+          speechRecognitionLanguage="${langConfig.twilioSpeechRecognitionLanguage}"/>`;
     }
 
     twiml += `
@@ -1008,9 +1120,10 @@ export class TwilioVoiceHandler {
    * Generate TTS audio using OpenAI and create TwiML with Play instead of Say
    * @param {string} text - Text to convert to speech
    * @param {boolean} shouldGather - Whether to add Gather element
+   * @param {string} languageCode - Language code for TTS and ASR
    * @returns {Promise<string>} TwiML response with Play element
    */
-  async generateTTSBasedTwiML(text, shouldGather = true) {
+  async generateTTSBasedTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
     try {
       // Ensure text is a string
       const textString = typeof text === 'string' ? text : String(text || '');
@@ -1027,9 +1140,12 @@ export class TwilioVoiceHandler {
       }, config.TTS_TIMEOUT + 2000); // Add 2s buffer for TwiML generation
 
       try {
-        // Generate TTS audio using OpenAI with timeout
+        // Get language configuration
+        const langConfig = getLanguageConfig(languageCode);
+        
+        // Generate TTS audio using OpenAI with timeout and language
         const ttsResult = await Promise.race([
-          this.audioService.generateTTS(textString),
+          this.audioService.generateTTS(textString, languageCode),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('TTS timeout')), config.TTS_TIMEOUT + 2000)
           )
@@ -1058,8 +1174,8 @@ export class TwilioVoiceHandler {
           speechTimeout="auto" 
           speechModel="phone_call"
           enhanced="true"
-          language="en-US"
-          speechRecognitionLanguage="en-US"
+          language="${langConfig.twilioLanguage}"
+          speechRecognitionLanguage="${langConfig.twilioSpeechRecognitionLanguage}"
           profanityFilter="false"
           interimSpeechResultsCallback="/twilio/voice/interim"
           interimSpeechResultsCallbackMethod="POST"/>`;
@@ -1077,14 +1193,14 @@ export class TwilioVoiceHandler {
         });
         
         // Fallback to Polly if TTS fails
-        return this.generateTwiML(textString, shouldGather);
+        return this.generateTwiML(textString, shouldGather, languageCode);
       }
     } catch (error) {
       logger.error('Error generating TTS-based TwiML:', error);
       
       // Fallback to Polly if TTS fails
       logger.info('Falling back to Polly TTS due to error');
-      return this.generateTwiML(textString, shouldGather);
+      return this.generateTwiML(textString, shouldGather, languageCode);
     }
   }
 

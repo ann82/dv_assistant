@@ -807,3 +807,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - No more URLs read out in voice responses
 - Follow-up questions are no longer classified as off-topic
+
+## [Unreleased]
+### Added
+- Multi-language support for the voice agent (Twilio and OpenAI TTS/ASR)
+- Language detection from request headers, explicit selection, or speech content
+- Localized prompts and responses for English, Spanish, French, and German
+- Centralized language and prompt configuration in `relay-server/lib/languageConfig.js`
+- Easy extensibility for new languages and custom prompts
+
+### Changed
+- All TTS and ASR operations now use the correct language and voice for each call
+- Prompts and error messages are now localized based on detected language
