@@ -1,5 +1,5 @@
 import logger from './logger.js';
-import { detectUSLocation, extractLocationFromQuery, detectLocationWithGeocoding } from './enhancedLocationDetector.js';
+import { extractLocationFromQuery, detectLocationWithGeocoding } from './enhancedLocationDetector.js';
 import { getConversationContext } from './intentClassifier.js';
 
 /**
