@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.6] - 2025-01-27
+
+### Added
+- **Code Cleanup & Optimization** - Major cleanup of unused code and imports
+  - **Unused File Removal**: Removed 5 unused files including debug tests, voice config tests, and example files
+  - **Import Optimization**: Removed unused imports across multiple files to reduce bundle size
+  - **Function Cleanup**: Removed unused legacy functions and test functions
+  - **Standardized Location Prompts**: Simplified location prompt generation to use consistent format
+
+### Changed
+- **Location Prompt Standardization**
+  - **Consistent Format**: Location prompts now use standard format: "Please tell me your city or area, like San Francisco, California."
+  - **Removed Randomization**: Eliminated random city selection and multiple prompt variations
+  - **Simplified Logic**: Streamlined prompt generation for better maintainability
+- **Import Structure**
+  - **Cleaner Dependencies**: Removed unused imports from intentClassifier, twilioVoice, and other modules
+  - **Reduced Bundle Size**: Eliminated unused dependencies and functions
+  - **Better Maintainability**: Cleaner code structure with only necessary imports
+
+### Fixed
+- **Duplicate Export Error**: Fixed SyntaxError caused by duplicate `rewriteQuery` export in intentClassifier.js
+- **Import Conflicts**: Resolved import/export conflicts that were causing module loading errors
+- **Code Maintainability**: Improved code organization and reduced technical debt
+
+### Technical Improvements
+- **Code Quality**: Significant reduction in unused code and improved maintainability
+- **Module Structure**: Cleaner import/export patterns across the codebase
+- **Performance**: Reduced memory footprint by removing unused functions and imports
+- **Developer Experience**: Cleaner codebase for easier maintenance and development
+
 ## [1.19.5] - 2025-01-27
 
 ### Added

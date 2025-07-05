@@ -2,9 +2,24 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.19.5** (Updated: January 27, 2025)
+**Current Version: 1.19.6** (Updated: January 27, 2025)
 
 ## Features
+
+### Code Cleanup & Location Prompt Standardization (v1.19.6)
+- **Major Code Cleanup**
+  - **Unused File Removal**: Removed 5 unused files including debug tests, voice config tests, and example files
+  - **Import Optimization**: Removed unused imports across multiple files to reduce bundle size and improve maintainability
+  - **Function Cleanup**: Removed unused legacy functions and test functions
+  - **Module Structure**: Cleaner import/export patterns across the codebase
+- **Location Prompt Standardization**
+  - **Consistent Format**: Location prompts now use standard format: "Please tell me your city or area, like San Francisco, California."
+  - **Removed Randomization**: Eliminated random city selection and multiple prompt variations for better consistency
+  - **Simplified Logic**: Streamlined prompt generation for better maintainability and user experience
+- **Technical Improvements**
+  - **Code Quality**: Significant reduction in unused code and improved maintainability
+  - **Performance**: Reduced memory footprint by removing unused functions and imports
+  - **Developer Experience**: Cleaner codebase for easier maintenance and development
 
 ### Enhanced Intent Classification & Location Detection (v1.19.5)
 - **"Near Me" Query Intelligence**

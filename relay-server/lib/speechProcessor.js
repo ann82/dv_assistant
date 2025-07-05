@@ -131,30 +131,7 @@ Examples:
  * @returns {string} The location prompt message
  */
 export function generateLocationPrompt() {
-  const exampleCities = [
-    'San Francisco',
-    'Oakland',
-    'San Jose',
-    'Santa Clara',
-    'San Mateo',
-    'Palo Alto',
-    'Mountain View',
-    'Sunnyvale',
-    'Redwood City'
-  ];
-
-  // Ensure we always include at least one example city
-  const city1 = exampleCities[Math.floor(Math.random() * exampleCities.length)];
-  const city2 = exampleCities[Math.floor(Math.random() * exampleCities.length)];
-
-  const prompts = [
-    `To help you find local resources, I need to know your location. Please tell me your city or area, like ${city1} or ${city2}.`,
-    `I need to know your location to help you find resources. Could you please tell me which city you're in? For example, you could say ${city1} or ${city2}.`,
-    `To find the closest resources to you, I need to know your location. Please tell me your city or area, such as ${city1} or ${city2}.`,
-    `Please share your location so I can find the best resources for you. Which city or area are you in? For example, you could say ${city1} or ${city2}.`
-  ];
-
-  return prompts[Math.floor(Math.random() * prompts.length)];
+  return "Please tell me your city or area, like San Francisco, California.";
 }
 
 /**
