@@ -2,9 +2,27 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.19.4** (Updated: January 27, 2025)
+**Current Version: 1.19.5** (Updated: January 27, 2025)
 
 ## Features
+
+### Enhanced Intent Classification & Location Detection (v1.19.5)
+- **"Near Me" Query Intelligence**
+  - **Resource-Seeking Intent Classification**: Queries like "resources near me", "help near me", "shelter near me", "support near me" are now correctly classified as resource-seeking intents (not general information)
+  - **Location Prompting**: "me", "my location", "here", "near me", etc. are treated as incomplete locations, triggering prompts for specific locations
+  - **Intent Accuracy**: Improved classification ensures users get appropriate resource responses instead of generic information
+- **Advanced Location Detection**
+  - **Incomplete Location Handling**: System detects when users provide vague location references and prompts for specific cities/areas
+  - **Geocoding Integration**: Uses Nominatim/OpenStreetMap API to validate and complete location information
+  - **US vs Non-US Logic**: Properly distinguishes between US and non-US locations for appropriate site restrictions
+- **Query Rewriting Optimization**
+  - **US Location Enhancement**: For US locations, appends `site:org OR site:gov` to resource-seeking queries
+  - **Non-US Handling**: Non-US locations receive appropriate responses without US-specific site restrictions
+  - **Resource Query Enhancement**: Queries without "shelter" are rewritten to `"domestic violence shelter <location> site:org OR site:gov"` for US locations
+- **Test Infrastructure**
+  - **Comprehensive Test Coverage**: All 23 enhanced query rewriter tests pass with proper location and intent handling
+  - **Mock Improvements**: Removed deprecated `isUS` references, focusing on `isComplete` and `scope` for clarity
+  - **Country-Based Logic**: Tests now properly distinguish US vs non-US locations using country codes
 
 ### Tavily API Standardization & Raw Content Parsing (v1.19.4)
 - **Unified Tavily API Integration**

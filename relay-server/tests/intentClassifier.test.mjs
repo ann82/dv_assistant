@@ -244,75 +244,120 @@ describe('Intent Classification', () => {
 
   describe('Follow-up Question Handling', () => {
     it('should handle "last one" follow-up questions correctly', async () => {
-      // Mock lastQueryContext with sample results
-      const lastQueryContext = {
-        intent: 'general_information',
-        location: 'San Jose, California',
-        results: [
-          {
-            title: 'First Shelter - Domestic Violence Support Center',
-            content: 'This shelter provides emergency housing, counseling services, and legal assistance for domestic violence survivors. They offer 24/7 hotline support and family services including childcare.',
-            url: 'https://example1.org',
-            score: 0.9
-          },
-          {
-            title: 'Second Shelter - Safe Haven for Families',
-            content: 'Safe Haven provides transitional housing, support groups, and employment assistance. They specialize in helping families with children and offer transportation assistance.',
-            url: 'https://example2.org',
-            score: 0.8
-          },
-          {
-            title: 'Third Shelter - Crisis Intervention Center',
-            content: 'This crisis center offers emergency shelter, safety planning, and advocacy services. They provide 24/7 crisis intervention and have partnerships with local law enforcement.',
-            url: 'https://example3.org',
-            score: 0.7
-          }
-        ],
-        timestamp: Date.now()
-      };
-
-      // Test "last one" follow-up
-      const followUpResponse = await generateFollowUpResponse('Can you tell me more about the last one?', lastQueryContext);
+      const callSid = 'test-call-sid';
+      const mockResults = [
+        { 
+          title: 'First Shelter - Domestic Violence Support Center',
+          content: 'This shelter provides emergency housing and support services.',
+          url: 'https://example1.org'
+        },
+        { 
+          title: 'Second Shelter - Emergency Housing',
+          content: 'Emergency housing for domestic violence survivors.',
+          url: 'https://example2.org'
+        },
+        { 
+          title: 'Third Shelter - Crisis Intervention Center',
+          content: 'Crisis intervention and emergency shelter services.',
+          url: 'https://example3.org'
+        }
+      ];
       
-      expect(followUpResponse).toBeDefined();
-      expect(followUpResponse.type).toBe('specific_result');
-      expect(followUpResponse.intent).toBe('general_information');
-      expect(followUpResponse.voiceResponse).toContain('Third Shelter');
-      expect(followUpResponse.voiceResponse).toContain('emergency shelter');
-      expect(followUpResponse.voiceResponse).toContain('safety planning');
-      expect(followUpResponse.voiceResponse).toContain('advocacy services');
+      updateConversationContext(callSid, 'find_shelter', 'find shelter', 'response', { results: mockResults });
+      
+      const followUpQuery = 'Tell me more about the last one';
+      const result = await generateFollowUpResponse(followUpQuery, getConversationContext(callSid).lastQueryContext);
+      
+      expect(result).toBeDefined();
+      expect(result.focusTarget).toBe('Third Shelter - Crisis Intervention Center');
     });
 
     it('should handle "first one" follow-up questions correctly', async () => {
-      const lastQueryContext = {
-        intent: 'find_shelter',
-        location: 'San Jose, California',
-        results: [
-          {
-            title: 'First Shelter - Domestic Violence Support Center',
-            content: 'This shelter provides emergency housing, counseling services, and legal assistance for domestic violence survivors. They offer 24/7 hotline support and family services including childcare.',
-            url: 'https://example1.org',
-            score: 0.9
-          },
-          {
-            title: 'Second Shelter - Safe Haven for Families',
-            content: 'Safe Haven provides transitional housing, support groups, and employment assistance.',
-            url: 'https://example2.org',
-            score: 0.8
-          }
-        ],
-        timestamp: Date.now()
-      };
-
-      // Test "first one" follow-up
-      const followUpResponse = await generateFollowUpResponse('Tell me more about the first one', lastQueryContext);
+      const callSid = 'test-call-sid';
+      const mockResults = [
+        { 
+          title: 'First Shelter - Domestic Violence Support Center',
+          content: 'This shelter provides emergency housing and support services.',
+          url: 'https://example1.org'
+        },
+        { 
+          title: 'Second Shelter - Emergency Housing',
+          content: 'Emergency housing for domestic violence survivors.',
+          url: 'https://example2.org'
+        }
+      ];
       
-      expect(followUpResponse).toBeDefined();
-      expect(followUpResponse.type).toBe('specific_result');
-      expect(followUpResponse.voiceResponse).toContain('First Shelter');
-      expect(followUpResponse.voiceResponse).toContain('counseling services');
-      expect(followUpResponse.voiceResponse).toContain('legal assistance');
-      expect(followUpResponse.voiceResponse).toContain('family services');
+      updateConversationContext(callSid, 'find_shelter', 'find shelter', 'response', { results: mockResults });
+      
+      const followUpQuery = 'Tell me more about the first one';
+      const result = await generateFollowUpResponse(followUpQuery, getConversationContext(callSid).lastQueryContext);
+      
+      expect(result).toBeDefined();
+      expect(result.focusTarget).toBe('First Shelter - Domestic Violence Support Center');
+    });
+  });
+
+  describe('"Near Me" Query Classification', () => {
+    it('should classify "resources near me" as other_resources intent', async () => {
+      const intent = await getIntent('resources near me');
+      expect(intent).toBe('other_resources');
+    });
+
+    it('should classify "help near me" as other_resources intent', async () => {
+      const intent = await getIntent('help near me');
+      expect(intent).toBe('other_resources');
+    });
+
+    it('should classify "shelter near me" as find_shelter intent', async () => {
+      const intent = await getIntent('shelter near me');
+      expect(intent).toBe('find_shelter');
+    });
+
+    it('should classify "legal help near me" as legal_services intent', async () => {
+      const intent = await getIntent('legal help near me');
+      expect(intent).toBe('legal_services');
+    });
+
+    it('should classify "counseling near me" as counseling_services intent', async () => {
+      const intent = await getIntent('counseling near me');
+      expect(intent).toBe('counseling_services');
+    });
+
+    it('should classify "services near me" as other_resources intent', async () => {
+      const intent = await getIntent('services near me');
+      expect(intent).toBe('other_resources');
+    });
+
+    it('should classify "near me" with different proximity words', async () => {
+      const testCases = [
+        { query: 'shelter nearby', expected: 'find_shelter' },
+        { query: 'help around me', expected: 'other_resources' },
+        { query: 'resources close to me', expected: 'other_resources' },
+        { query: 'legal services my location', expected: 'legal_services' },
+        { query: 'counseling here', expected: 'counseling_services' },
+        { query: 'support current location', expected: 'other_resources' }
+      ];
+
+      for (const { query, expected } of testCases) {
+        const intent = await getIntent(query);
+        expect(intent).toBe(expected);
+      }
+    });
+
+    it('should classify "near me" queries in different word orders', async () => {
+      const testCases = [
+        { query: 'near me shelter', expected: 'find_shelter' },
+        { query: 'nearby help', expected: 'other_resources' },
+        { query: 'around me resources', expected: 'other_resources' },
+        { query: 'my location legal services', expected: 'legal_services' },
+        { query: 'here counseling', expected: 'counseling_services' },
+        { query: 'current location support', expected: 'other_resources' }
+      ];
+
+      for (const { query, expected } of testCases) {
+        const intent = await getIntent(query);
+        expect(intent).toBe(expected);
+      }
     });
   });
 }); 

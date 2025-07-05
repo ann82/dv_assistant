@@ -5,62 +5,24 @@ import logger from './logger.js';
  * 
  * This module provides intelligent location detection using:
  * 1. Geocoding APIs (Nominatim/OpenStreetMap) for accurate location validation
- * 2. Fallback to hardcoded patterns for reliability
+ * 2. Fallback to pattern matching for reliability
  * 3. Caching for performance
- * 4. US-specific detection for shelter search optimization
+ * 4. Global location detection with proper state/country specification
  */
 
 // Cache for geocoding results (in-memory, expires after 24 hours)
 const LOCATION_CACHE = new Map();
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
-// Fallback hardcoded values (kept for reliability)
-const US_STATES = {
-  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
-  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
-  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
-  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
-  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
-  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
-  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
-  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
-  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
-  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
-  // Territories
-  'american samoa': 'AS', 'guam': 'GU', 'northern mariana islands': 'MP', 'puerto rico': 'PR', 'us virgin islands': 'VI',
-  'district of columbia': 'DC', 'washington dc': 'DC', 'dc': 'DC'
-};
-
-const NON_US_COUNTRIES = [
-  'afghanistan', 'albania', 'algeria', 'andorra', 'angola', 'antigua and barbuda', 'argentina',
-  'armenia', 'australia', 'austria', 'azerbaijan', 'bahamas', 'bahrain', 'bangladesh', 'barbados',
-  'belarus', 'belgium', 'belize', 'benin', 'bhutan', 'bolivia', 'bosnia and herzegovina', 'botswana',
-  'brazil', 'brunei', 'bulgaria', 'burkina faso', 'burundi', 'cambodia', 'cameroon', 'canada',
-  'cape verde', 'central african republic', 'chad', 'chile', 'china', 'colombia', 'comoros',
-  'congo', 'costa rica', 'croatia', 'cuba', 'cyprus', 'czech republic', 'denmark', 'djibouti',
-  'dominica', 'dominican republic', 'east timor', 'ecuador', 'egypt', 'el salvador', 'equatorial guinea',
-  'eritrea', 'estonia', 'ethiopia', 'fiji', 'finland', 'france', 'gabon', 'gambia', 'georgia',
-  'germany', 'ghana', 'greece', 'grenada', 'guatemala', 'guinea', 'guinea-bissau', 'guyana',
-  'haiti', 'honduras', 'hungary', 'iceland', 'india', 'indonesia', 'iran', 'iraq', 'ireland',
-  'israel', 'italy', 'ivory coast', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya',
-  'kiribati', 'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia',
-  'libya', 'liechtenstein', 'lithuania', 'luxembourg', 'macedonia', 'madagascar', 'malawi',
-  'malaysia', 'maldives', 'mali', 'malta', 'marshall islands', 'mauritania', 'mauritius',
-  'mexico', 'micronesia', 'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique',
-  'myanmar', 'namibia', 'nauru', 'nepal', 'netherlands', 'new zealand', 'nicaragua', 'niger',
-  'nigeria', 'north korea', 'norway', 'oman', 'pakistan', 'palau', 'panama', 'papua new guinea',
-  'paraguay', 'peru', 'philippines', 'poland', 'portugal', 'qatar', 'romania', 'russia',
-  'rwanda', 'saint kitts and nevis', 'saint lucia', 'saint vincent and the grenadines',
-  'samoa', 'san marino', 'sao tome and principe', 'saudi arabia', 'senegal', 'serbia',
-  'seychelles', 'sierra leone', 'singapore', 'slovakia', 'slovenia', 'solomon islands',
-  'somalia', 'south africa', 'south korea', 'south sudan', 'spain', 'sri lanka', 'sudan',
-  'suriname', 'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania', 'thailand',
-  'togo', 'tonga', 'trinidad and tobago', 'tunisia', 'turkey', 'turkmenistan', 'tuvalu',
-  'uganda', 'ukraine', 'united arab emirates', 'united kingdom', 'uruguay', 'uzbekistan',
-  'vanuatu', 'vatican city', 'venezuela', 'vietnam', 'yemen', 'zambia', 'zimbabwe'
+// Common words to filter out from location detection
+const FILTER_WORDS = [
+  'me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere',
+  'home', 'house', 'place', 'area', 'region', 'zone', 'district'
 ];
 
-const ZIP_CODE_PATTERN = /^\d{5}(-\d{4})?$/;
+const CURRENT_LOCATION_WORDS = [
+  'me', 'my location', 'here', 'near me', 'nearby', 'around me', 'close to me', 'current location'
+];
 
 /**
  * Get cached location data
@@ -139,17 +101,22 @@ async function geocodeLocation(location) {
 }
 
 /**
- * Enhanced US location detection using geocoding with fallback
+ * Enhanced global location detection using geocoding with fallback
  * @param {string} location - The location string to check
- * @returns {Promise<Object>} Object with isUS flag and normalized location
+ * @returns {Promise<Object>} Object with location info and completeness status
  */
-export async function detectUSLocation(location) {
+export async function detectLocation(location) {
   if (!location || typeof location !== 'string') {
-    return { isUS: false, location: null, scope: 'non-US' };
+    return { location: null, scope: 'none', isComplete: false };
   }
   
   const normalizedLocation = location.toLowerCase().trim();
   
+  // Treat current-location words as incomplete (word boundary match)
+  if (containsCurrentLocationWord(normalizedLocation)) {
+    return { location: null, scope: 'current-location', isComplete: false };
+  }
+
   // Check cache first
   const cached = getCachedLocation(normalizedLocation);
   if (cached) {
@@ -157,25 +124,17 @@ export async function detectUSLocation(location) {
     return cached;
   }
   
-  // Quick checks for obvious patterns
-  if (ZIP_CODE_PATTERN.test(normalizedLocation)) {
-    const result = { isUS: true, location: location.trim(), scope: 'US' };
-    cacheLocation(normalizedLocation, result);
-    return result;
-  }
-  
   // Try geocoding first (most accurate)
   try {
     const geocodeResult = await geocodeLocation(location);
     
     if (geocodeResult) {
-      const isUS = geocodeResult.countryCode === 'us' || 
-                   geocodeResult.country?.toLowerCase() === 'united states';
-      
+      // Consider location complete if geocoding succeeded and we have city, state, or country
+      const isComplete = !!(geocodeResult.city || geocodeResult.state || geocodeResult.country);
       const result = {
-        isUS,
         location: location.trim(),
-        scope: isUS ? 'US' : 'non-US',
+        scope: isComplete ? 'complete' : 'incomplete',
+        isComplete,
         geocodeData: geocodeResult
       };
       
@@ -186,54 +145,43 @@ export async function detectUSLocation(location) {
   } catch (error) {
     logger.warn('Geocoding failed, falling back to pattern matching:', error);
   }
-  
-  // Fallback to hardcoded pattern matching
-  const fallbackResult = detectUSLocationFallback(location);
+  // Fallback to pattern matching
+  const fallbackResult = detectLocationFallback(location);
+  // If fallbackResult has a US city or state, treat as complete
+  if (fallbackResult.location) {
+    const usCitiesOrStates = /san francisco|oakland|new york|los angeles|chicago|houston|phoenix|philadelphia|san antonio|san diego|dallas|san jose|austin|jacksonville|fort worth|columbus|charlotte|indianapolis|seattle|denver|washington|boston|el paso|nashville|detroit|oklahoma city|portland|las vegas|memphis|louisville|baltimore|milwaukee|albuquerque|tucson|fresno|sacramento|kansas city|atlanta|miami|colorado springs|raleigh|omaha|long beach|virginia beach|oakland|minneapolis|tulsa|arlington|tampa|new orleans|wichita|cleveland|bakersfield|aurora|anaheim|honolulu|santa ana|riverside|corpus christi|lexington|henderson|stockton|saint paul|cincinnati|st. louis|pittsburgh|greensboro|lincoln|anchorage|plano|orlando|irvine|newark|toledo|durham|chula vista|fort wayne|jersey city|st. petersburg|laredo|madison|chandler|lubbock|scottsdale|reno|buffalo|gilbert|glendale|north las vegas|winston–salem|chesapeake|norfolk|fremont|garland|irving|hialeah|richmond|boise|spokane|baton rouge|des moines|tacoma|san bernardino|modesto|fontana|santa clarita|birmingham|oxnard|fayetteville|moreno valley|rochester|glendale|huntington beach|salt lake city|grand rapids|amarillo|yonkers|aurora|montgomery|akron|little rock|huntsville|augusta|port st. lucie|grand prairie|columbus|tallahassee|overland park|tempe|mckinney|mobile|cape coral|shreveport|frisco|knoxville|worcester|brownsville|vancouver|fort lauderdale|sioux falls|peoria|ontario|jackson|elizabeth|warren|salem|springfield|eugene|pembroke pines|paterson|naperville|bridgeport|savannah|mesquite|killeen|palmdale|alexandria|hayward|clarksville|lakewood|hollywood|pasadena|syracuse|macon|torrance|fullerton|surprise|denton|roseville|thornton|miramar|pasadena|mesquite|olathe|dayton|carrollton|waco|clearwater|west valley city|bellevue|west jordan|richmond|gainesville|cedar rapids|visalia|coral springs|new haven|stamford|concord|kent|santa clara|el monte|topeka|simi valley|springfield|abilene|evansville|athens|vallejo|allentown|norman|beaumont|independence|murfreesboro|ann arbor|springfield|berkeley|peoria|providence|elgin|columbia|fairfield|aspen|boulder|durango|estes park|fort collins|glenwood springs|grand junction|gunnison|leadville|montrose|pueblo|steamboat springs|telluride|vail|alamosa|canon city|craig|delta|eagle|englewood|frisco|georgetown|golden|la junta|lamar|littleton|longmont|louisville|montrose|pagosa springs|parker|ridgway|salida|silverton|sterling|trinidad|walsenburg|wellington|westminster|wheat ridge|yuma|alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming/gi;
+    if (usCitiesOrStates.test(fallbackResult.location.toLowerCase())) {
+      fallbackResult.isComplete = true;
+      fallbackResult.scope = 'complete';
+    }
+  }
   cacheLocation(normalizedLocation, fallbackResult);
   return fallbackResult;
 }
 
 /**
- * Fallback US location detection using hardcoded patterns
+ * Fallback location detection using pattern matching
  * @param {string} location - The location string to check
- * @returns {Object} Object with isUS flag and normalized location
+ * @returns {Object} Object with location info and completeness status
  */
-function detectUSLocationFallback(location) {
+function detectLocationFallback(location) {
   if (!location || typeof location !== 'string') {
-    return { isUS: false, location: null, scope: 'non-US' };
+    return { location: null, scope: 'none', isComplete: false };
   }
   
   const normalizedLocation = location.toLowerCase().trim();
   
-  // Check for ZIP code first (definitely US)
-  if (ZIP_CODE_PATTERN.test(normalizedLocation)) {
-    return { isUS: true, location: location.trim(), scope: 'US' };
-  }
+  // Check if it contains state/province and country indicators
+  const hasState = /,\s*[A-Z]{2}\b|\b(?:state|province|region|california|texas|florida|new york|illinois|pennsylvania|ohio|georgia|north carolina|michigan|new jersey|virginia|washington|arizona|massachusetts|tennessee|indiana|missouri|maryland|colorado|minnesota|wisconsin|south carolina|alabama|louisiana|kentucky|oregon|oklahoma|connecticut|utah|iowa|nevada|arkansas|mississippi|kansas|vermont|nebraska|idaho|west virginia|hawaii|new hampshire|maine|montana|rhode island|delaware|south dakota|north dakota|alaska|wyoming|ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|northwest territories|nunavut|yukon)\b/i.test(location);
+  const hasCountry = /,\s*(?:united states|usa|canada|uk|england|australia|germany|france|india|china|japan|brazil|mexico|spain|italy|netherlands|sweden|norway|denmark|finland|switzerland|austria|belgium|ireland|new zealand|south africa|singapore|malaysia|thailand|vietnam|philippines|indonesia|korea|taiwan|hong kong|israel|turkey|greece|poland|czech|hungary|romania|bulgaria|croatia|serbia|slovenia|slovakia|estonia|latvia|lithuania|iceland|luxembourg|monaco|liechtenstein|andorra|san marino|vatican|malta|cyprus)\b/i.test(location);
   
-  // Check if it's a known non-US country
-  const normalizedLocationNoComma = normalizedLocation.replace(/,/g, '');
-  for (const country of NON_US_COUNTRIES) {
-    if (
-      normalizedLocation === country ||
-      normalizedLocationNoComma === country ||
-      normalizedLocation.endsWith(` ${country}`) ||
-      normalizedLocation.includes(`, ${country}`) ||
-      normalizedLocation.includes(`${country},`) ||
-      normalizedLocation.includes(` ${country} `)
-    ) {
-      return { isUS: false, location: location.trim(), scope: 'non-US' };
-    }
-  }
+  const isComplete = hasState || hasCountry;
   
-  // Check if it contains a US state
-  for (const [stateName, stateCode] of Object.entries(US_STATES)) {
-    if (normalizedLocation.includes(stateName) || normalizedLocation.includes(stateCode.toLowerCase())) {
-      return { isUS: true, location: location.trim(), scope: 'US' };
-    }
-  }
-  
-  // If no clear indicators, assume it might be US (for cities without state)
-  return { isUS: true, location: location.trim(), scope: 'US' };
+  return {
+    location: location.trim(),
+    scope: isComplete ? 'complete' : 'incomplete',
+    isComplete
+  };
 }
 
 /**
@@ -243,15 +191,25 @@ function detectUSLocationFallback(location) {
  */
 export function extractLocationFromQuery(query) {
   if (!query || typeof query !== 'string') {
-    return { location: null, scope: 'non-US' };
+    return { location: null, scope: 'none' };
   }
 
   // Clean the query first by removing common conversational fillers
   const cleanedQuery = cleanConversationalFillers(query);
   
+  // If query contains current-location words (word boundary match), treat as current-location
+  if (containsCurrentLocationWord(cleanedQuery)) {
+    return { location: null, scope: 'current-location' };
+  }
+
   // Check for incomplete location queries first
   if (isIncompleteLocationQuery(cleanedQuery)) {
     return { location: null, scope: 'incomplete' };
+  }
+  
+  // Check for "near me" or "nearby" type queries that indicate current location
+  if (isCurrentLocationQuery(cleanedQuery)) {
+    return { location: null, scope: 'current-location' };
   }
   
   // Enhanced location patterns that handle more conversational contexts
@@ -271,12 +229,10 @@ export function extractLocationFromQuery(query) {
     /(?:shelter|help|resources?|services?)\s+(?:in|near|around|at|within|close\s+to)\s+([^,.]+(?:,\s*[^,.]+)?)(?:\s*$|\s*[?.,])/i,
     // Pattern for location at the end of sentence
     /(?:in|near|around|at|within|close\s+to)\s+([^,.]+(?:,\s*[^,.]+)?)(?:\s*$|\s*[?.,])/i,
-    // New pattern for queries like "find shelter home Mumbai" where "home" is a service word
+    // Pattern for queries like "find shelter home Mumbai" where "home" is a service word
     /find\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:home|house|place)s?\s+([^,.]+(?:,\s*[^,.]+)?)/i,
     /(?:need|want|looking\s+for)\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:home|house|place)s?\s+([^,.]+(?:,\s*[^,.]+)?)/i,
-    /(?:can\s+you\s+)?(?:help\s+me\s+)?(?:find|get)\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:home|house|place)s?\s+([^,.]+(?:,\s*[^,.]+)?)/i,
-    // Pattern for standalone location names (capitalized)
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:California|CA|Texas|TX|Florida|FL|New\s+York|NY|Illinois|IL|Pennsylvania|PA|Ohio|OH|Georgia|GA|North\s+Carolina|NC|Michigan|MI|New\s+Jersey|NJ|Virginia|VA|Washington|WA|Arizona|AZ|Massachusetts|MA|Tennessee|TN|Indiana|IN|Missouri|MO|Maryland|MD|Colorado|CO|Minnesota|MN|Wisconsin|WI|South\s+Carolina|SC|Alabama|AL|Louisiana|LA|Kentucky|KY|Oregon|OR|Oklahoma|OK|Connecticut|CT|Utah|UT|Iowa|IA|Nevada|NV|Arkansas|AR|Mississippi|MS|Kansas|KS|Vermont|VT|Nebraska|NE|Idaho|ID|West\s+Virginia|WV|Hawaii|HI|New\s+Hampshire|NH|Maine|ME|Montana|MT|Rhode\s+Island|RI|Delaware|DE|South\s+Dakota|SD|North\s+Dakota|ND|Alaska|AK|District\s+of\s+Columbia|DC|Wyoming|WY)\b/i
+    /(?:can\s+you\s+)?(?:help\s+me\s+)?(?:find|get)\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:home|house|place)s?\s+([^,.]+(?:,\s*[^,.]+)?)/i
   ];
 
   for (const pattern of locationPatterns) {
@@ -288,75 +244,55 @@ export function extractLocationFromQuery(query) {
       if (cleanLocation) {
         return {
           location: cleanLocation,
-          scope: 'unknown', // Will be determined by detectUSLocation
-          isUS: null // Will be determined by detectUSLocation
+          scope: 'unknown' // Will be determined by detectLocation
         };
       }
     }
   }
 
-  // Try to extract standalone location names (common US cities)
+  // Try to extract standalone location names
   const standaloneLocation = extractStandaloneLocation(cleanedQuery);
   if (standaloneLocation) {
     return {
       location: standaloneLocation,
-      scope: 'unknown',
-      isUS: null
+      scope: 'unknown'
     };
   }
 
-  return { location: null, scope: 'non-US' };
+  // If no location found, return scope: 'none'
+  return { location: null, scope: 'none' };
 }
 
 /**
- * Clean conversational fillers from the start of queries
- * @param {string} query - The user query
+ * Clean conversational fillers from query
+ * @param {string} query - The query to clean
  * @returns {string} Cleaned query
  */
 function cleanConversationalFillers(query) {
   if (!query || typeof query !== 'string') {
-    return query;
+    return '';
   }
 
-  const conversationalFillers = [
-    'hey', 'hi', 'hello', 'good morning', 'good afternoon', 'good evening',
-    'please help me', 'please assist me', 'i would like', 'i want to',
-    'i am looking for', 'i am searching for', 'i need to find', 'i want to find',
-    'can you find', 'could you find', 'can you get', 'could you get',
-    'i need some', 'i want some', 'i am looking for some', 'i need to get some',
-    'i was wondering', 'i hope you can help', 'i hope you can assist',
-    'i hope you can find', 'i hope you can search', 'excuse me', 'sorry to bother you',
-    'can you help me', 'could you help me'
+  let cleaned = query.toLowerCase().trim();
+  
+  // Remove common conversational fillers
+  const fillers = [
+    /\b(?:um|uh|er|ah|hmm|well|like|you know|i mean|basically|actually|literally)\b/gi,
+    /\b(?:please|can you|could you|would you|will you)\b/gi,
+    /\b(?:i need|i want|i'm looking for|i'm trying to find)\b/gi,
+    /\b(?:help me|assist me|guide me)\b/gi
   ];
-
-  let cleaned = query.trim();
-  let original = cleaned;
-
-  // Remove consecutive fillers at the start
-  let previousLength = 0;
-  while (cleaned.length !== previousLength) {
-    previousLength = cleaned.length;
-    for (const filler of conversationalFillers) {
-      // More aggressive pattern matching that handles punctuation
-      const fillerPattern = new RegExp(`^\\s*${filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[.,!?;]?\\s*`, 'i');
-      if (fillerPattern.test(cleaned)) {
-        cleaned = cleaned.replace(fillerPattern, '');
-      }
-    }
-  }
-
-  // If we removed everything, return the original
-  if (cleaned.trim() === '') {
-    return original;
-  }
-
-  // Return lowercase to match test expectations
-  return cleaned.trim().toLowerCase();
+  
+  fillers.forEach(filler => {
+    cleaned = cleaned.replace(filler, ' ').replace(/\s+/g, ' ').trim();
+  });
+  
+  return cleaned;
 }
 
 /**
- * Clean extracted location by removing common artifacts
- * @param {string} location - The extracted location
+ * Clean extracted location by removing common words and normalizing
+ * @param {string} location - The location string to clean
  * @returns {string|null} Cleaned location or null if invalid
  */
 function cleanExtractedLocation(location) {
@@ -366,34 +302,31 @@ function cleanExtractedLocation(location) {
 
   let cleaned = location.trim();
   
-  // Remove common artifacts
-  cleaned = cleaned.replace(/^(a|an|the)\s+/i, ''); // Remove articles
-  cleaned = cleaned.replace(/\s+(a|an|the)\s+/gi, ' '); // Remove articles in middle
-  cleaned = cleaned.replace(/^(some|any|all)\s+/i, ''); // Remove quantifiers
-  cleaned = cleaned.replace(/\s+(some|any|all)\s+/gi, ' '); // Remove quantifiers in middle
-  cleaned = cleaned.replace(/^(shelter|help|resource|service)s?\s+/i, ''); // Remove service words
-  cleaned = cleaned.replace(/\s+(shelter|help|resource|service)s?\s+/gi, ' '); // Remove service words in middle
-  cleaned = cleaned.replace(/^(home|house|place)s?\s+/i, ''); // Remove building words
-  cleaned = cleaned.replace(/\s+(home|house|place)s?\s+/gi, ' '); // Remove building words in middle
+  // Remove common words that shouldn't be treated as locations
+  const words = cleaned.toLowerCase().split(/\s+/);
+  const filteredWords = words.filter(word => {
+    const cleanWord = word.replace(/[^\w]/g, '');
+    return !FILTER_WORDS.includes(cleanWord) && cleanWord.length > 1;
+  });
   
-  // Remove trailing punctuation
-  cleaned = cleaned.replace(/[?.,!;]+$/, '');
-  
-  // Clean up extra whitespace
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
-  // Must have at least 2 characters and contain letters
-  if (cleaned.length < 2 || !/[a-zA-Z]/.test(cleaned)) {
+  if (filteredWords.length === 0) {
     return null;
   }
   
-  // Return lowercase for consistency with test expectations
-  return cleaned.toLowerCase();
+  // Reconstruct the location with proper capitalization
+  cleaned = filteredWords.map(word => {
+    // Preserve original capitalization for proper nouns
+    const originalWord = location.toLowerCase().includes(word) ? 
+      location.match(new RegExp(word, 'i'))[0] : word;
+    return originalWord.charAt(0).toUpperCase() + originalWord.slice(1).toLowerCase();
+  }).join(' ');
+  
+  return cleaned || null;
 }
 
 /**
- * Extract standalone location names (common US cities)
- * @param {string} query - The cleaned query
+ * Extract standalone location names from query
+ * @param {string} query - The query to extract from
  * @returns {string|null} Extracted location or null
  */
 function extractStandaloneLocation(query) {
@@ -401,86 +334,88 @@ function extractStandaloneLocation(query) {
     return null;
   }
 
-  // Common US cities and locations that might appear standalone
-  const commonLocations = [
-    'san francisco', 'los angeles', 'new york', 'chicago', 'houston', 'phoenix',
-    'philadelphia', 'san antonio', 'san diego', 'dallas', 'san jose', 'austin',
-    'jacksonville', 'fort worth', 'columbus', 'charlotte', 'san francisco',
-    'indianapolis', 'seattle', 'denver', 'washington', 'boston', 'el paso',
-    'nashville', 'detroit', 'oklahoma city', 'portland', 'las vegas', 'memphis',
-    'louisville', 'baltimore', 'milwaukee', 'albuquerque', 'tucson', 'fresno',
-    'sacramento', 'atlanta', 'kansas city', 'long beach', 'colorado springs',
-    'raleigh', 'miami', 'virginia beach', 'omaha', 'oakland', 'minneapolis',
-    'tulsa', 'arlington', 'tampa', 'new orleans', 'wichita', 'cleveland',
-    'bakersfield', 'aurora', 'anaheim', 'honolulu', 'santa ana', 'corpus christi',
-    'riverside', 'lexington', 'stockton', 'henderson', 'saint paul', 'st louis',
-    'chula vista', 'orlando', 'san jose', 'laredo', 'chandler', 'madison',
-    'lubbock', 'scottsdale', 'garland', 'irving', 'fremont', 'irvine',
-    'birmingham', 'rochester', 'san bernardino', 'spokane', 'gilbert',
-    'arlington', 'montgomery', 'boise', 'richmond', 'des moines',
-    'santa clara', 'santa cruz', 'santa barbara', 'santa monica',
-    'palo alto', 'mountain view', 'sunnyvale', 'cupertino', 'san mateo',
-    'redwood city', 'menlo park', 'burlingame', 'san carlos', 'belmont',
-    'foster city', 'san bruno', 'south san francisco', 'daly city',
-    'san leandro', 'hayward', 'fremont', 'union city', 'newark',
-    'fremont', 'pleasanton', 'livermore', 'dublin', 'san ramon',
-    'walnut creek', 'concord', 'antioch', 'brentwood', 'oakley',
-    'pittsburg', 'martinez', 'pleasant hill', 'lafayette', 'orinda',
-    'moraga', 'danville', 'san rafael', 'novato', 'petaluma',
-    'santa rosa', 'napa', 'vallejo', 'fairfield', 'vacaville',
-    'davis', 'woodland', 'sacramento', 'roseville', 'rocklin',
-    'lincoln', 'auburn', 'grass valley', 'nevada city', 'truckee',
-    'tahoe', 'south lake tahoe', 'truckee', 'reno', 'carson city',
-    'sparks', 'fernley', 'fallon', 'elko', 'winnemucca'
-  ];
-
-  const words = query.toLowerCase().split(/\s+/);
+  // Look for capitalized words that might be location names
+  const words = query.split(/\s+/);
+  const potentialLocations = [];
   
-  // Look for multi-word locations first
-  for (let i = 0; i < words.length - 1; i++) {
-    for (let j = i + 1; j <= words.length; j++) {
-      const potentialLocation = words.slice(i, j).join(' ');
-      if (commonLocations.includes(potentialLocation)) {
-        return potentialLocation;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].replace(/[^\w]/g, '');
+    
+    // Check if it's a capitalized word (potential location)
+    if (word.length > 2 && word.charAt(0) === word.charAt(0).toUpperCase()) {
+      // Look for consecutive capitalized words
+      let location = word;
+      let j = i + 1;
+      
+      while (j < words.length) {
+        const nextWord = words[j].replace(/[^\w]/g, '');
+        if (nextWord.length > 2 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) {
+          location += ' ' + nextWord;
+          j++;
+        } else {
+          break;
+        }
       }
+      
+      if (location.length > 2) {
+        potentialLocations.push(location);
+      }
+      
+      i = j - 1; // Skip the words we've already processed
     }
   }
   
-  // Look for single-word locations
-  for (const word of words) {
-    if (commonLocations.includes(word)) {
-      return word;
-    }
+  // Return the longest potential location
+  if (potentialLocations.length > 0) {
+    return potentialLocations.sort((a, b) => b.length - a.length)[0];
   }
   
   return null;
 }
 
 /**
- * Check if a query is an incomplete location query
- * @param {string} query - The cleaned query
- * @returns {boolean} True if the query ends with a location preposition without a location
+ * Check if query is an incomplete location query
+ * @param {string} query - The query to check
+ * @returns {boolean} True if incomplete location query
  */
 function isIncompleteLocationQuery(query) {
   if (!query || typeof query !== 'string') {
     return false;
   }
 
-  // Patterns for incomplete location queries
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for queries that mention location but don't specify where
   const incompletePatterns = [
-    // Ends with location prepositions
-    /\b(?:in|near|around|at|within|close\s+to)\s*[?.,!;]*$/i,
-    // Ends with "shelter" + location preposition
-    /\b(?:shelter|help|resources?|services?)\s+(?:in|near|around|at|within|close\s+to)\s*[?.,!;]*$/i,
-    // Ends with "find" + "shelter" + location preposition
-    /\bfind\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:in|near|around|at|within|close\s+to)\s*[?.,!;]*$/i,
-    // Ends with "help me find" + "shelter" + location preposition
-    /\b(?:can\s+you\s+)?(?:help\s+me\s+)?(?:find|get)\s+(?:some\s+)?(?:shelter|help|resources?|services?)\s+(?:in|near|around|at|within|close\s+to)\s*[?.,!;]*$/i,
-    // Ends with "home" + location preposition
-    /\b(?:home|house|place)s?\s+(?:in|near|around|at|within|close\s+to)\s*[?.,!;]*$/i
+    /\b(?:find|need|want|looking\s+for)\s+(?:shelter|help|resources?|services?)\s+(?:near|in|around|at)\s*$/i,
+    /\b(?:shelter|help|resources?|services?)\s+(?:near|in|around|at)\s*$/i,
+    /\b(?:near|in|around|at)\s*$/i,
+    /\b(?:location|place|area|city|town)\s*$/i
   ];
+  
+  return incompletePatterns.some(pattern => pattern.test(lowerQuery));
+}
 
-  return incompletePatterns.some(pattern => pattern.test(query));
+/**
+ * Check if query is a current location query
+ * @param {string} query - The query to check
+ * @returns {boolean} True if current location query
+ */
+function isCurrentLocationQuery(query) {
+  if (!query || typeof query !== 'string') {
+    return false;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for "near me" or "nearby" type queries
+  const currentLocationPatterns = [
+    /\b(?:near|around|close\s+to)\s+(?:me|here|nearby|my\s+location|current\s+location)\b/i,
+    /\b(?:my\s+area|my\s+city|my\s+town|where\s+i\s+am)\b/i,
+    /\b(?:current\s+area|current\s+city|current\s+town)\b/i
+  ];
+  
+  return currentLocationPatterns.some(pattern => pattern.test(lowerQuery));
 }
 
 /**
@@ -495,15 +430,51 @@ export async function detectLocationWithGeocoding(query) {
     return locationInfo;
   }
   
-  // Use geocoding to determine if it's US
-  const usLocationInfo = await detectUSLocation(locationInfo.location);
+  // Use geocoding to determine completeness
+  const locationData = await detectLocation(locationInfo.location);
   
-  return {
+  logger.info('detectLocationWithGeocoding debug:', { 
+    query, 
+    locationInfo, 
+    locationData,
+    hasGeocodeData: !!(locationData?.geocodeData),
+    hasCity: !!(locationData?.geocodeData?.city),
+    hasState: !!(locationData?.geocodeData?.state),
+    hasCountry: !!(locationData?.geocodeData?.country)
+  });
+
+  // Force complete if geocoding found city, state, or country
+  if (locationData && (locationData.geocodeData?.city || locationData.geocodeData?.state || locationData.geocodeData?.country)) {
+    const result = {
+      location: locationInfo.location,
+      scope: 'complete',
+      isComplete: true,
+      geocodeData: locationData.geocodeData
+    };
+    logger.info('detectLocationWithGeocoding: returning complete location:', result);
+    return result;
+  }
+
+  // If detectLocation returned isComplete: true, use that
+  if (locationData && locationData.isComplete) {
+    const result = {
+      location: locationInfo.location,
+      scope: 'complete',
+      isComplete: true,
+      geocodeData: locationData.geocodeData
+    };
+    logger.info('detectLocationWithGeocoding: using detectLocation isComplete:', result);
+    return result;
+  }
+
+  const result = {
     location: locationInfo.location,
-    scope: usLocationInfo.scope,
-    isUS: usLocationInfo.isUS,
-    geocodeData: usLocationInfo.geocodeData
+    scope: locationData?.scope || 'unknown',
+    isComplete: locationData?.isComplete || false,
+    geocodeData: locationData?.geocodeData
   };
+  logger.info('detectLocationWithGeocoding: returning fallback result:', result);
+  return result;
 }
 
 /**
@@ -514,7 +485,7 @@ export async function detectLocationWithGeocoding(query) {
 export async function getLocationCoordinates(location) {
   if (!location) return null;
   
-  const locationInfo = await detectUSLocation(location);
+  const locationInfo = await detectLocation(location);
   
   // Only return coordinates if we have valid geocode data and the location matches
   if (locationInfo.geocodeData && locationInfo.geocodeData.latitude && locationInfo.geocodeData.longitude) {
@@ -542,7 +513,7 @@ export async function getLocationCoordinates(location) {
 export function clearExpiredCache() {
   const now = Date.now();
   for (const [key, value] of LOCATION_CACHE.entries()) {
-    if (now - value.timestamp >= CACHE_EXPIRY) {
+    if (now - value.timestamp > CACHE_EXPIRY) {
       LOCATION_CACHE.delete(key);
     }
   }
@@ -555,14 +526,47 @@ export function clearExpiredCache() {
 export function getCacheStats() {
   return {
     size: LOCATION_CACHE.size,
-    entries: Array.from(LOCATION_CACHE.keys())
+    maxAge: CACHE_EXPIRY
+  };
+}
+
+// Legacy function for backward compatibility
+export async function detectUSLocation(location) {
+  const result = await detectLocation(location);
+  return {
+    location: result.location,
+    scope: result.scope,
+    isComplete: result.isComplete,
+    geocodeData: result.geocodeData
   };
 }
 
 // Export helper functions for testing
 export { 
-  detectUSLocationFallback,
+  detectLocationFallback,
   cleanConversationalFillers,
   cleanExtractedLocation,
   extractStandaloneLocation
-}; 
+};
+
+// Legacy function for backward compatibility
+export function detectUSLocationFallback(location) {
+  const result = detectLocationFallback(location);
+  return {
+    location: result.location,
+    scope: result.scope,
+    isComplete: result.isComplete
+  };
+} 
+
+function containsCurrentLocationWord(text) {
+  if (!text || typeof text !== 'string') return false;
+  for (const word of CURRENT_LOCATION_WORDS) {
+    // Escape regex special characters in word
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Use word boundary regex for each word/phrase
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    if (regex.test(text)) return true;
+  }
+  return false;
+} 

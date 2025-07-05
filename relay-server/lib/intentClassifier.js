@@ -6,6 +6,7 @@ import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import { gptCache } from './queryCache.js';
 import { extractLocationFromQuery as enhancedExtractLocation } from './enhancedLocationDetector.js';
+import { rewriteQuery } from './enhancedQueryRewriter.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
@@ -155,54 +156,7 @@ export function clearConversationContext(callSid) {
  * @returns {Promise<string>} The rewritten query
  */
 export async function rewriteQuery(query, intent, callSid = null) {
-  if (!query || typeof query !== 'string') {
-    return query || '';
-  }
-
-  let rewrittenQuery = query.trim();
-  const lowerQuery = rewrittenQuery.toLowerCase();
-
-  try {
-    // Use geocoding-based location detection
-    const locationInfo = await detectLocationWithGeocoding(query);
-
-    // Add location context if present and US
-    if (locationInfo && locationInfo.location && locationInfo.isUS) {
-      // Add shelter-specific terms for shelter intent
-      if (intent === 'find_shelter') {
-        rewrittenQuery = `"domestic violence shelter" near ${locationInfo.location} "shelter name" "address" "phone number" "services offered" "24 hour hotline" site:.org OR site:.gov -site:yellowpages.com -site:city-data.com -site:tripadvisor.com`;
-      } else {
-        // For other intents, just add location context
-        if (!rewrittenQuery.includes(locationInfo.location)) {
-          rewrittenQuery = `${rewrittenQuery} in ${locationInfo.location}`;
-        }
-      }
-    } else if (locationInfo && locationInfo.location && !locationInfo.isUS) {
-      // For non-US locations, preserve the location but don't add US-specific enhancements
-      // Optionally, you could return a message here if you want to block non-US queries
-      // For now, just keep the original query as-is
-    }
-  } catch (error) {
-    logger.error('Error in location detection during query rewriting:', error);
-    // Continue with the original query if location detection fails
-  }
-
-  // Add intent-specific enhancements for other intents
-  switch (intent) {
-    case 'general_information':
-      if (!lowerQuery.includes('information') && !lowerQuery.includes('resources')) {
-        rewrittenQuery = `${rewrittenQuery} information resources guide`;
-      }
-      break;
-    case 'other_resources':
-      if (!lowerQuery.includes('resources') && !lowerQuery.includes('support')) {
-        rewrittenQuery = `${rewrittenQuery} support resources assistance`;
-      }
-      break;
-  }
-
-  // Ensure we always return a valid string
-  return rewrittenQuery || query || '';
+  return rewriteQuery(query, intent, callSid);
 }
 
 /**
@@ -338,7 +292,25 @@ function classifyIntentFallback(query) {
   if (/\b(end|stop|goodbye|bye|hang up|disconnect|thank you|thanks)\b/i.test(lowerQuery)) {
     return 'end_conversation';
   }
-  
+
+  // --- NEW: Check for resource-seeking queries with 'near me', 'my location', etc. ---
+  const resourceNearMePattern = /\b(shelter|help|resources?|services?|support)\b.*\b(near me|nearby|my location|here|around me|close to me|current location)\b|\b(near me|nearby|my location|here|around me|close to me|current location)\b.*\b(shelter|help|resources?|services?|support)\b/;
+  if (resourceNearMePattern.test(lowerQuery)) {
+    // Pick the most appropriate resource intent
+    if (/shelter|housing|safe|place to stay|home/.test(lowerQuery)) {
+      return 'find_shelter';
+    }
+    if (/legal|lawyer|attorney|restraining order|court|divorce|custody|rights/.test(lowerQuery)) {
+      return 'legal_services';
+    }
+    if (/counseling|therapy|therapist|counselor|mental health|emotional support|talk to someone/.test(lowerQuery)) {
+      return 'counseling_services';
+    }
+    // Default to other_resources for generic resource/help queries
+    return 'other_resources';
+  }
+  // --- END NEW ---
+
   // First check for domestic violence related keywords
   const domesticViolenceKeywords = [
     'domestic', 'violence', 'abuse', 'shelter', 'safe', 'refuge', 'protection',
@@ -572,7 +544,7 @@ export async function handleFollowUp(query, lastQueryContext) {
         logger.info('Detected location follow-up via geocoding:', {
           query,
           location: locationData.location,
-          isUS: locationData.isUS,
+          isComplete: locationData.isComplete,
           lastIntent: lastQueryContext.intent,
           needsLocation
         });
@@ -1466,7 +1438,7 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
       locationQuery,
       combinedQuery,
       location,
-      isUS: locationData.isUS
+      isComplete: locationData.isComplete
     });
     
     // Import required functions for processing

@@ -34,7 +34,7 @@ const HTTP_STATUS = {
 };
 
 export class TwilioVoiceHandler {
-  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, VoiceResponseClass = twilio.twiml.VoiceResponse) {
+  constructor(accountSid, authToken, phoneNumber, validateRequest = twilioValidateRequest, WebSocketClass = RealWebSocket, VoiceResponseClass = twilio.twiml.VoiceResponse, dependencies = {}) {
     // Handle test environment where credentials might not be available
     if (process.env.NODE_ENV === 'test') {
       this.accountSid = accountSid || 'ACtest123456789';
@@ -69,6 +69,9 @@ export class TwilioVoiceHandler {
     
     // Schedule periodic cleanup of old audio files
     this.scheduleAudioCleanup();
+
+    // Dependency injection for testability
+    this._deps = dependencies;
   }
 
   /**
@@ -145,10 +148,21 @@ export class TwilioVoiceHandler {
    * @param {string} promptKey - Prompt key (e.g., 'welcome', 'incompleteLocation')
    * @returns {string} Localized prompt
    */
-  getLocalizedPrompt(languageCode, promptKey) {
+  getLocalizedPrompt(languageCode, promptKey, params = {}) {
     try {
-      const langConfig = getLanguageConfig(languageCode);
-      return langConfig.prompts[promptKey] || langConfig.prompts.fallback || 'I\'m sorry, I didn\'t understand your request.';
+      // Use injected getLanguageConfig if available, otherwise use the global one
+      const getLangConfig = this._deps?.getLanguageConfig || getLanguageConfig;
+      const langConfig = getLangConfig(languageCode);
+      let prompt = langConfig.prompts[promptKey] || langConfig.prompts.fallback || 'I\'m sorry, I didn\'t understand your request.';
+
+      // Replace placeholders in the prompt if parameters are provided
+      if (Object.keys(params).length > 0) {
+        for (const key in params) {
+          prompt = prompt.replace(`{{${key}}}`, params[key]);
+        }
+      }
+
+      return prompt;
     } catch (error) {
       logger.error('Error getting localized prompt:', { languageCode, promptKey, error: error.message });
       return 'I\'m sorry, I didn\'t understand your request.';
@@ -289,6 +303,13 @@ export class TwilioVoiceHandler {
   async processSpeechInput(speechResult, callSid = null, languageCode = DEFAULT_LANGUAGE) {
     const requestId = Math.random().toString(36).substring(7);
 
+    // Use injected dependencies if provided, otherwise dynamically import
+    const getDep = async (name, importPath, exportName) => {
+      if (this._deps && this._deps[name]) return this._deps[name];
+      const mod = await import(importPath);
+      return exportName ? mod[exportName] : mod.default;
+    };
+
     try {
       logger.info('Processing speech input:', {
         requestId,
@@ -299,11 +320,19 @@ export class TwilioVoiceHandler {
         timestamp: new Date().toISOString()
       });
 
-      // Import required functions
-      const { getIntent, getConversationContext, rewriteQuery, updateConversationContext, handleFollowUp, cleanResultTitle, manageConversationFlow, shouldAttemptReengagement, generateReengagementMessage } = await import('../lib/intentClassifier.js');
-      const { extractLocation, generateLocationPrompt } = await import('../lib/speechProcessor.js');
-      const { callTavilyAPI } = await import('../lib/apis.js');
-      const { ResponseGenerator } = await import('../lib/response.js');
+      // Get dependencies (mocked or real)
+      const getIntent = await getDep('getIntent', '../lib/intentClassifier.js', 'getIntent');
+      const getConversationContext = await getDep('getConversationContext', '../lib/intentClassifier.js', 'getConversationContext');
+      const rewriteQuery = await getDep('rewriteQuery', '../lib/intentClassifier.js', 'rewriteQuery');
+      const updateConversationContext = await getDep('updateConversationContext', '../lib/intentClassifier.js', 'updateConversationContext');
+      const handleFollowUp = await getDep('handleFollowUp', '../lib/intentClassifier.js', 'handleFollowUp');
+      const cleanResultTitle = await getDep('cleanResultTitle', '../lib/intentClassifier.js', 'cleanResultTitle');
+      const manageConversationFlow = await getDep('manageConversationFlow', '../lib/intentClassifier.js', 'manageConversationFlow');
+      const extractLocation = await getDep('extractLocation', '../lib/speechProcessor.js', 'extractLocation');
+      const generateLocationPrompt = await getDep('generateLocationPrompt', '../lib/speechProcessor.js', 'generateLocationPrompt');
+      const callTavilyAPI = await getDep('callTavilyAPI', '../lib/apis.js', 'callTavilyAPI');
+      const ResponseGenerator = await getDep('ResponseGenerator', '../lib/response.js', 'ResponseGenerator');
+      const getLanguageConfig = await getDep('getLanguageConfig', '../lib/languageConfig.js', 'getLanguageConfig');
       
       // Get conversation context FIRST
       const context = callSid ? getConversationContext(callSid) : null;
@@ -374,6 +403,63 @@ export class TwilioVoiceHandler {
       const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
       const isConsentResponse = consentKeywords.some(keyword => lowerSpeech.includes(keyword));
       const lastResponse = callSid ? this.activeCalls.get(callSid)?.lastResponse : null;
+      
+      // Check if this is a confirmation response for location
+      const hasPreviousLocation = context?.lastQueryContext?.location;
+      const isLocationConfirmation = hasPreviousLocation && isConsentResponse;
+      
+      if (isLocationConfirmation) {
+        const isAffirmative = ['yes', 'agree', 'ok', 'okay', 'sure'].some(keyword => lowerSpeech.includes(keyword));
+        
+        logger.info('Processing location confirmation response:', {
+          requestId,
+          callSid,
+          speechResult,
+          isAffirmative,
+          previousLocation: hasPreviousLocation
+        });
+        
+        if (isAffirmative) {
+          // User confirmed using previous location, proceed with search
+          const intent = context.lastIntent || 'find_shelter';
+          const query = `${intent.replace('_', ' ')} in ${hasPreviousLocation}`;
+          
+          logger.info('User confirmed previous location, proceeding with search:', {
+            requestId,
+            callSid,
+            intent,
+            query,
+            location: hasPreviousLocation
+          });
+          
+          // Rewrite query with confirmed location
+          const rewrittenQuery = await rewriteQuery(query, intent, callSid);
+          
+          // Call Tavily API with rewritten query
+          const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+          
+          // Format response for voice
+          const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
+          
+          // Update conversation context
+          if (callSid) {
+            updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
+          }
+          
+          return formattedResponse.voiceResponse;
+        } else {
+          // User declined previous location, ask for new location
+          logger.info('User declined previous location, asking for new location:', {
+            requestId,
+            callSid,
+            speechResult
+          });
+          
+          return this.getLocalizedPrompt(languageCode, 'locationPrompt');
+        }
+      }
+
+      // Check if this looks like a consent response, redirect to consent endpoint
       const wasAskingForConsent = lastResponse && (
         lastResponse.includes('text message') || 
         lastResponse.includes('summary') || 
@@ -381,7 +467,6 @@ export class TwilioVoiceHandler {
         lastResponse.includes('receive a summary')
       );
       
-      // If this looks like a consent response, redirect to consent endpoint
       if (isConsentResponse && wasAskingForConsent) {
         logger.info('Detected consent response in processSpeechInput, redirecting to consent endpoint:', {
           requestId,
@@ -526,8 +611,7 @@ export class TwilioVoiceHandler {
       // For resource-related intents (shelter, legal, counseling), extract location
       if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
         // Extract location from speech using enhanced location detector
-        const { extractLocationFromQuery, detectLocation } = await import('./enhancedLocationDetector.js');
-        const locationInfo = extractLocationFromQuery(speechResult);
+        const locationInfo = await extractLocation(speechResult);
         
         logger.info('Extracted location info:', {
           requestId,
@@ -536,45 +620,89 @@ export class TwilioVoiceHandler {
           originalSpeech: speechResult
         });
 
+        // Check conversation context for previously mentioned location
+        const context = callSid ? getConversationContext(callSid) : null;
+        const hasPreviousLocation = context?.lastQueryContext?.location;
+        
+        logger.info('Location context check:', {
+          requestId,
+          callSid,
+          hasPreviousLocation,
+          previousLocation: context?.lastQueryContext?.location,
+          currentLocationScope: locationInfo.scope
+        });
+
         // Check for incomplete location queries
         if (locationInfo.scope === 'incomplete') {
-          logger.info('Incomplete location query detected, asking for specific location:', {
+          logger.info('Incomplete location query detected:', {
             requestId,
             callSid,
             speechResult,
-            languageCode
+            languageCode,
+            hasPreviousLocation
           });
+          
+          // If we have a previous location, re-confirm it
+          if (hasPreviousLocation) {
+            return this.getLocalizedPrompt(languageCode, 'confirmLocation', { location: hasPreviousLocation });
+          }
+          
+          // Otherwise, ask for specific location
           return this.getLocalizedPrompt(languageCode, 'incompleteLocation');
         }
 
         // Check for current location queries
         if (locationInfo.scope === 'current-location') {
-          logger.info('Current location query detected, asking for specific location:', {
+          logger.info('Current location query detected:', {
             requestId,
             callSid,
             speechResult,
-            languageCode
+            languageCode,
+            hasPreviousLocation
           });
+          
+          // If we have a previous location, re-confirm it
+          if (hasPreviousLocation) {
+            return this.getLocalizedPrompt(languageCode, 'confirmLocation', { location: hasPreviousLocation });
+          }
+          
+          // Otherwise, ask for specific location
           return this.getLocalizedPrompt(languageCode, 'currentLocation');
         }
 
         if (!locationInfo.location) {
-          logger.info('No location found in speech, generating prompt:', {
+          logger.info('No location found in speech:', {
             requestId,
             callSid,
-            speechResult
+            speechResult,
+            hasPreviousLocation
           });
+          
+          // If we have a previous location, re-confirm it
+          if (hasPreviousLocation) {
+            return this.getLocalizedPrompt(languageCode, 'confirmLocation', { location: hasPreviousLocation });
+          }
+          
+          // Otherwise, generate location prompt
           return generateLocationPrompt();
         }
 
         // Check if location is complete (has state/province and country)
         const locationData = await detectLocation(locationInfo.location);
         if (locationData && !locationData.isComplete) {
-          logger.info('Incomplete location detected, asking for more specific location:', { 
+          logger.info('Incomplete location detected:', { 
             location: locationInfo.location, 
             callSid,
-            requestId
+            requestId,
+            hasPreviousLocation
           });
+          
+          // If we have a previous complete location, offer to use it
+          if (hasPreviousLocation) {
+            return this.getLocalizedPrompt(languageCode, 'usePreviousLocation', { location: hasPreviousLocation });
+          }
+          
+          // Otherwise, ask for more specific location
           return this.getLocalizedPrompt(languageCode, 'moreSpecificLocation');
         }
 

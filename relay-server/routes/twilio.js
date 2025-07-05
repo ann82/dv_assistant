@@ -330,9 +330,24 @@ router.post('/voice/process', async (req, res) => {
     // Clear the request timeout since we got a response
     clearTimeout(requestTimeout);
     
+    // Extract response and flags from processResult (similar to handleSpeechInput)
+    const response = typeof processedResponse === 'string' ? processedResponse : processedResponse.response;
+    const shouldEndCall = typeof processedResponse === 'object' && processedResponse.shouldEndCall;
+    const shouldRedirectToConsent = typeof processedResponse === 'object' && processedResponse.shouldRedirectToConsent;
+    
+    // Handle consent redirect
+    if (shouldRedirectToConsent) {
+      logger.info('Redirecting to consent endpoint:', { CallSid, SpeechResult: cleanedSpeechResult });
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say(response);
+      twiml.redirect('/twilio/consent');
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+    
     // Generate TwiML response with timeout handling
     const twiml = await Promise.race([
-      twilioVoiceHandler.generateTTSBasedTwiML(processedResponse, true),
+      twilioVoiceHandler.generateTTSBasedTwiML(response, !shouldEndCall),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('TwiML generation timeout')), 15000)
       )
@@ -341,7 +356,7 @@ router.post('/voice/process', async (req, res) => {
     res.type('text/xml');
     res.send(twiml);
     
-    logger.info('Successfully processed speech:', { CallSid, responseLength: processedResponse.length });
+    logger.info('Successfully processed speech:', { CallSid, responseLength: response.length });
     
   } catch (error) {
     clearTimeout(requestTimeout);

@@ -37,40 +37,39 @@ vi.mock('../lib/enhancedLocationDetector.js', () => ({
     return { location: null, scope: 'non-US' };
   }),
   detectLocationWithGeocoding: vi.fn((query) => {
-    if (!query) return { location: null, scope: 'non-US', isUS: false };
+    if (!query) return { location: null, scope: 'non-US', isComplete: false, country: null };
     
     const lowerQuery = query.toLowerCase();
     
-    // Extract locations based on common patterns - check longer patterns first
     if (lowerQuery.includes('new york city, ny')) {
-      return { location: 'New York City, NY', scope: 'US', isUS: true };
+      return { location: 'New York City, NY', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('san francisco, ca')) {
-      return { location: 'San Francisco, CA', scope: 'US', isUS: true };
+      return { location: 'San Francisco, CA', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('san francisco')) {
-      return { location: 'San Francisco', scope: 'US', isUS: true };
+      return { location: 'San Francisco', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('oakland')) {
-      return { location: 'Oakland', scope: 'US', isUS: true };
+      return { location: 'Oakland', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('new york')) {
-      return { location: 'New York', scope: 'US', isUS: true };
+      return { location: 'New York', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('mumbai, india')) {
-      return { location: 'Mumbai, India', scope: 'non-US', isUS: false };
+      return { location: 'Mumbai, India', scope: 'complete', isComplete: true, country: 'IN' };
     }
     if (lowerQuery.includes('toronto, canada')) {
-      return { location: 'Toronto, Canada', scope: 'non-US', isUS: false };
+      return { location: 'Toronto, Canada', scope: 'complete', isComplete: true, country: 'CA' };
     }
     if (lowerQuery.includes('94102')) {
-      return { location: '94102', scope: 'US', isUS: true };
+      return { location: '94102', scope: 'complete', isComplete: true, country: 'US' };
     }
     if (lowerQuery.includes('london')) {
-      return { location: 'London', scope: 'non-US', isUS: false };
+      return { location: 'London', scope: 'complete', isComplete: true, country: 'GB' };
     }
     
-    return { location: null, scope: 'non-US', isUS: false };
+    return { location: null, scope: 'non-US', isComplete: false, country: null };
   })
 }));
 

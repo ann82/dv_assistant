@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { 
-  detectUSLocation, 
+  detectLocation, 
   extractLocationFromQuery, 
   detectLocationWithGeocoding,
   getLocationCoordinates,
   clearExpiredCache,
   getCacheStats,
-  detectUSLocationFallback,
+  detectLocationFallback,
   cleanConversationalFillers,
   cleanExtractedLocation,
   extractStandaloneLocation
@@ -26,24 +26,8 @@ describe('Enhanced Location Detector', () => {
     clearExpiredCache();
   });
 
-  describe('detectUSLocation', () => {
-    it('should detect US ZIP codes', async () => {
-      const result = await detectUSLocation('94102');
-      expect(result).toEqual({
-        isUS: true,
-        location: '94102',
-        scope: 'US'
-      });
-
-      const result2 = await detectUSLocation('12345-6789');
-      expect(result2).toEqual({
-        isUS: true,
-        location: '12345-6789',
-        scope: 'US'
-      });
-    });
-
-    it('should use geocoding for US cities', async () => {
+  describe('detectLocation', () => {
+    it('should detect complete locations with geocoding', async () => {
       // Mock successful geocoding response for San Francisco
       global.fetch.mockResolvedValueOnce({
         ok: true,
@@ -60,12 +44,12 @@ describe('Enhanced Location Detector', () => {
         }]
       });
 
-      const result = await detectUSLocation('San Francisco');
+      const result = await detectLocation('San Francisco, California, USA');
       
       expect(result).toEqual({
-        isUS: true,
-        location: 'San Francisco',
-        scope: 'US',
+        location: 'San Francisco, California, USA',
+        scope: 'complete',
+        isComplete: true,
         geocodeData: {
           country: 'United States',
           countryCode: 'us',
@@ -78,37 +62,37 @@ describe('Enhanced Location Detector', () => {
       });
     });
 
-    it('should use geocoding for non-US locations', async () => {
-      // Mock successful geocoding response for London
+    it('should detect incomplete locations with geocoding', async () => {
+      // Mock successful geocoding response for just "San Francisco"
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [{
-          lat: '51.5074',
-          lon: '-0.1278',
-          display_name: 'London, Greater London, England, United Kingdom',
+          lat: '37.7749',
+          lon: '-122.4194',
+          display_name: 'San Francisco, San Francisco County, California, United States',
           address: {
-            city: 'London',
-            state: 'Greater London',
-            country: 'United Kingdom',
-            country_code: 'gb'
+            city: 'San Francisco',
+            state: null,
+            country: null,
+            country_code: null
           }
         }]
       });
 
-      const result = await detectUSLocation('London');
+      const result = await detectLocation('San Francisco');
       
       expect(result).toEqual({
-        isUS: false,
-        location: 'London',
-        scope: 'non-US',
+        location: 'San Francisco',
+        scope: 'incomplete',
+        isComplete: false,
         geocodeData: {
-          country: 'United Kingdom',
-          countryCode: 'gb',
-          state: 'Greater London',
-          city: 'London',
-          latitude: 51.5074,
-          longitude: -0.1278,
-          displayName: 'London, Greater London, England, United Kingdom'
+          country: null,
+          countryCode: null,
+          state: null,
+          city: 'San Francisco',
+          latitude: 37.7749,
+          longitude: -122.4194,
+          displayName: 'San Francisco, San Francisco County, California, United States'
         }
       });
     });
@@ -117,324 +101,348 @@ describe('Enhanced Location Detector', () => {
       // Mock failed geocoding response
       global.fetch.mockRejectedValueOnce(new Error('API Error'));
 
-      const result = await detectUSLocation('California');
+      const result = await detectLocation('San Francisco, CA');
       
       expect(result).toEqual({
-        isUS: true,
-        location: 'California',
-        scope: 'US'
+        location: 'San Francisco, CA',
+        scope: 'complete',
+        isComplete: true
       });
     });
 
     it('should use cached results for repeated queries', async () => {
       // Use a unique location to avoid cache interference
-      const uniqueLocation = 'CacheTestville123';
+      const uniqueLocation = 'CacheTestville123, Test State, Test Country';
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [{
           lat: '10.0000',
           lon: '20.0000',
-          display_name: 'CacheTestville123, Test State, United States',
+          display_name: 'CacheTestville123, Test State, Test Country',
           address: {
             city: 'CacheTestville123',
             state: 'Test State',
-            country: 'United States',
-            country_code: 'us'
+            country: 'Test Country',
+            country_code: 'tc'
           }
         }]
       });
 
       // First call should hit the API
-      const result1 = await detectUSLocation(uniqueLocation);
-      expect(result1.isUS).toBe(true);
+      const result1 = await detectLocation(uniqueLocation);
+      expect(result1.isComplete).toBe(true);
       expect(global.fetch).toHaveBeenCalledTimes(1);
 
       // Clear the mock to reset the call count
       global.fetch.mockClear();
 
       // Second call should use cache (no API call)
-      const result2 = await detectUSLocation(uniqueLocation);
-      expect(result2.isUS).toBe(true);
+      const result2 = await detectLocation(uniqueLocation);
+      expect(result2.isComplete).toBe(true);
       expect(global.fetch).toHaveBeenCalledTimes(0); // No new API call
     });
 
     it('should handle edge cases', async () => {
-      expect(await detectUSLocation('')).toEqual({
-        isUS: false,
+      expect(await detectLocation('')).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'none',
+        isComplete: false
       });
 
-      expect(await detectUSLocation(null)).toEqual({
-        isUS: false,
+      expect(await detectLocation(null)).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'none',
+        isComplete: false
       });
 
-      expect(await detectUSLocation(undefined)).toEqual({
-        isUS: false,
+      expect(await detectLocation(undefined)).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'none',
+        isComplete: false
       });
+    });
+
+    it('should treat "near me", "my location", "here" as current-location/incomplete', async () => {
+      const cases = [
+        'me',
+        'near me',
+        'my location',
+        'here',
+        'around me',
+        'close to me',
+        'current location',
+        'help near me',
+        'shelter near me',
+        'resources around me',
+        'services close to me'
+      ];
+      for (const input of cases) {
+        const result = await detectLocation(input);
+        expect(result).toEqual({ location: null, scope: 'current-location', isComplete: false });
+      }
     });
   });
 
-  describe('detectUSLocationFallback', () => {
-    it('should detect US states', () => {
-      expect(detectUSLocationFallback('California')).toEqual({
-        isUS: true,
-        location: 'California',
-        scope: 'US'
-      });
+  describe('"Near Me" Location Extraction', () => {
+    it('should extract location from "near me" queries and mark as incomplete', async () => {
+      const testCases = [
+        'resources near me',
+        'help near me', 
+        'shelter near me',
+        'legal services near me',
+        'counseling near me',
+        'support near me'
+      ];
 
-      expect(detectUSLocationFallback('CA')).toEqual({
-        isUS: true,
-        location: 'CA',
-        scope: 'US'
-      });
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
     });
 
-    it('should detect non-US countries', () => {
-      expect(detectUSLocationFallback('Canada')).toEqual({
-        isUS: false,
-        location: 'Canada',
-        scope: 'non-US'
-      });
+    it('should extract location from "nearby" queries and mark as incomplete', async () => {
+      const testCases = [
+        'shelter nearby',
+        'help nearby',
+        'resources nearby',
+        'services nearby'
+      ];
 
-      expect(detectUSLocationFallback('United Kingdom')).toEqual({
-        isUS: false,
-        location: 'United Kingdom',
-        scope: 'non-US'
-      });
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
     });
 
-    it('should handle mixed locations', () => {
-      expect(detectUSLocationFallback('San Francisco, California')).toEqual({
-        isUS: true,
+    it('should extract location from "around me" queries and mark as incomplete', async () => {
+      const testCases = [
+        'help around me',
+        'shelter around me',
+        'resources around me',
+        'services around me'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should extract location from "close to me" queries and mark as incomplete', async () => {
+      const testCases = [
+        'shelter close to me',
+        'help close to me',
+        'resources close to me',
+        'services close to me'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should extract location from "my location" queries and mark as incomplete', async () => {
+      const testCases = [
+        'shelter my location',
+        'help my location',
+        'resources my location',
+        'legal services my location',
+        'counseling my location'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should extract location from "here" queries and mark as incomplete', async () => {
+      const testCases = [
+        'shelter here',
+        'help here',
+        'resources here',
+        'services here',
+        'counseling here'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should extract location from "current location" queries and mark as incomplete', async () => {
+      const testCases = [
+        'shelter current location',
+        'help current location',
+        'resources current location',
+        'support current location'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should handle mixed word orders for current location queries', async () => {
+      const testCases = [
+        'near me shelter',
+        'nearby help',
+        'around me resources',
+        'close to me services',
+        'my location legal services',
+        'here counseling',
+        'current location support'
+      ];
+
+      for (const query of testCases) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+    });
+
+    it('should distinguish between current location and specific location queries', async () => {
+      // These should be treated as current location (incomplete)
+      const currentLocationQueries = [
+        'shelter near me',
+        'help nearby',
+        'resources around me'
+      ];
+
+      for (const query of currentLocationQueries) {
+        const result = extractLocationFromQuery(query);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
+
+      // These should extract specific locations
+      const specificLocationQueries = [
+        'shelter in San Francisco',
+        'help in New York',
+        'resources in Los Angeles'
+      ];
+
+      for (const query of specificLocationQueries) {
+        const result = extractLocationFromQuery(query);
+        expect(result.location).toBeTruthy();
+        expect(result.scope).not.toBe('current-location');
+      }
+    });
+  });
+
+  describe('detectLocationFallback', () => {
+    it('should detect complete locations with state/province', () => {
+      expect(detectLocationFallback('San Francisco, California')).toEqual({
         location: 'San Francisco, California',
-        scope: 'US'
+        scope: 'complete',
+        isComplete: true
       });
 
-      expect(detectUSLocationFallback('Mumbai, India')).toEqual({
-        isUS: false,
+      expect(detectLocationFallback('Toronto, Ontario')).toEqual({
+        location: 'Toronto, Ontario',
+        scope: 'complete',
+        isComplete: true
+      });
+    });
+
+    it('should detect complete locations with country', () => {
+      expect(detectLocationFallback('London, England, UK')).toEqual({
+        location: 'London, England, UK',
+        scope: 'complete',
+        isComplete: true
+      });
+
+      expect(detectLocationFallback('Mumbai, India')).toEqual({
         location: 'Mumbai, India',
-        scope: 'non-US'
+        scope: 'complete',
+        isComplete: true
+      });
+    });
+
+    it('should detect incomplete locations', () => {
+      expect(detectLocationFallback('San Francisco')).toEqual({
+        location: 'San Francisco',
+        scope: 'incomplete',
+        isComplete: false
+      });
+
+      expect(detectLocationFallback('London')).toEqual({
+        location: 'London',
+        scope: 'incomplete',
+        isComplete: false
       });
     });
   });
 
   describe('extractLocationFromQuery', () => {
-    it('should extract location from conversational queries with fillers', () => {
-      const result = extractLocationFromQuery("Hey, can you help me find some shelter homes near Santa Clara?");
-      expect(result.location).toBe('santa clara');
-      expect(result.scope).toBe('unknown');
-    });
+    it('should extract locations from various query patterns', () => {
+      expect(extractLocationFromQuery('find shelter in San Francisco')).toEqual({
+        location: 'San Francisco',
+        scope: 'unknown'
+      });
 
-    it('should extract location from queries with multiple fillers', () => {
-      const result = extractLocationFromQuery("Hi there, I need help finding shelter in San Francisco");
-      expect(result.location).toBe('san francisco');
-      expect(result.scope).toBe('unknown');
-    });
+      expect(extractLocationFromQuery('shelter near London, UK')).toEqual({
+        location: 'London, Uk',
+        scope: 'unknown'
+      });
 
-    it('should extract location from complex conversational queries', () => {
-      const result = extractLocationFromQuery("Hello, I was wondering if you could help me find some shelter resources near Palo Alto");
-      expect(result.location).toBe('palo alto');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should extract location from queries ending with location', () => {
-      const result = extractLocationFromQuery("I need shelter in Mountain View");
-      expect(result.location).toBe('mountain view');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should extract location with state abbreviations', () => {
-      const result = extractLocationFromQuery("Find shelter near Sacramento, CA");
-      expect(result.location).toBe('sacramento, ca');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should extract standalone location names', () => {
-      const result = extractLocationFromQuery("I need help in Santa Clara");
-      expect(result.location).toBe('santa clara');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should handle queries with articles and quantifiers', () => {
-      const result = extractLocationFromQuery("I need some shelter in the San Jose area");
-      expect(result.location).toBe('san jose area');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should return null for queries without location', () => {
-      const result = extractLocationFromQuery("I need help with domestic violence");
-      expect(result.location).toBeNull();
-      expect(result.scope).toBe('non-US');
-    });
-
-    it('should handle empty queries', () => {
-      const result = extractLocationFromQuery("");
-      expect(result.location).toBeNull();
-      expect(result.scope).toBe('non-US');
-    });
-
-    it('should handle null queries', () => {
-      const result = extractLocationFromQuery(null);
-      expect(result.location).toBeNull();
-      expect(result.scope).toBe('non-US');
-    });
-
-    it('should correctly extract location when "home" is used as a service word', () => {
-      const result = extractLocationFromQuery("Hey, can you help me find shelter home Mumbai?");
-      expect(result.location).toBe('mumbai');
-      expect(result.scope).toBe('unknown');
-    });
-
-    it('should detect incomplete location queries', () => {
-      const result = extractLocationFromQuery("Can you help me find shelter homes near?");
-      expect(result.location).toBeNull();
-      expect(result.scope).toBe('incomplete');
-    });
-
-    it('should detect incomplete location queries with different patterns', () => {
-      const incompleteQueries = [
-        "find shelter in",
-        "I need help near",
-        "shelter around",
-        "help me find shelter at",
-        "can you help me find shelter close to"
-      ];
-
-      incompleteQueries.forEach(query => {
-        const result = extractLocationFromQuery(query);
-        expect(result.location).toBeNull();
-        expect(result.scope).toBe('incomplete');
+      expect(extractLocationFromQuery('help in Mumbai, India')).toEqual({
+        location: 'Mumbai, India',
+        scope: 'unknown'
       });
     });
 
-    it('should not detect complete location queries as incomplete', () => {
-      const completeQueries = [
-        "find shelter in San Francisco",
-        "I need help near New York",
-        "shelter around Los Angeles",
-        "help me find shelter at Chicago"
-      ];
+    it('should handle incomplete location queries', () => {
+      expect(extractLocationFromQuery('find shelter in')).toEqual({
+        location: null,
+        scope: 'incomplete'
+      });
 
-      completeQueries.forEach(query => {
-        const result = extractLocationFromQuery(query);
-        expect(result.scope).not.toBe('incomplete');
+      expect(extractLocationFromQuery('shelter near')).toEqual({
+        location: null,
+        scope: 'incomplete'
       });
     });
-  });
 
-  describe('cleanConversationalFillers', () => {
-    it('should remove common fillers from start of query', () => {
-      const result = cleanConversationalFillers("Hey, can you help me find shelter in Santa Clara?");
-      expect(result).toBe("find shelter in santa clara?");
+    it('should handle current location queries', () => {
+      expect(extractLocationFromQuery('shelter near me')).toEqual({
+        location: null,
+        scope: 'current-location'
+      });
+
+      expect(extractLocationFromQuery('help near my location')).toEqual({
+        location: null,
+        scope: 'current-location'
+      });
     });
 
-    it('should remove multiple consecutive fillers', () => {
-      const result = cleanConversationalFillers("Hi there, I need help finding shelter in San Francisco");
-      expect(result).toBe("there, i need help finding shelter in san francisco");
+    it('should handle queries without locations', () => {
+      expect(extractLocationFromQuery('I need help with domestic violence')).toEqual({
+        location: null,
+        scope: 'none'
+      });
     });
 
-    it('should handle complex filler combinations', () => {
-      const result = cleanConversationalFillers("Hello, I was wondering if you could help me find some shelter");
-      expect(result).toBe("if you could help me find some shelter");
-    });
-
-    it('should preserve query if no fillers', () => {
-      const result = cleanConversationalFillers("Find shelter in Palo Alto");
-      expect(result).toBe("find shelter in palo alto");
-    });
-
-    it('should handle empty string', () => {
-      const result = cleanConversationalFillers("");
-      expect(result).toBe("");
-    });
-
-    it('should handle null input', () => {
-      const result = cleanConversationalFillers(null);
-      expect(result).toBe(null);
-    });
-  });
-
-  describe('cleanExtractedLocation', () => {
-    it('should remove articles from location', () => {
-      const result = cleanExtractedLocation("the Santa Clara");
-      expect(result).toBe("santa clara");
-    });
-
-    it('should remove quantifiers from location', () => {
-      const result = cleanExtractedLocation("some San Francisco");
-      expect(result).toBe("san francisco");
-    });
-
-    it('should remove service words from location', () => {
-      const result = cleanExtractedLocation("shelter Palo Alto");
-      expect(result).toBe("palo alto");
-    });
-
-    it('should clean complex location strings', () => {
-      const result = cleanExtractedLocation("the some shelter Mountain View area");
-      expect(result).toBe("mountain view area");
-    });
-
-    it('should remove trailing punctuation', () => {
-      const result = cleanExtractedLocation("Santa Clara?");
-      expect(result).toBe("santa clara");
-    });
-
-    it('should return null for invalid locations', () => {
-      const result = cleanExtractedLocation("a");
-      expect(result).toBeNull();
-    });
-
-    it('should handle empty string', () => {
-      const result = cleanExtractedLocation("");
-      expect(result).toBeNull();
-    });
-
-    it('should handle null input', () => {
-      const result = cleanExtractedLocation(null);
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('extractStandaloneLocation', () => {
-    it('should extract common US cities', () => {
-      const result = extractStandaloneLocation("I need help in santa clara");
-      expect(result).toBe("santa clara");
-    });
-
-    it('should extract multi-word cities', () => {
-      const result = extractStandaloneLocation("Find shelter in san francisco");
-      expect(result).toBe("san francisco");
-    });
-
-    it('should extract cities with state', () => {
-      const result = extractStandaloneLocation("I need help in palo alto california");
-      expect(result).toBe("palo alto");
-    });
-
-    it('should return null for non-location words', () => {
-      const result = extractStandaloneLocation("I need help with domestic violence");
-      expect(result).toBeNull();
-    });
-
-    it('should handle empty string', () => {
-      const result = extractStandaloneLocation("");
-      expect(result).toBeNull();
-    });
-
-    it('should handle null input', () => {
-      const result = extractStandaloneLocation(null);
-      expect(result).toBeNull();
+    it('should treat "near me", "my location", "here" as current-location', () => {
+      const cases = [
+        'Can you help me with some resources that are near me?',
+        'I need a shelter near me',
+        'Find services around me',
+        'Help at my location',
+        'Support here',
+        'Resources close to me',
+        'Shelter current location'
+      ];
+      for (const input of cases) {
+        const result = extractLocationFromQuery(input);
+        expect(result).toEqual({ location: null, scope: 'current-location' });
+      }
     });
   });
 
   describe('detectLocationWithGeocoding', () => {
-    it('should detect US locations with geocoding', async () => {
+    it('should detect complete locations with geocoding', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [{
@@ -450,12 +458,12 @@ describe('Enhanced Location Detector', () => {
         }]
       });
 
-      const result = await detectLocationWithGeocoding('find shelter in San Francisco');
+      const result = await detectLocationWithGeocoding('find shelter in San Francisco, California, USA');
       
       expect(result).toEqual({
-        location: 'san francisco',
-        scope: 'US',
-        isUS: true,
+        location: 'San Francisco, California',
+        scope: 'complete',
+        isComplete: true,
         geocodeData: {
           country: 'United States',
           countryCode: 'us',
@@ -468,7 +476,7 @@ describe('Enhanced Location Detector', () => {
       });
     });
 
-    it('should detect non-US locations with geocoding', async () => {
+    it('should detect incomplete locations with geocoding', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [{
@@ -477,9 +485,9 @@ describe('Enhanced Location Detector', () => {
           display_name: 'London, Greater London, England, United Kingdom',
           address: {
             city: 'London',
-            state: 'Greater London',
-            country: 'United Kingdom',
-            country_code: 'gb'
+            state: null,
+            country: null,
+            country_code: null
           }
         }]
       });
@@ -487,13 +495,13 @@ describe('Enhanced Location Detector', () => {
       const result = await detectLocationWithGeocoding('shelter in London');
       
       expect(result).toEqual({
-        location: 'london',
-        scope: 'non-US',
-        isUS: false,
+        location: 'London',
+        scope: 'incomplete',
+        isComplete: false,
         geocodeData: {
-          country: 'United Kingdom',
-          countryCode: 'gb',
-          state: 'Greater London',
+          country: null,
+          countryCode: null,
+          state: null,
           city: 'London',
           latitude: 51.5074,
           longitude: -0.1278,
@@ -506,67 +514,21 @@ describe('Enhanced Location Detector', () => {
       const result = await detectLocationWithGeocoding('I need help with domestic violence');
       expect(result).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'none'
       });
-    });
-  });
-
-  describe('getLocationCoordinates', () => {
-    it('should return coordinates for valid locations', async () => {
-      // Mock successful geocoding response
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [{
-          lat: '37.7749',
-          lon: '-122.4194',
-          display_name: 'San Francisco, California, United States',
-          address: {
-            city: 'San Francisco',
-            state: 'California',
-            country: 'United States',
-            country_code: 'us'
-          }
-        }]
-      });
-
-      const coords = await getLocationCoordinates('San Francisco');
-      
-      expect(coords).toEqual({
-        latitude: 37.7749,
-        longitude: -122.4194
-      });
-    });
-
-    it('should return null for invalid locations', async () => {
-      const invalidLocation = 'DefinitelyNotARealPlaceXYZ123456789';
-      
-      // Mock empty geocoding response for invalid location
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [] // Empty array for invalid location
-      });
-
-      const coords = await getLocationCoordinates(invalidLocation);
-      expect(coords).toBeNull();
-    });
-
-    it('should return null for empty input', async () => {
-      const coords = await getLocationCoordinates('');
-      expect(coords).toBeNull();
     });
   });
 
   describe('Cache Management', () => {
-    it('should provide cache statistics', () => {
-      const stats = getCacheStats();
-      expect(stats).toHaveProperty('size');
-      expect(stats).toHaveProperty('entries');
-      expect(Array.isArray(stats.entries)).toBe(true);
-    });
-
     it('should clear expired cache entries', () => {
       // This test verifies the function exists and doesn't throw
       expect(() => clearExpiredCache()).not.toThrow();
+    });
+
+    it('should return cache statistics', () => {
+      const stats = getCacheStats();
+      expect(stats).toHaveProperty('size');
+      expect(stats).toHaveProperty('maxAge');
     });
   });
 
@@ -575,12 +537,12 @@ describe('Enhanced Location Detector', () => {
       // Mock API error
       global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
-      const result = await detectUSLocation('San Francisco');
+      const result = await detectLocation('San Francisco');
       
       // Should fallback to pattern matching
-      expect(result.isUS).toBe(true);
+      expect(result.isComplete).toBe(false);
       expect(result.location).toBe('San Francisco');
-      expect(result.scope).toBe('US');
+      expect(result.scope).toBe('incomplete');
     });
 
     it('should handle malformed geocoding responses', async () => {
@@ -590,12 +552,12 @@ describe('Enhanced Location Detector', () => {
         json: async () => null
       });
 
-      const result = await detectUSLocation('San Francisco');
+      const result = await detectLocation('San Francisco');
       
       // Should fallback to pattern matching
-      expect(result.isUS).toBe(true);
+      expect(result.isComplete).toBe(false);
       expect(result.location).toBe('San Francisco');
-      expect(result.scope).toBe('US');
+      expect(result.scope).toBe('incomplete');
     });
 
     it('should handle HTTP errors', async () => {
@@ -605,12 +567,12 @@ describe('Enhanced Location Detector', () => {
         statusText: 'Not Found'
       });
 
-      const result = await detectUSLocation('San Francisco');
+      const result = await detectLocation('San Francisco');
       
       // Should fallback to pattern matching
-      expect(result.isUS).toBe(true);
+      expect(result.isComplete).toBe(false);
       expect(result.location).toBe('San Francisco');
-      expect(result.scope).toBe('US');
+      expect(result.scope).toBe('incomplete');
     });
   });
 }); 

@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.5] - 2025-01-27
+
+### Added
+- **Enhanced Intent Classification & Location Detection** - Major improvements to "near me" query handling
+  - **Resource-Seeking Intent Classification**: Queries like "resources near me", "help near me", "shelter near me", "support near me" are now correctly classified as resource-seeking intents instead of general information
+  - **Location Prompting**: "me", "my location", "here", "near me", etc. are treated as incomplete locations, triggering prompts for specific locations
+  - **Intent Accuracy**: Improved classification ensures users get appropriate resource responses instead of generic information
+- **Advanced Location Detection**
+  - **Incomplete Location Handling**: System detects when users provide vague location references and prompts for specific cities/areas
+  - **Geocoding Integration**: Uses Nominatim/OpenStreetMap API to validate and complete location information
+  - **US vs Non-US Logic**: Properly distinguishes between US and non-US locations for appropriate site restrictions
+
+### Changed
+- **Query Rewriting Optimization**
+  - **US Location Enhancement**: For US locations, appends `site:org OR site:gov` to resource-seeking queries
+  - **Non-US Handling**: Non-US locations receive appropriate responses without US-specific site restrictions
+  - **Resource Query Enhancement**: Queries without "shelter" are rewritten to `"domestic violence shelter <location> site:org OR site:gov"` for US locations
+- **Test Infrastructure**
+  - **Mock Improvements**: Removed deprecated `isUS` references, focusing on `isComplete` and `scope` for clarity
+  - **Country-Based Logic**: Tests now properly distinguish US vs non-US locations using country codes
+
+### Fixed
+- **Intent Classification**: Fixed classification of "near me" queries to properly identify resource-seeking intents
+- **Location Detection**: Fixed handling of vague location references to prompt for specific locations
+- **Query Rewriting**: Fixed site restriction logic to only apply to US locations
+- **Test Reliability**: All 23 enhanced query rewriter tests now pass with proper location and intent handling
+
+### Technical Improvements
+- **Enhanced Location Detector**: Improved location detection with geocoding validation and incomplete location handling
+- **Intent Classifier**: Enhanced pattern matching for resource-seeking queries with location references
+- **Query Rewriter**: Unified query rewriting logic with proper US/non-US distinction
+- **Test Coverage**: Comprehensive test coverage for all location and intent scenarios
+
 ## [1.19.3] - 2025-01-27
 
 ### Fixed

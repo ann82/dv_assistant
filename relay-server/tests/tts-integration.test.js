@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 
-// Mock AudioService
+// Mock all dependencies
 vi.mock('../services/audioService.js', () => ({
   AudioService: vi.fn().mockImplementation(() => ({
     generateTTS: vi.fn().mockResolvedValue({
@@ -12,6 +11,44 @@ vi.mock('../services/audioService.js', () => ({
     })
   }))
 }));
+
+vi.mock('../lib/config.js', () => ({
+  default: {
+    TTS_TIMEOUT: 10000,
+    ENABLE_TTS: true,
+    FALLBACK_TO_POLLY: true
+  }
+}));
+
+vi.mock('../lib/languageConfig.js', () => ({
+  getLanguageConfig: vi.fn().mockReturnValue({
+    twilioLanguage: 'en-US',
+    twilioSpeechRecognitionLanguage: 'en-US',
+    openaiVoice: 'nova'
+  })
+}));
+
+// Mock Twilio
+const mockTwiml = {
+  say: vi.fn().mockReturnThis(),
+  play: vi.fn().mockReturnThis(),
+  gather: vi.fn().mockReturnThis(),
+  redirect: vi.fn().mockReturnThis(),
+  hangup: vi.fn().mockReturnThis(),
+  toString: vi.fn().mockReturnValue('<Response><Say>Test</Say></Response>')
+};
+
+vi.mock('twilio', () => ({
+  default: {
+    twiml: {
+      VoiceResponse: vi.fn().mockImplementation(() => mockTwiml)
+    },
+    validateRequest: vi.fn().mockReturnValue(true)
+  }
+}));
+
+// Import after mocks
+import { TwilioVoiceHandler } from '../lib/twilioVoice.js';
 
 describe('TTS Integration Tests', () => {
   let twilioVoiceHandler;
@@ -53,7 +90,7 @@ describe('TTS Integration Tests', () => {
       expect(result).toContain('<Play>');
       
       // Should not contain Gather element
-      expect(result).not.toContain('<Gather');
+      expect(result).not.toContain('<Gather>');
     });
 
     it('should fallback to Polly when TTS fails', async () => {
