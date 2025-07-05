@@ -479,6 +479,7 @@ You can add more languages by editing `relay-server/lib/languageConfig.js`.
 - All prompts and responses are localized based on the detected language.
 - Twilio TTS/ASR and OpenAI TTS use the correct language and voice for each call.
 - Prompts for each language are defined in `languageConfig.js`.
+- OpenAI TTS uses language-specific voices (nova, shimmer, echo, onyx) while Twilio uses Polly voices for fallback.
 
 ### Customizing Prompts
 - To customize or add translations, edit the `prompts` section for each language in `relay-server/lib/languageConfig.js`.
@@ -487,17 +488,27 @@ You can add more languages by editing `relay-server/lib/languageConfig.js`.
 ### Example
 ```js
 export const SUPPORTED_LANGUAGES = {
-  'en-US': { ... },
-  'es-ES': { ... },
+  'en-US': { 
+    twilioVoice: 'Polly.Amy',
+    openaiVoice: 'nova',
+    // ... other config
+  },
+  'es-ES': { 
+    twilioVoice: 'Polly.Conchita',
+    openaiVoice: 'shimmer',
+    // ... other config
+  },
   // Add more here
 };
 ```
 
 ### Adding a New Language
 1. Add a new entry to `SUPPORTED_LANGUAGES` in `languageConfig.js`.
-2. Specify the Twilio voice, language codes, and all required prompts.
-3. Restart the server to apply changes.
+2. Specify the Twilio voice, OpenAI voice, language codes, and all required prompts.
+3. Choose an appropriate OpenAI voice from: nova, shimmer, echo, onyx, fable, alloy, ash, sage, coral.
+4. Restart the server to apply changes.
 
 ### Notes
 - If a language is not detected, the system defaults to English (US).
 - All TTS and ASR operations are now language-aware for improved accessibility and user experience.
+- OpenAI TTS is used as the primary TTS provider, with Twilio Polly as fallback.

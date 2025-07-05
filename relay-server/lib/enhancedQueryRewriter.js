@@ -145,15 +145,7 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   return searchQuery;
 }
 
-/**
- * Test function for query rewriting (synchronous version for testing)
- * @param {string} query - The user query
- * @param {string} intent - The detected intent
- * @returns {Promise<string>} Rewritten query
- */
-export async function testQueryRewriting(query, intent = 'find_shelter') {
-  return rewriteQuery(query, intent);
-}
+
 
 // Export utility functions for testing
 export {

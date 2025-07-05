@@ -819,3 +819,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - All TTS and ASR operations now use the correct language and voice for each call
 - Prompts and error messages are now localized based on detected language
+
+### Fixed
+- OpenAI TTS voice configuration now uses correct API voice names (nova, shimmer, echo, onyx) instead of Twilio voice names
+- Resolved 400 error when generating TTS with invalid voice names
+- Proper fallback mechanism between OpenAI TTS (primary) and Twilio Polly (fallback)

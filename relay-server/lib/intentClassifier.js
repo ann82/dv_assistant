@@ -1,10 +1,6 @@
 import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
-import { detectLocationWithGeocoding } from './enhancedLocationDetector.js';
-import { encode } from 'gpt-tokenizer';
-import { patternCategories, shelterKeywords } from './patternConfig.js';
-import { gptCache } from './queryCache.js';
 import { extractLocationFromQuery as enhancedExtractLocation } from './enhancedLocationDetector.js';
 import { rewriteQuery } from './enhancedQueryRewriter.js';
 
@@ -13,30 +9,7 @@ export { rewriteQuery };
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
-const intentSchema = {
-  name: 'classify_intent',
-  description: 'Classify the user query into one of the predefined intents',
-  parameters: {
-    type: 'object',
-    properties: {
-      intent: {
-        type: 'string',
-        enum: [
-          'find_shelter',
-          'legal_services',
-          'counseling_services',
-          'emergency_help',
-          'general_information',
-          'other_resources',
-          'end_conversation',
-          'off_topic'
-        ],
-        description: 'The classified intent of the user query'
-      }
-    },
-    required: ['intent']
-  }
-};
+
 
 // Add conversation context handling
 const conversationContexts = new Map();
@@ -358,99 +331,7 @@ function classifyIntentFallback(query) {
   return 'general_information';
 }
 
-// Helper functions for intent-based routing
-export const intentHandlers = {
-  find_shelter: async (query) => {
-    // Handle shelter search queries
-    return 'shelter_search';
-  },
-  legal_services: async (query) => {
-    // Handle legal service queries
-    return 'legal_resource_search';
-  },
-  counseling_services: async (query) => {
-    // Handle counseling service queries
-    return 'counseling_resource_search';
-  },
-  emergency_help: async (query) => {
-    // Handle emergency situations
-    return 'emergency_response';
-  },
-  general_information: async (query) => {
-    // Handle general information requests
-    return 'information_search';
-  },
-  other_resources: async (query) => {
-    // Handle other resource queries
-    return 'resource_search';
-  },
-  end_conversation: async (query) => {
-    // Handle end conversation requests
-    return 'end_conversation';
-  },
-  off_topic: async (query) => {
-    // Enhanced off-topic handling with conversation management
-    const queryLower = query.toLowerCase();
-    
-    // Check for conversation end requests
-    if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
-        queryLower.includes('end call') || queryLower.includes('hang up') ||
-        queryLower.includes('thank you') || queryLower.includes('thanks')) {
-      return {
-        type: 'conversation_end',
-        intent: 'end_conversation',
-        voiceResponse: "Thank you for calling. I hope I was able to help. If you need support in the future, please don't hesitate to call back. Take care.",
-        smsResponse: null,
-        shouldEndCall: false, // Don't end immediately, ask for SMS consent first
-        shouldReengage: false,
-        redirectionMessage: "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no."
-      };
-    }
-    
-    // Check for re-engagement attempts
-    if (queryLower.includes('help') || queryLower.includes('support') || 
-        queryLower.includes('domestic') || queryLower.includes('violence')) {
-      return {
-        type: 're_engagement',
-        intent: 'general_information',
-        voiceResponse: "I'm here to help with domestic violence support and resources. What specific information or assistance do you need today?",
-        smsResponse: "I'm here to help with domestic violence support. What do you need assistance with?",
-        shouldReengage: true
-      };
-    }
-    
-    // Check for medical queries specifically
-    if (/\b(chemo|chemotherapy|cancer|treatment|medicine|medical|doctor|hospital|disease|illness|symptoms|diagnosis|prescription|medication|drug|pharmacy)\b/i.test(queryLower)) {
-      return {
-        type: 'medical_redirection',
-        intent: 'off_topic',
-        voiceResponse: "I'm specifically designed to help with domestic violence support and resources. For medical questions about chemotherapy, cancer treatment, or other health concerns, please consult with your healthcare provider or call a medical information line. If you're experiencing domestic violence and need support, I'm here to help with that.",
-        smsResponse: "I'm here for domestic violence support. For medical questions, please consult your healthcare provider.",
-        shouldRedirect: true
-      };
-    }
-    
-    // Handle entertainment and other off-topic queries
-    if (/\b(weather|sports|joke|funny|music|movie|food|restaurant|shopping|game|entertainment)\b/i.test(queryLower)) {
-      return {
-        type: 'entertainment_redirection',
-        intent: 'off_topic',
-        voiceResponse: "I'm specifically designed to help with domestic violence support and resources. For entertainment, weather, sports, or other general topics, you might want to try a different service. If you have questions about domestic violence support, I'm here to help with that.",
-        smsResponse: "I'm here for domestic violence support. For other topics, please try a different service.",
-        shouldRedirect: true
-      };
-    }
-    
-    // Generic off-topic response
-    return {
-      type: 'off_topic_redirection',
-      intent: 'off_topic',
-      voiceResponse: "I'm specifically designed to help with domestic violence support and resources. If you have questions about that, I'd be happy to help. Otherwise, you might want to try a different service for other topics.",
-      smsResponse: "I'm here for domestic violence support. For other topics, please try a different service.",
-      shouldRedirect: true
-    };
-  }
-};
+
 
 // Helper function to check if a query is resource-related
 export function isResourceQuery(intent) {

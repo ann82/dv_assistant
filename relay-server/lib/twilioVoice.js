@@ -9,7 +9,7 @@ import { AudioService } from '../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { getLanguageConfig, DEFAULT_LANGUAGE } from './languageConfig.js';
-import { detectLocation } from './enhancedLocationDetector.js';
+
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -688,7 +688,8 @@ export class TwilioVoiceHandler {
         }
 
         // Check if location is complete (has state/province and country)
-        const locationData = await detectLocation(locationInfo.location);
+        const { detectLocation } = await import('./enhancedLocationDetector.js');
+      const locationData = await detectLocation(locationInfo.location);
         if (locationData && !locationData.isComplete) {
           logger.info('Incomplete location detected:', { 
             location: locationInfo.location, 

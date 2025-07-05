@@ -507,17 +507,7 @@ export async function getLocationCoordinates(location) {
   return null;
 }
 
-/**
- * Clear expired cache entries
- */
-export function clearExpiredCache() {
-  const now = Date.now();
-  for (const [key, value] of LOCATION_CACHE.entries()) {
-    if (now - value.timestamp > CACHE_EXPIRY) {
-      LOCATION_CACHE.delete(key);
-    }
-  }
-}
+
 
 /**
  * Get cache statistics
@@ -530,16 +520,7 @@ export function getCacheStats() {
   };
 }
 
-// Legacy function for backward compatibility
-export async function detectUSLocation(location) {
-  const result = await detectLocation(location);
-  return {
-    location: result.location,
-    scope: result.scope,
-    isComplete: result.isComplete,
-    geocodeData: result.geocodeData
-  };
-}
+
 
 // Export helper functions for testing
 export { 
@@ -549,15 +530,7 @@ export {
   extractStandaloneLocation
 };
 
-// Legacy function for backward compatibility
-export function detectUSLocationFallback(location) {
-  const result = detectLocationFallback(location);
-  return {
-    location: result.location,
-    scope: result.scope,
-    isComplete: result.isComplete
-  };
-} 
+ 
 
 function containsCurrentLocationWord(text) {
   if (!text || typeof text !== 'string') return false;
