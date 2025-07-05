@@ -8,6 +8,9 @@ import { gptCache } from './queryCache.js';
 import { extractLocationFromQuery as enhancedExtractLocation } from './enhancedLocationDetector.js';
 import { rewriteQuery } from './enhancedQueryRewriter.js';
 
+// Re-export rewriteQuery for backward compatibility
+export { rewriteQuery };
+
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
 const intentSchema = {
@@ -148,16 +151,7 @@ export function clearConversationContext(callSid) {
   logger.info('Cleared conversation context for call:', callSid);
 }
 
-/**
- * Rewrite query for optimal search results
- * @param {string} query - The user query
- * @param {string} intent - The detected intent
- * @param {string} callSid - The call SID for conversation context
- * @returns {Promise<string>} The rewritten query
- */
-export async function rewriteQuery(query, intent, callSid = null) {
-  return rewriteQuery(query, intent, callSid);
-}
+
 
 /**
  * Classifies a user query into one of the predefined intents using GPT-3.5-turbo
