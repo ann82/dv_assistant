@@ -194,7 +194,7 @@ describe('ResponseGenerator', () => {
       const query = 'Find a domestic violence shelter near me';
       const patterns = ResponseGenerator.getFactualPatterns(query);
       // Print the actual output for debugging
-      console.log('Pattern matches for query:', query, patterns);
+
       // Should contain matches from multiple categories
       expect(patterns.some(p => p.includes('shelter:'))).toBe(true);
       expect(patterns.some(p => p.includes('location:'))).toBe(true);

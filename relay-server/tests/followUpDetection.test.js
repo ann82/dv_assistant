@@ -64,7 +64,7 @@ describe('Follow-up Detection Fix', () => {
       expect(followUpResponse).not.toBeNull();
       expect(followUpResponse.type).toBeDefined();
       
-      console.log(`Follow-up query "${query}" was correctly detected as follow-up with type: ${followUpResponse.type}`);
+      
     }
   });
 
@@ -81,7 +81,7 @@ describe('Follow-up Detection Fix', () => {
     for (const query of offTopicQueries) {
       const intent = await getIntent(query);
       expect(intent).toBe('off_topic');
-      console.log(`Query "${query}" was correctly classified as: ${intent}`);
+      
     }
   });
 
@@ -114,7 +114,7 @@ describe('Follow-up Detection Fix', () => {
     expect(followUpResponse.intent).toBe('find_shelter'); // Should inherit the previous intent
     expect(followUpResponse.type).toBe('specific_result');
     
-    console.log('Follow-up correctly inherited previous intent and was processed as specific result');
+    
   });
 
   it('should handle context timeout correctly', async () => {
@@ -131,6 +131,6 @@ describe('Follow-up Detection Fix', () => {
     const followUpResponse = await handleFollowUp('tell me more about that one', oldContext);
     expect(followUpResponse).toBeNull();
     
-    console.log('Correctly handled expired context timeout');
+    
   });
 }); 

@@ -306,6 +306,9 @@ export class TwilioVoiceHandler {
     // Use injected dependencies if provided, otherwise dynamically import
     const getDep = async (name, importPath, exportName) => {
       if (this._deps && this._deps[name]) return this._deps[name];
+      if (process.env.NODE_ENV === 'test') {
+        throw new Error(`Missing injected dependency: ${name}`);
+      }
       const mod = await import(importPath);
       return exportName ? mod[exportName] : mod.default;
     };
@@ -333,9 +336,11 @@ export class TwilioVoiceHandler {
       const callTavilyAPI = await getDep('callTavilyAPI', '../lib/apis.js', 'callTavilyAPI');
       const ResponseGenerator = await getDep('ResponseGenerator', '../lib/response.js', 'ResponseGenerator');
       const getLanguageConfig = await getDep('getLanguageConfig', '../lib/languageConfig.js', 'getLanguageConfig');
+      const shouldAttemptReengagement = await getDep('shouldAttemptReengagement', '../lib/intentClassifier.js', 'shouldAttemptReengagement');
+      const generateReengagementMessage = await getDep('generateReengagementMessage', '../lib/intentClassifier.js', 'generateReengagementMessage');
       
       // Get conversation context FIRST
-      const context = callSid ? getConversationContext(callSid) : null;
+      const context = callSid ? await getConversationContext(callSid) : null;
       logger.info('Retrieved conversation context:', {
         requestId,
         callSid,
@@ -613,15 +618,7 @@ export class TwilioVoiceHandler {
         // Extract location from speech using enhanced location detector
         const locationInfo = await extractLocation(speechResult);
         
-        logger.info('Extracted location info:', {
-          requestId,
-          callSid,
-          locationInfo,
-          originalSpeech: speechResult
-        });
-
         // Check conversation context for previously mentioned location
-        const context = callSid ? getConversationContext(callSid) : null;
         const hasPreviousLocation = context?.lastQueryContext?.location;
         
         logger.info('Location context check:', {
@@ -737,7 +734,7 @@ export class TwilioVoiceHandler {
 
         // Check if location is complete (has state/province and country)
         const { detectLocation } = await import('./enhancedLocationDetector.js');
-      const locationData = await detectLocation(locationInfo.location);
+    const locationData = await detectLocation(locationInfo.location);
         if (locationData && !locationData.isComplete) {
           logger.info('Incomplete location detected:', { 
             location: locationInfo.location, 

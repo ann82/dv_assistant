@@ -51,11 +51,7 @@ describe('Tavily Processor', () => {
     const userQuery = "find shelter homes in South Lake Tahoe";
     const result = processTavilyResponse(exampleTavilyResponse, userQuery, 3);
 
-    console.log('\n=== PROCESSED TAVILY RESPONSE ===');
-    console.log('Voice Response:', result.voiceResponse);
-    console.log('\nSMS Response:');
-    console.log(result.smsResponse);
-    console.log('\n================================\n');
+    
 
     // Verify the response structure
     expect(result).toHaveProperty('voiceResponse');
@@ -126,13 +122,7 @@ describe('Tavily Processor', () => {
     expect(details).toHaveProperty('phoneNumbers');
     expect(details).toHaveProperty('address');
 
-    console.log('\n=== RESULT DETAILS ===');
-    console.log('Title:', details.title);
-    console.log('URL:', details.url);
-    console.log('Score:', details.score);
-    console.log('Phone Numbers:', details.phoneNumbers);
-    console.log('Address:', details.address);
-    console.log('=====================\n');
+    
   });
 
   test('should limit results to specified maximum', () => {
