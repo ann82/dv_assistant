@@ -100,6 +100,21 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       context.lastQueryContext.matchedResult = matchedResult;
       context.lastQueryContext.timestamp = Date.now(); // Refresh timestamp
     }
+  } else if (isResourceQuery(intent)) {
+    // Ensure we create context for resource queries even without Tavily results
+    let location = extractLocationFromQuery(query);
+    if (location) location = toTitleCase(location);
+    
+    context.lastQueryContext = {
+      intent: intent,
+      location: location,
+      results: [],
+      timestamp: Date.now(),
+      smsResponse: response.smsResponse || null,
+      voiceResponse: response.voiceResponse || null,
+      needsLocation: !location, // Needs location if no location found
+      lastQuery: query
+    };
   }
 
   logger.info('Updated conversation context:', {
@@ -447,6 +462,28 @@ export async function handleFollowUp(query, lastQueryContext) {
       }
     } catch (error) {
       logger.error('Error in location geocoding for follow-up detection:', error);
+    }
+  }
+  
+  // Additional check for location statements that might not be caught by geocoding
+  const locationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at'];
+  const hasLocationKeywords = locationKeywords.some(keyword => lowerQuery.includes(keyword));
+  const isShortLocationStatement = query.trim().length <= 50 && hasLocationKeywords;
+  
+  if (isResourceRequest && needsLocation && isShortLocationStatement && !isLocationFollowUp) {
+    // Try to extract location using the enhanced detector
+    const { extractLocationFromQuery } = await import('./enhancedLocationDetector.js');
+    const extractedLocation = extractLocationFromQuery(query);
+    
+    if (extractedLocation && extractedLocation.location) {
+      isLocationFollowUp = true;
+      locationData = { location: extractedLocation.location, isComplete: true };
+      logger.info('Detected location follow-up via keyword matching:', {
+        query,
+        location: extractedLocation.location,
+        lastIntent: lastQueryContext.intent,
+        needsLocation
+      });
     }
   }
   
