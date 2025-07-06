@@ -4,7 +4,7 @@ import { ResponseGenerator } from './response.js';
 import twilio from 'twilio';
 import { TwilioWebSocketServer } from '../websocketServer.js';
 import logger from './logger.js';
-import { getConversationContext } from './intentClassifier.js';
+import { getConversationContext, updateConversationContext } from './intentClassifier.js';
 import { AudioService } from '../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -648,7 +648,23 @@ export class TwilioVoiceHandler {
           }
           
           // Otherwise, ask for specific location
-          return this.getLocalizedPrompt(languageCode, 'incompleteLocation');
+          const locationPrompt = this.getLocalizedPrompt(languageCode, 'incompleteLocation');
+          
+          // Update conversation context to preserve the need for location
+          if (callSid) {
+            updateConversationContext(callSid, intent, speechResult, {
+              voiceResponse: locationPrompt,
+              smsResponse: null
+            });
+            logger.info('Updated conversation context for incomplete location:', {
+              requestId,
+              callSid,
+              intent,
+              needsLocation: true
+            });
+          }
+          
+          return locationPrompt;
         }
 
         // Check for current location queries
@@ -667,7 +683,23 @@ export class TwilioVoiceHandler {
           }
           
           // Otherwise, ask for specific location
-          return this.getLocalizedPrompt(languageCode, 'currentLocation');
+          const locationPrompt = this.getLocalizedPrompt(languageCode, 'currentLocation');
+          
+          // Update conversation context to preserve the need for location
+          if (callSid) {
+            updateConversationContext(callSid, intent, speechResult, {
+              voiceResponse: locationPrompt,
+              smsResponse: null
+            });
+            logger.info('Updated conversation context for current location:', {
+              requestId,
+              callSid,
+              intent,
+              needsLocation: true
+            });
+          }
+          
+          return locationPrompt;
         }
 
         if (!locationInfo.location) {
@@ -684,7 +716,23 @@ export class TwilioVoiceHandler {
           }
           
           // Otherwise, generate location prompt
-          return generateLocationPrompt();
+          const locationPrompt = generateLocationPrompt();
+          
+          // Update conversation context to preserve the need for location
+          if (callSid) {
+            updateConversationContext(callSid, intent, speechResult, {
+              voiceResponse: locationPrompt,
+              smsResponse: null
+            });
+            logger.info('Updated conversation context for no location:', {
+              requestId,
+              callSid,
+              intent,
+              needsLocation: true
+            });
+          }
+          
+          return locationPrompt;
         }
 
         // Check if location is complete (has state/province and country)
@@ -704,7 +752,23 @@ export class TwilioVoiceHandler {
           }
           
           // Otherwise, ask for more specific location
-          return this.getLocalizedPrompt(languageCode, 'moreSpecificLocation');
+          const locationPrompt = this.getLocalizedPrompt(languageCode, 'moreSpecificLocation');
+          
+          // Update conversation context to preserve the need for location
+          if (callSid) {
+            updateConversationContext(callSid, intent, speechResult, {
+              voiceResponse: locationPrompt,
+              smsResponse: null
+            });
+            logger.info('Updated conversation context for incomplete location data:', {
+              requestId,
+              callSid,
+              intent,
+              needsLocation: true
+            });
+          }
+          
+          return locationPrompt;
         }
 
         // Rewrite query with context
