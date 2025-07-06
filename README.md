@@ -4,22 +4,9 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2025-01-27):**
-- **Configurable Welcome Message**: Added cost-efficient, configurable welcome message for both voice and web interfaces
-- **Zero Additional AI Costs**: Welcome messages use pre-written text instead of AI generation, saving $0.10-2.00/month
-- **Emergency Assessment**: Welcome message includes immediate danger assessment and 911 guidance
-- **Consistent Experience**: Same empathetic welcome message across voice and web platforms
-- **Enhanced AI Instructions**: Integrated comprehensive conversation guidelines from frontend to relay-server
-- **Improved Response Quality**: Replaced simple 3-line prompt with detailed 150+ line instructions
-- **Unified Experience**: Shared conversation config between web and voice interfaces
-- **Better Emergency Protocols**: Enhanced 911 escalation and safety planning
-- **Cultural Sensitivity**: Added LGBTQ+ support, language preferences, and accessibility guidelines
-- **Code Reduction**: Eliminated 154 lines of duplicated instructions, single source of truth
-- **Query Rewriting Optimization**: Simplified and improved Tavily query construction for better search results
-- **Enhanced Site Filtering**: Added exclusion of low-quality sites (yellowpages, city-data, tripadvisor) for better results
-- **Improved Location Search**: Better proximity search with "near" operator and exact phrase matching
-- **Enhanced Voice Responses (v1.19.0)**: Voice responses now include shelter name, address, and phone number when available
-- **Test Suite Updated**: All tests now align with new query rewriting, filtering, and response logic, and pass successfully (334 tests passed, 3 skipped)
+**Latest Update (2025-07-01):**
+- **Codebase Cleanup**: Removed deprecated modules (`enhancedContextManager.js`, `contextIntegration.js`, `tavilyIntegration.js`, `utils.js`) and their associated tests for clarity and maintainability
+- **Test Suite Green**: All tests now pass (21 test files, 263 tests, 2 skipped, 100% pass rate)
 
 ---
 

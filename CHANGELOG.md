@@ -824,3 +824,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAI TTS voice configuration now uses correct API voice names (nova, shimmer, echo, onyx) instead of Twilio voice names
 - Resolved 400 error when generating TTS with invalid voice names
 - Proper fallback mechanism between OpenAI TTS (primary) and Twilio Polly (fallback)
+
+## [1.21.0] - 2025-07-01
+
+### Removed
+- Deprecated modules: `enhancedContextManager.js`, `contextIntegration.js`, `tavilyIntegration.js`, `utils.js`
+- Associated test files: `enhancedContext.test.js`, `followUp.test.js`, `tavilyIntegration.test.js`, `speech.test.mjs`, `twilio.test.js`
+
+### Changed
+- Codebase is now cleaner and easier to maintain; only relevant, supported code and tests remain
+- No user-facing features changed; this is a maintainability and clarity update
+
+### Test Suite
+- All tests now pass (21 test files, 263 tests, 2 skipped, 100% pass rate)
