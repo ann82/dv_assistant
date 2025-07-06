@@ -54,12 +54,20 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       timestamp: Date.now(),
       smsResponse: response.smsResponse || null,
       voiceResponse: response.voiceResponse || null,
-      needsLocation: !location && isResourceQuery(intent) // Needs location if no location found and it's a resource query
+      needsLocation: !location && isResourceQuery(intent), // Needs location if no location found and it's a resource query
+      lastQuery: query // Store the original query for context
     };
   } else if (isResourceQuery(intent)) {
-    if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
-      let location = extractLocationFromQuery(query);
-      if (location) location = toTitleCase(location);
+    // For resource queries without Tavily results, preserve context if we need location
+    let location = extractLocationFromQuery(query);
+    if (location) location = toTitleCase(location);
+    
+    // If we have a previous context that needs location, preserve it
+    if (context.lastQueryContext && context.lastQueryContext.needsLocation && !location) {
+      // Update timestamp but keep the context for location follow-up
+      context.lastQueryContext.timestamp = Date.now();
+      context.lastQueryContext.lastQuery = query;
+    } else if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
       context.lastQueryContext = {
         intent: intent,
         location: location,
@@ -67,7 +75,20 @@ export function updateConversationContext(callSid, intent, query, response, tavi
         timestamp: Date.now(),
         smsResponse: response.smsResponse || null,
         voiceResponse: response.voiceResponse || null,
-        needsLocation: !location && isResourceQuery(intent) // Needs location if no location found and it's a resource query
+        needsLocation: !location && isResourceQuery(intent), // Needs location if no location found and it's a resource query
+        lastQuery: query
+      };
+    } else if (!location && isResourceQuery(intent)) {
+      // Create context for resource queries that need location but have no results yet
+      context.lastQueryContext = {
+        intent: intent,
+        location: null,
+        results: [],
+        timestamp: Date.now(),
+        smsResponse: response.smsResponse || null,
+        voiceResponse: response.voiceResponse || null,
+        needsLocation: true,
+        lastQuery: query
       };
     } else {
       context.lastQueryContext = null;
