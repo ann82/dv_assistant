@@ -12,7 +12,7 @@ import { createHash } from 'crypto';
 import pkg from 'twilio/lib/twiml/VoiceResponse.js';
 const { VoiceResponse } = pkg;
 import { getIntent, rewriteQuery, updateConversationContext, getConversationContext } from '../lib/intentClassifier.js';
-import { generateSpeechHash } from '../lib/utils.js';
+
 import { v4 as uuidv4 } from 'uuid';
 import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 import { filterConfig, matchesPattern, cleanTitle } from '../lib/filterConfig.js';
