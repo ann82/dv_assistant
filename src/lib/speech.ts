@@ -87,19 +87,19 @@ export class SpeechHandler {
     }
   }
 
-  setVoice(voice) {
+  setVoice(voice: SpeechSynthesisVoice) {
     this.voice = voice;
   }
 
-  setRate(rate) {
+  setRate(rate: number) {
     this.rate = rate;
   }
 
-  setPitch(pitch) {
+  setPitch(pitch: number) {
     this.pitch = pitch;
   }
 
-  setVolume(volume) {
+  setVolume(volume: number) {
     this.volume = volume;
   }
 } 

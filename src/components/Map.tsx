@@ -24,6 +24,7 @@ export function Map({
         scrollWheelZoom={false}
         zoomControl={false}
         attributionControl={false}
+        style={{ height: '100%', width: '100%' }}
       >
         <ChangeView center={center} zoom={11} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2025-07-06
+
+### Added
+- **Full TypeScript Support**: Complete TypeScript migration with proper configuration and type definitions
+- **TypeScript Configuration**: Added `tsconfig.json` with React/JSX support, esModuleInterop, and strict type checking
+- **Missing Dependencies**: Installed essential packages with proper type definitions
+  - `react-feather` for icon components
+  - `react-leaflet` and `leaflet` for map functionality
+  - `@types/leaflet` for TypeScript definitions
+  - `realtime-api-beta` for OpenAI realtime API integration
+  - `web-vitals` for performance monitoring
+- **Type Annotations**: Added proper TypeScript types throughout the codebase
+- **Performance Monitoring**: Added `reportWebVitals.ts` for web performance tracking
+
+### Changed
+- **Enhanced Development Experience**: Clean TypeScript configuration with modern React/JSX support
+- **Improved Code Quality**: All TypeScript errors resolved, proper type safety throughout
+- **Updated Import Statements**: Fixed module imports to use correct package names and paths
+- **SpeechHandler Methods**: Added proper type annotations to `setVoice`, `setRate`, `setPitch`, and `setVolume` methods
+- **Map Component**: Enhanced with proper styling and type definitions
+
+### Fixed
+- **TypeScript Compilation Errors**: Resolved all 86+ TypeScript errors for clean compilation
+- **Missing Module Errors**: Fixed imports for all external dependencies
+- **Button Component Props**: Resolved onClick prop type issues with proper React.ButtonHTMLAttributes extension
+- **SpeechHandler Initialization**: Removed unnecessary `init()` call (constructor handles initialization)
+- **ReportWebVitals Integration**: Fixed web-vitals imports and function names
+- **Map Component Props**: Resolved react-leaflet prop type issues
+
+### Technical Details
+- **TypeScript Configuration**: Modern setup with `jsx: "react-jsx"`, `esModuleInterop: true`, and strict type checking
+- **Zero TypeScript Errors**: All type checking passes with clean compilation
+- **Enhanced IDE Support**: Better IntelliSense, error detection, and refactoring capabilities
+- **Future-Proof Codebase**: Type-safe development environment for ongoing maintenance and feature development
+
+## [1.21.0] - 2025-07-01
+
+### Removed
+- Deprecated modules: `enhancedContextManager.js`, `contextIntegration.js`, `tavilyIntegration.js`, `utils.js`
+- Associated test files: `enhancedContext.test.js`, `followUp.test.js`, `tavilyIntegration.test.js`, `speech.test.mjs`, `twilio.test.js`
+
+### Changed
+- Codebase is now cleaner and easier to maintain; only relevant, supported code and tests remain
+- No user-facing features changed; this is a maintainability and clarity update
+
+### Test Suite
+- All tests now pass (21 test files, 263 tests, 2 skipped, 100% pass rate)
+
 ## [1.20.0] - 2025-01-27
 
 ### Added
@@ -824,16 +872,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAI TTS voice configuration now uses correct API voice names (nova, shimmer, echo, onyx) instead of Twilio voice names
 - Resolved 400 error when generating TTS with invalid voice names
 - Proper fallback mechanism between OpenAI TTS (primary) and Twilio Polly (fallback)
-
-## [1.21.0] - 2025-07-01
-
-### Removed
-- Deprecated modules: `enhancedContextManager.js`, `contextIntegration.js`, `tavilyIntegration.js`, `utils.js`
-- Associated test files: `enhancedContext.test.js`, `followUp.test.js`, `tavilyIntegration.test.js`, `speech.test.mjs`, `twilio.test.js`
-
-### Changed
-- Codebase is now cleaner and easier to maintain; only relevant, supported code and tests remain
-- No user-facing features changed; this is a maintainability and clarity update
-
-### Test Suite
-- All tests now pass (21 test files, 263 tests, 2 skipped, 100% pass rate)

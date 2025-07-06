@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { RealtimeClient } from '@openai/realtime-api-beta';
-import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
+import { RealtimeClient } from 'realtime-api-beta';
+import type { ItemType } from 'realtime-api-beta/dist/lib/client';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { SpeechHandler } from '../lib/speech';
 import { instructions, welcomeMessage } from '../utils/conversation_config.js';
@@ -92,7 +92,6 @@ class ShelterCache {
     const key = this.getKey(location, services);
     const entry = this.cache[key];
     if (entry && this.isEntryValid(entry)) {
-      console.log('📦 Using cached results for:', location);
       return entry.results;
     }
     return null;
@@ -106,7 +105,6 @@ class ShelterCache {
       location,
       services
     };
-    console.log('📦 Cached results for:', location);
   }
 
   // Add method to clear expired entries
@@ -115,7 +113,6 @@ class ShelterCache {
     Object.keys(this.cache).forEach(key => {
       if (now - this.cache[key].timestamp >= SHELTER_CACHE_EXPIRY) {
         delete this.cache[key];
-        console.log('🗑️ Cleared expired cache entry for:', this.cache[key].location);
       }
     });
   }
@@ -597,14 +594,7 @@ export function ConsolePage() {
           // If useCurrentLocation is true or no location provided, get current location
           if (useCurrentLocation || !location) {
             try {
-              console.log('📍 Attempting to get current location...');
               const currentLocation = await getCurrentLocation();
-              console.log('📍 Current location obtained:', {
-                city: currentLocation.city,
-                state: currentLocation.state,
-                country: currentLocation.country,
-                coordinates: `${currentLocation.latitude},${currentLocation.longitude}`
-              });
               setUserLocation(currentLocation);
               searchLocation = currentLocation.city || `${currentLocation.latitude},${currentLocation.longitude}`;
             } catch (error) {
@@ -617,7 +607,6 @@ export function ConsolePage() {
           // Check cache first
           const cachedResults = getCachedResults(searchLocation, services);
           if (cachedResults) {
-            console.log('📦 Using cached results for:', searchLocation);
             return cachedResults;
           }
 
@@ -628,7 +617,6 @@ export function ConsolePage() {
           }
 
           // Make API request to Tavily
-          console.log('🔍 Searching for shelters with query:', query);
           const response = await fetch('https://api.tavily.com/search', {
             method: 'POST',
             headers: {
@@ -731,17 +719,7 @@ export function ConsolePage() {
     };
   }, [getCurrentLocation]);
 
-  // Initialize speech handler
-  useEffect(() => {
-    const initSpeech = async () => {
-      try {
-        await speechHandlerRef.current.init();
-      } catch (error) {
-        console.error('Error initializing speech:', error);
-      }
-    };
-    initSpeech();
-  }, []);
+  // Speech handler is automatically initialized in constructor
 
   /**
    * Render the application
@@ -908,9 +886,7 @@ export function ConsolePage() {
               iconPosition={isConnected ? 'end' : 'start'}
               icon={isConnected ? X : Zap}
               buttonStyle={isConnected ? 'regular' : 'action'}
-              onClick={
-                isConnected ? disconnectConversation : connectConversation
-              }
+              onClick={isConnected ? disconnectConversation : connectConversation}
             />
           </div>
         </div>
