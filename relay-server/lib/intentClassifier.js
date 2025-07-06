@@ -1386,31 +1386,65 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
     const { callTavilyAPI } = await import('./apis.js');
     const { ResponseGenerator } = await import('./response.js');
     
-    // Process the combined query
-    const tavilyResponse = await ResponseGenerator.queryTavily(combinedQuery);
-    
-    if (tavilyResponse && tavilyResponse.results && tavilyResponse.results.length > 0) {
-      // Format response for voice
-      const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', combinedQuery, 3);
+    // Process the combined query with timeout handling
+    let tavilyResponse;
+    try {
+      // Use a shorter timeout for location follow-ups to be more responsive
+      const { callTavilyAPI } = await import('./apis.js');
       
+      // Create a timeout promise for faster response
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Location search timeout')), 15000); // 15 second timeout
+      });
+      
+      // Race between Tavily API call and timeout
+      tavilyResponse = await Promise.race([
+        callTavilyAPI(combinedQuery, location),
+        timeoutPromise
+      ]);
+      
+      // If we get here, Tavily succeeded, so format the response
+      if (tavilyResponse && tavilyResponse.results && tavilyResponse.results.length > 0) {
+        const { ResponseGenerator } = await import('./response.js');
+        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', combinedQuery, 3);
+        
+        return {
+          type: 'location_follow_up',
+          intent: lastQueryContext.intent,
+          voiceResponse: formattedResponse.voiceResponse,
+          smsResponse: formattedResponse.smsResponse,
+          results: tavilyResponse.results,
+          location: location
+        };
+      }
+    } catch (tavilyError) {
+      logger.error('Tavily API error in location follow-up:', {
+        error: tavilyError.message,
+        query: combinedQuery,
+        location
+      });
+      
+      // Return a helpful response even if Tavily fails
       return {
         type: 'location_follow_up',
         intent: lastQueryContext.intent,
-        voiceResponse: formattedResponse.voiceResponse,
-        smsResponse: formattedResponse.smsResponse,
-        results: tavilyResponse.results,
-        location: location
-      };
-    } else {
-      return {
-        type: 'location_follow_up',
-        intent: lastQueryContext.intent,
-        voiceResponse: `I couldn't find any ${lastQueryContext.intent.replace('_', ' ')} resources in ${location}. Could you try a nearby city or let me know if you need help with something else?`,
-        smsResponse: null,
+        voiceResponse: `I'm having trouble searching for ${lastQueryContext.intent.replace('_', ' ')} resources in ${location} right now. Let me provide you with some general information about domestic violence resources in that area. You can also try calling the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance.`,
+        smsResponse: `I couldn't search for ${lastQueryContext.intent.replace('_', ' ')} resources in ${location} due to a technical issue. For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233 or visit thehotline.org`,
         results: [],
-        location: location
+        location: location,
+        error: tavilyError.message
       };
     }
+    
+    // If we get here, Tavily succeeded but returned no results
+    return {
+      type: 'location_follow_up',
+      intent: lastQueryContext.intent,
+      voiceResponse: `I couldn't find any ${lastQueryContext.intent.replace('_', ' ')} resources in ${location}. Could you try a nearby city or let me know if you need help with something else?`,
+      smsResponse: null,
+      results: [],
+      location: location
+    };
   } catch (error) {
     logger.error('Error generating location follow-up response:', error);
     return {
