@@ -75,7 +75,6 @@ vi.mock('../lib/enhancedLocationDetector.js', () => ({
 
 import { 
   rewriteQuery, 
-  testQueryRewriting, 
   cleanConversationalFillers
 } from '../lib/enhancedQueryRewriter.js';
 import { extractLocationFromQuery } from '../lib/enhancedLocationDetector.js';
@@ -190,25 +189,25 @@ describe('Enhanced Query Rewriter', () => {
     it('should rewrite US location queries with shelter terms', async () => {
       const result = await rewriteQuery('Hey, I need help in San Francisco');
       
-      expect(result).toBe('domestic violence shelter San Francisco site:org OR site:gov');
+      expect(result).toBe('"domestic violence shelter" San Francisco "shelter name" "address" "phone number"');
     });
 
     it('should preserve existing shelter terms in US locations', async () => {
       const result = await rewriteQuery('Hi, I need shelter in Oakland');
       
-      expect(result).toBe('I need shelter in Oakland site:org OR site:gov');
+      expect(result).toBe('"domestic violence shelter" Oakland "shelter name" "address" "phone number"');
     });
 
     it('should handle non-US locations without US-specific enhancements', async () => {
       const result = await rewriteQuery('Hello, I need shelter in London');
       
-      expect(result).toBe('I need shelter in London');
+      expect(result).toBe('"domestic violence shelter" London "shelter name" "address" "phone number"');
     });
 
     it('should handle queries without locations', async () => {
       const result = await rewriteQuery('I need help');
       
-      expect(result).toBe('I need help');
+      expect(result).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
     });
 
     it('should handle edge cases', async () => {
@@ -220,58 +219,52 @@ describe('Enhanced Query Rewriter', () => {
     it('should log the rewriting process', async () => {
       const result = await rewriteQuery('Hey, help me in San Francisco', 'find_shelter', 'test-call-sid');
       
-      expect(result).toContain('domestic violence shelter San Francisco');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter" San Francisco');
+      expect(result).toContain('"shelter name" "address" "phone number"');
     });
 
     it('should enhance US location queries with site restrictions', async () => {
       const result = await rewriteQuery('find shelter in San Francisco', 'find_shelter');
-      expect(result).toBe('find shelter in San Francisco site:org OR site:gov');
+      expect(result).toBe('"domestic violence shelter" San Francisco "shelter name" "address" "phone number"');
     });
 
     it('should preserve existing shelter terms and add location', async () => {
       const result = await rewriteQuery('I need shelter in Oakland', 'find_shelter');
-      expect(result).toBe('I need shelter in Oakland site:org OR site:gov');
+      expect(result).toBe('"domestic violence shelter" Oakland "shelter name" "address" "phone number"');
     });
 
     it('should handle geocoding failures gracefully', async () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('find shelter near New York City, NY?');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter" New York City, NY');
+      expect(result).toContain('"shelter name" "address" "phone number"');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('find shelter near New York City, NY?');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter" New York City, NY');
+      expect(result).toContain('"shelter name" "address" "phone number"');
     });
   });
 
-  describe('testQueryRewriting', () => {
-    it('should work as an alias for rewriteQuery', async () => {
-      const result = await testQueryRewriting('Hey, I need help in San Francisco');
-      
-      expect(result).toBe('domestic violence shelter San Francisco site:org OR site:gov');
-    });
-  });
+
 
   describe('Integration with Location Detection', () => {
     it('should handle geocoding failures gracefully', async () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('find shelter near New York City, NY?');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter" New York City, NY');
+      expect(result).toContain('"shelter name" "address" "phone number"');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('find shelter near New York City, NY?');
-      expect(result).toContain('site:org OR site:gov');
+      expect(result).toContain('"domestic violence shelter" New York City, NY');
+      expect(result).toContain('"shelter name" "address" "phone number"');
     });
   });
 }); 

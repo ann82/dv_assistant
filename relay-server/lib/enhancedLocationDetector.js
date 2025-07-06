@@ -520,6 +520,18 @@ export function getCacheStats() {
   };
 }
 
+/**
+ * Clear expired cache entries
+ */
+export function clearExpiredCache() {
+  const now = Date.now();
+  for (const [key, value] of LOCATION_CACHE.entries()) {
+    if (now - value.timestamp > CACHE_EXPIRY) {
+      LOCATION_CACHE.delete(key);
+    }
+  }
+}
+
 
 
 // Export helper functions for testing

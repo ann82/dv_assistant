@@ -92,44 +92,19 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   // Step 3: Build optimized search query
   let searchQuery = cleanedQuery;
 
-  if (locationInfo.location && locationInfo.isComplete) {
-    // Resource-seeking keywords
-    const resourceKeywords = /\b(shelter|help|resources?|housing|support)\b/i;
-    if (resourceKeywords.test(cleanedQuery)) {
-      if (/\bshelter\b/i.test(cleanedQuery)) {
-        // Only append site restriction for US locations
-        if (locationInfo.country === 'US' && !/site:org OR site:gov/i.test(cleanedQuery)) {
-          searchQuery = `${cleanedQuery} site:org OR site:gov`;
-        } else {
-          searchQuery = cleanedQuery;
-        }
-        logger.info('Query contains shelter, appended site restriction (US only):', { searchQuery, callSid });
-      } else {
-        // Rewrite to enhanced form for resource-seeking queries without 'shelter' (US only)
-        if (locationInfo.country === 'US') {
-          searchQuery = `domestic violence shelter ${locationInfo.location} site:org OR site:gov`;
-          logger.info('Enhanced query with complete US location and resource-seeking intent:', { searchQuery, callSid });
-        } else {
-          searchQuery = cleanedQuery;
-          logger.info('Non-US location, no site restriction added:', { searchQuery, callSid });
-        }
-      }
-    } else {
-      // Non-resource-seeking query with complete location - just append site restriction (US only)
-      if (locationInfo.country === 'US' && !/site:org OR site:gov/i.test(cleanedQuery)) {
-        searchQuery = `${cleanedQuery} site:org OR site:gov`;
-        logger.info('Non-resource query with complete US location, appended site restriction:', { searchQuery, callSid });
-      } else {
-        searchQuery = cleanedQuery;
-        logger.info('Non-resource query with non-US location, no site restriction added:', { searchQuery, callSid });
-      }
+  // Always add 'domestic violence shelter' for resource-seeking intents
+  if (['find_shelter', 'legal_services', 'counseling_services', 'emergency_help', 'other_resources'].includes(intent)) {
+    let locationPart = locationInfo.location && locationInfo.isComplete ? ` ${locationInfo.location}` : '';
+    searchQuery = `"domestic violence shelter"${locationPart}`;
+    
+    // Add specific resource details for all queries
+    if (intent === 'find_shelter') {
+      searchQuery += ' "shelter name" "address" "phone number"';
+    } else if (intent === 'legal_services') {
+      searchQuery += ' "legal aid" "attorney" "lawyer"';
+    } else if (intent === 'counseling_services') {
+      searchQuery += ' "counseling" "therapy" "support group"';
     }
-  } else if (locationInfo.location && !locationInfo.isComplete) {
-    // Incomplete location - keep original query but clean fillers
-    logger.info('Incomplete location detected, keeping original query:', { searchQuery, callSid });
-  } else {
-    // No location - just clean conversational fillers
-    logger.info('No location detected, keeping cleaned query:', { searchQuery, callSid });
   }
 
   // Step 4: Add conversation context if available

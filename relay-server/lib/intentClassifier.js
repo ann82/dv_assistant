@@ -546,7 +546,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       voiceResponse: `I'll send you the ${lastQueryContext.intent.replace('_', ' ')} details via text message. You should receive them shortly.`,
       smsResponse: lastQueryContext.smsResponse,
       results: lastQueryContext.results,
-      matchedResult
+      matchedResult,
+      focusTarget: matchedResult ? cleanResultTitle(matchedResult.title) : null
     };
   }
   
@@ -560,7 +561,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
         voiceResponse: `I can provide you with the address for ${cleanTitle}. Would you like me to send you the complete details including the address via text message?`,
         smsResponse: lastQueryContext.smsResponse,
         results: lastQueryContext.results,
-        matchedResult
+        matchedResult,
+        focusTarget: cleanTitle
       };
     } else {
       return {
@@ -568,7 +570,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
         intent: lastQueryContext.intent,
         voiceResponse: `I found ${lastQueryContext.results.length} resources in ${lastQueryContext.location || 'that area'}. How else can I help you today?`,
         smsResponse: lastQueryContext.smsResponse,
-        results: lastQueryContext.results
+        results: lastQueryContext.results,
+        focusTarget: null
       };
     }
   }
@@ -584,7 +587,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
         voiceResponse: `For ${cleanTitle}, the phone number is ${phone}. Would you like me to send you the complete details?`,
         smsResponse: lastQueryContext.smsResponse,
         results: lastQueryContext.results,
-        matchedResult
+        matchedResult,
+        focusTarget: cleanTitle
       };
     } else {
       return {
@@ -592,7 +596,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
         intent: lastQueryContext.intent,
         voiceResponse: `I found ${lastQueryContext.results.length} resources. Would you like me to send you the contact information for all of them?`,
         smsResponse: lastQueryContext.smsResponse,
-        results: lastQueryContext.results
+        results: lastQueryContext.results,
+        focusTarget: null
       };
     }
   }
@@ -608,7 +613,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       voiceResponse: `Here's what I found about ${cleanTitle}: ${summary}. Would you like me to send you the complete details?`,
       smsResponse: lastQueryContext.smsResponse,
       results: lastQueryContext.results,
-      matchedResult
+      matchedResult,
+      focusTarget: cleanTitle
     };
   }
   
@@ -619,7 +625,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
       intent: lastQueryContext.intent,
       voiceResponse: generateDetailedShelterInfo(lastQueryContext),
       smsResponse: lastQueryContext.smsResponse,
-      results: lastQueryContext.results
+      results: lastQueryContext.results,
+      focusTarget: null
     };
   }
   
@@ -629,7 +636,8 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
     intent: lastQueryContext.intent,
     voiceResponse: generateGenericFollowUpResponse(lastQueryContext),
     smsResponse: lastQueryContext.smsResponse,
-    results: lastQueryContext.results
+    results: lastQueryContext.results,
+    focusTarget: null
   };
 }
 

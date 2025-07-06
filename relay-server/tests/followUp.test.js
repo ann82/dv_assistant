@@ -14,6 +14,31 @@ vi.mock('../lib/apis.js', () => ({
   callGPT: vi.fn().mockResolvedValue('yes')
 }));
 
+// Mock OpenAI for enhanced context system
+vi.mock('openai', () => ({
+  OpenAI: vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                primaryNeeds: ['finding shelter'],
+                keyTopics: ['shelter location'],
+                providedResources: ['Austin Shelter'],
+                conversationState: 'resource_seeking',
+                nextLikelyNeeds: ['more details'],
+                userSentiment: 'concerned',
+                locationContext: 'Austin, Texas'
+              })
+            }
+          }]
+        })
+      }
+    }
+  }))
+}));
+
 import { 
   updateConversationContext, 
   getConversationContext, 
@@ -25,6 +50,7 @@ import {
   findBestMatch,
   rewriteQuery
 } from '../lib/intentClassifier.js';
+import { ContextIntegration } from '../lib/contextIntegration.js';
 
 // Mock the rewriteQuery function since it's not exported
 vi.mock('../lib/intentClassifier.js', async (importOriginal) => {
@@ -425,6 +451,107 @@ describe('Follow-up Question Support', () => {
       response = await handleFollowUp('Can you send that to me?', mockContext);
       expect(response).toBeTruthy();
       expect(response.type).toBe('send_details');
+    });
+  });
+
+  describe('Enhanced Context System Integration', () => {
+    const enhancedTestCallSid = 'test-enhanced-followup';
+    
+    beforeEach(async () => {
+      // Clear any existing context
+      await ContextIntegration.clearAllContext(enhancedTestCallSid);
+    });
+
+    afterEach(async () => {
+      // Clean up
+      await ContextIntegration.clearAllContext(enhancedTestCallSid);
+    });
+
+    it('should detect enhanced follow-ups with semantic understanding', async () => {
+      // Set up context with shelter request
+      await ContextIntegration.updateContext(enhancedTestCallSid, {
+        intent: 'find_shelter',
+        query: 'I need shelter',
+        response: {
+          voiceResponse: 'Please tell me your city or area.',
+          smsResponse: null
+        },
+        needsLocation: true
+      });
+
+      // Test location follow-up
+      const locationFollowUp = await ContextIntegration.detectFollowUp(enhancedTestCallSid, 'I live in Austin, Texas');
+      expect(locationFollowUp).toBeDefined();
+      expect(locationFollowUp.type).toBe('enhanced_follow_up');
+      expect(locationFollowUp.intent).toBe('follow_up');
+    });
+
+    it('should provide context insights', async () => {
+      await ContextIntegration.updateContext(enhancedTestCallSid, {
+        intent: 'find_shelter',
+        query: 'I need shelter urgently',
+        response: {
+          voiceResponse: 'I can help you find shelter.',
+          smsResponse: null
+        },
+        needsLocation: true
+      });
+
+      const insights = await ContextIntegration.getContextInsights(enhancedTestCallSid);
+      expect(insights.hasContext).toBe(true);
+      expect(insights.conversationState).toBe('location_needed');
+      expect(insights.primaryNeeds).toContain('finding shelter');
+    });
+
+    it('should maintain backward compatibility with legacy follow-ups', async () => {
+      // Set up legacy context
+      updateConversationContext(enhancedTestCallSid, 'find_shelter', 'find shelter in Austin', {
+        voiceResponse: 'I found shelters in Austin.',
+        smsResponse: 'Shelter details...'
+      }, {
+        results: [
+          {
+            title: 'Austin Shelter',
+            url: 'https://example.com',
+            content: 'Emergency shelter',
+            score: 0.9
+          }
+        ]
+      });
+
+      // Test that enhanced system can still detect legacy follow-ups
+      const followUp = await ContextIntegration.detectFollowUp(enhancedTestCallSid, 'Tell me more about the first one');
+      expect(followUp).toBeDefined();
+    });
+
+    it('should generate enhanced conversation summaries', async () => {
+      await ContextIntegration.updateContext(enhancedTestCallSid, {
+        intent: 'find_shelter',
+        query: 'I need shelter',
+        response: { voiceResponse: 'I can help you find shelter.' },
+        needsLocation: true
+      });
+
+      await ContextIntegration.updateContext(enhancedTestCallSid, {
+        intent: 'find_shelter',
+        query: 'I live in Austin, Texas',
+        response: { voiceResponse: 'I found shelters in Austin.' },
+        location: 'Austin, Texas',
+        tavilyResults: {
+          results: [
+            {
+              title: 'Austin Shelter',
+              url: 'https://example.com',
+              content: 'Emergency shelter',
+              score: 0.9
+            }
+          ]
+        }
+      });
+
+      const summary = await ContextIntegration.generateSummary(enhancedTestCallSid);
+      expect(summary).toBeDefined();
+      expect(summary).toContain('Conversation Summary');
     });
   });
 }); 
