@@ -6,8 +6,6 @@ process.env.OPENAI_API_KEY = 'test-key';
 
 if (!process.env.TAVILY_API_KEY) {
   process.env.TAVILY_API_KEY = 'test-key';
-  // eslint-disable-next-line no-console
-  console.log('[Test Setup] Set dummy TAVILY_API_KEY for tests');
 }
 
 // Mock WebSocket

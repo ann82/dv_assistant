@@ -584,7 +584,7 @@ export function ConsolePage() {
         useCurrentLocation?: boolean 
       }) => {
         if (!TAVILY_API_KEY) {
-          console.error('❌ Tavily API key is not configured');
+          console.error('Tavily API key is not configured');
           throw new Error('Tavily API key is not configured');
         }
 
@@ -598,7 +598,7 @@ export function ConsolePage() {
               setUserLocation(currentLocation);
               searchLocation = currentLocation.city || `${currentLocation.latitude},${currentLocation.longitude}`;
             } catch (error) {
-              console.error('❌ Error getting location:', error);
+              console.error('Error getting location:', error);
               setLocationError('Could not get your current location. Please specify a location.');
               throw new Error('Could not get current location. Please specify a location.');
             }
@@ -653,7 +653,7 @@ export function ConsolePage() {
 
           return results;
         } catch (error) {
-          console.error('❌ Error searching shelters:', error);
+          console.error('Error searching shelters:', error);
           throw new Error(`Failed to search shelters: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
@@ -704,7 +704,7 @@ export function ConsolePage() {
     // Add error handler for rate limits
     client.on('error', async (error: any) => {
       if (error.message?.includes('429')) {
-        console.warn('🔥 Rate limited (429) – restarting session after cooldown...');
+        console.warn('Rate limited (429) – restarting session after cooldown...');
         setRateLimited(true);
         await disconnectConversation();
         await new Promise((r) => setTimeout(r, 10000)); // 10 sec backoff
