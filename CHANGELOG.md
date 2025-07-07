@@ -598,6 +598,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Follow-up Detection**: Improved pattern matching to detect pet-related follow-up questions (e.g., "Do they allow pets?", "I love dogs", "Pet policy?") and other contextual follow-ups.
 - **Better Location Context Handling**: System now uses previously mentioned locations for follow-up questions instead of asking for location again.
 - **Pet Policy Responses**: Added specific handling for pet-related follow-up questions with appropriate guidance about calling shelters directly for pet accommodation policies.
+- **Enhanced Conversation Config**: Improved system prompts with better follow-up context awareness, enhanced pet policy guidance, improved location management, and better conversation continuity for more contextual and personalized responses.
 
 ### Fixed
 - **Follow-up Detection**: Fixed issue where pet-related questions like "You be able to let me know if they use shelters. I love dogs." were not being detected as follow-ups.
