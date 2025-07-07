@@ -331,7 +331,7 @@ export class TwilioVoiceHandler {
       const handleFollowUp = await getDep('handleFollowUp', '../lib/intentClassifier.js', 'handleFollowUp');
       const cleanResultTitle = await getDep('cleanResultTitle', '../lib/intentClassifier.js', 'cleanResultTitle');
       const manageConversationFlow = await getDep('manageConversationFlow', '../lib/intentClassifier.js', 'manageConversationFlow');
-      const extractLocation = await getDep('extractLocation', '../lib/speechProcessor.js', 'extractLocation');
+
       const generateLocationPrompt = await getDep('generateLocationPrompt', '../lib/speechProcessor.js', 'generateLocationPrompt');
       const callTavilyAPI = await getDep('callTavilyAPI', '../lib/apis.js', 'callTavilyAPI');
       const ResponseGenerator = await getDep('ResponseGenerator', '../lib/response.js', 'ResponseGenerator');
@@ -640,7 +640,8 @@ export class TwilioVoiceHandler {
         }
 
         // Extract location from speech using enhanced location detector
-        const locationInfo = await extractLocation(speechResult);
+        const { extractLocationFromQuery } = await import('./enhancedLocationDetector.js');
+        const locationInfo = extractLocationFromQuery(speechResult);
         
         // Check conversation context for previously mentioned location (already declared above)
         

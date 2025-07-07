@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2025-07-07
+
+### Fixed
+- **Runtime Error in Location Processing**: Fixed `Cannot read properties of null (reading 'scope')` error in TwilioVoiceHandler
+  - Updated `twilioVoice.js` to use `extractLocationFromQuery` instead of `extractLocation` for proper object format
+  - Ensured locationInfo object has required `scope` property for location processing logic
+  - Maintained all existing location detection functionality while fixing the null reference error
+
 ## [1.24.0] - 2025-07-06
 
 ### Changed
