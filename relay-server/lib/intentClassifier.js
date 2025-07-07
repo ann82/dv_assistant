@@ -422,12 +422,18 @@ export async function handleFollowUp(query, lastQueryContext) {
     // Demonstrative references
     'that one', 'this one', 'the one', 'those', 'these', 'it', 'them',
     'that place', 'this place', 'that shelter', 'this shelter',
+    // Location references (enhanced)
+    'these locations', 'those locations', 'these places', 'those places',
+    'in these', 'in those', 'at these', 'at those', 'for these', 'for those',
     // Specific follow-up patterns
     'where is', 'what is the address', 'what is the phone', 'what is the number',
     'can you send', 'can you text', 'can you message',
     // Pet-related follow-up patterns (enhanced)
     'pets', 'pet', 'animals', 'pet policy', 'pet-friendly', 'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services',
     'dogs', 'dog', 'cats', 'cat', 'if they', 'do they', 'can they', 'will they', 'allow', 'accept', 'take', 'bring', 'love dogs', 'love cats', 'have pets', 'with pets', 'pet policy', 'animal policy',
+    // Enhanced pet policy patterns
+    'let me know if', 'tell me if', 'do you know if', 'can you tell me if', 'i want to know if', 'i need to know if',
+    'allow pets', 'accept pets', 'take pets', 'bring pets', 'pet friendly', 'pet policy',
     // Additional follow-up patterns
     'let me know', 'tell me if', 'do you know if', 'can you tell me if', 'i want to know if', 'i need to know if',
     'what about', 'how about', 'what if', 'what happens if', 'what do they', 'what does it', 'what is it',

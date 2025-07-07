@@ -186,4 +186,43 @@ describe('Follow-up Detection Fix', () => {
       expect(followUpResponse.voiceResponse).toContain('call');
     }
   });
+
+  it('should detect the specific pet policy follow-up pattern correctly', async () => {
+    // First, set up a conversation context with a previous search
+    const mockTavilyResults = {
+      results: [
+        {
+          title: 'Domestic Violence Shelter - San Francisco',
+          url: 'https://example.com/shelter1',
+          content: 'A safe haven for domestic violence survivors in San Francisco.',
+          score: 0.8
+        },
+        {
+          title: 'Women\'s Crisis Center',
+          url: 'https://example.com/shelter2', 
+          content: 'Emergency shelter and support services for women in crisis.',
+          score: 0.7
+        }
+      ]
+    };
+
+    // Simulate a previous search
+    updateConversationContext('test-call-sid-specific-pattern', 'find_shelter', 'find shelters in San Francisco', {
+      voiceResponse: 'I found some shelters in San Francisco...',
+      smsResponse: 'Here are shelters in San Francisco...'
+    }, mockTavilyResults);
+
+    // Test the specific query pattern mentioned by the user
+    const specificQuery = "Not right now. Can you let me know in these locations allow pets?";
+    const followUpResponse = await handleFollowUp(specificQuery, getConversationContext('test-call-sid-specific-pattern').lastQueryContext);
+    
+    expect(followUpResponse).not.toBeNull();
+    expect(followUpResponse.type).toBe('pet_policy');
+    expect(followUpResponse.intent).toBe('find_shelter');
+    expect(followUpResponse.voiceResponse).toContain('pet accommodation policies');
+    expect(followUpResponse.voiceResponse).toContain('recommend calling the shelters directly');
+
+    // Clean up
+    clearConversationContext('test-call-sid-specific-pattern');
+  });
 }); 

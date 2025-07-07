@@ -346,12 +346,39 @@ router.post('/voice/process', async (req, res) => {
     }
     
     // Generate TwiML response with timeout handling
-    const twiml = await Promise.race([
-      twilioVoiceHandler.generateTTSBasedTwiML(response, !shouldEndCall),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('TwiML generation timeout')), 15000)
-      )
-    ]);
+    let twiml;
+    try {
+      twiml = await Promise.race([
+        twilioVoiceHandler.generateTTSBasedTwiML(response, !shouldEndCall),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('TwiML generation timeout')), 15000)
+        )
+      ]);
+    } catch (ttsError) {
+      logger.error('TTS generation failed, using fallback:', {
+        error: ttsError.message,
+        CallSid,
+        responseLength: response.length
+      });
+      
+      // Fallback to Polly TTS
+      const fallbackTwiml = new twilio.twiml.VoiceResponse();
+      fallbackTwiml.say(response);
+      
+      if (!shouldEndCall) {
+        fallbackTwiml.gather({
+          input: 'speech',
+          action: '/twilio/voice/process',
+          method: 'POST',
+          speechTimeout: 'auto',
+          speechModel: 'phone_call',
+          enhanced: 'true',
+          language: 'en-US'
+        });
+      }
+      
+      twiml = fallbackTwiml.toString();
+    }
     
     res.type('text/xml');
     res.send(twiml);

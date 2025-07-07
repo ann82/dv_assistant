@@ -5,6 +5,7 @@ import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { gptCache } from './queryCache.js';
 import { voiceInstructions } from './conversationConfig.js';
+import { callTavilyAPI } from './apis.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
@@ -408,113 +409,58 @@ export class ResponseGenerator {
     return (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2);
   }
 
-  static async getResponse(input, context = {}) {
-    const startTime = Date.now();
-    let response;
-    let source = 'unknown';
-    let success = false;
-    let fallback = false;
-    let confidence = 0;
-    let matches = [];
-
-    try {
-      // Check cache first
-      const cacheKey = this.generateCacheKey(input);
-      const cachedResponse = this.tavilyCache.get(cacheKey);
-      if (cachedResponse && Date.now() - cachedResponse.timestamp < this.CACHE_TTL) {
-        logger.info('Using cached response', { cacheKey });
-        return cachedResponse.response;
-      }
-
-      // Run intent classification and Tavily query in parallel
-      const [intentResult, tavilyResponse] = await Promise.all([
-        this.classifyIntent(input),
-        this.queryTavily(input)
-      ]);
-
-      confidence = intentResult.confidence;
-      matches = intentResult.matches;
-
-      if (confidence >= 0.7) {
-        // High confidence - use Tavily directly
-        source = 'tavily';
-        logger.info('Using Tavily (High Confidence)', { 
-          confidence,
-          input,
-          threshold: 0.7,
-          matches
-        });
-        response = this.formatTavilyResponse(tavilyResponse);
-        success = true;
-      } else if (confidence >= 0.3) {
-        // Low confidence - use GPT with Tavily context
-        source = 'gpt';
-        logger.info('Using GPT with Context (Low Confidence)', { 
-          confidence,
-          input,
-          threshold: 0.3,
-          matches
-        });
-        const gptContext = {
-          tavilyResults: tavilyResponse.results || [],
-          tavilyAnswer: tavilyResponse.answer || ''
-        };
-        response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', gptContext);
-        success = true;
-      } else {
-        // Non-factual - use GPT exclusively
-        source = 'gpt';
-        logger.info('Using GPT (Non-factual Query)', { 
-          confidence,
-          input,
-          threshold: 0.3,
-          matches
-        });
-        response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
-        success = true;
-      }
-
-      // Cache the response
-      this.cacheResponse(cacheKey, response);
-
-    } catch (error) {
-      logger.error('Error generating response', { 
-        error: error.message,
-        confidence,
-        source,
-        input,
-        matches,
-        stack: error.stack
-      });
-      // Fallback to GPT on error
-      source = 'gpt';
-      response = await this.generateGPTResponse(input, 'gpt-3.5-turbo', context);
-      success = true;
-      fallback = true;
-      // If confidence is still 0, set to high (simulate high confidence error)
-      if (confidence === 0) confidence = 0.8;
+  static async getResponse(query, context, requestType = 'web', maxResults = 3, voice = null) {
+    logger.info('getResponse called:', { query, requestType, voice });
+    
+    // Check cache first
+    const cacheKey = this.generateCacheKey(query);
+    const cachedItem = this.tavilyCache.get(cacheKey);
+    
+    if (cachedItem && (Date.now() - cachedItem.timestamp) < this.CACHE_TTL) {
+      logger.info('Using cached response for query:', { query });
+      return cachedItem.response;
     }
+    
+    // Run intent classification and Tavily query in parallel
+    const startTime = Date.now();
+    
+    try {
+      const [intentResult, tavilyResponse] = await Promise.all([
+        this.classifyIntent(query),
+        callTavilyAPI(query)
+      ]);
+      
+      const responseTime = Date.now() - startTime;
+      
+      // Update routing stats
+      const confidence = intentResult?.confidence || 0;
+      const success = !!tavilyResponse;
+      this.updateRoutingStats(confidence, 'tavily', success, false, responseTime);
+      
+      // Log when making a Tavily API call
+      logger.info('Calling Tavily API for query:', { query });
+      
+      // Format the response
+      const formattedResponse = this.formatTavilyResponse(tavilyResponse, requestType, query, maxResults, context, voice);
+      
+      // Cache the response
+      this.cacheResponse(cacheKey, formattedResponse);
+      
+      return formattedResponse;
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const confidence = 0;
+      this.updateRoutingStats(confidence, 'tavily', false, true, responseTime);
+      
+      logger.error('Error in getResponse:', { error: error.message, query });
+      throw error;
+    }
+  }
 
-    // Calculate response time
-    const responseTime = Date.now() - startTime;
-
-    // Log final response details
-    logger.info('Response Generated', {
-      confidence,
-      source,
-      success,
-      fallback,
-      responseTime,
-      input,
-      matches,
-      response: typeof response === 'string' ? response.substring(0, 100) + '...' : JSON.stringify(response).substring(0, 100) + '...',
-      timestamp: new Date().toISOString()
-    });
-
-    // Update routing stats
-    this.updateRoutingStats(confidence, source, success, fallback, responseTime);
-
-    return response;
+  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null, voice = null) {
+    logger.info('Formatting Tavily response:', { requestType, userQuery, voice });
+    // ... existing code ...
   }
 
   static generateCacheKey(input) {
@@ -625,7 +571,10 @@ export class ResponseGenerator {
            (tavilyResponse?.answer && tavilyResponse.answer.length > 0);
   }
 
-  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null) {
+  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null, ttsVoice = null) {
+    if (ttsVoice) {
+      logger.info('Formatting response with TTS voice:', { ttsVoice });
+    }
     // Always return a defined object for null/undefined input
     if (tavilyResponse == null) {
       return {
@@ -2142,6 +2091,17 @@ export class ResponseGenerator {
     });
     
     return summary;
+  }
+
+  // Add logging for Tavily API and GPT calls
+  static async getTavilyResults(query, location = null, maxResults = 3) {
+    logger.info('Calling Tavily API:', { query, location, maxResults });
+    // ... existing code ...
+  }
+
+  static async generateGPTResponse(prompt, model = 'gpt-3.5-turbo', systemPrompt = '', temperature = 0.2, maxTokens = 512) {
+    logger.info('Calling GPT model:', { model, temperature, maxTokens, systemPromptPreview: systemPrompt.slice(0, 100) });
+    // ... existing code ...
   }
 }
 

@@ -591,30 +591,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified interface for easier use
 
 ## [Unreleased]
-
 ### Added
 - Enhanced conversation context handling: query rewriting and response generation now use previous queries, intents, and locations for more coherent, context-aware, and personalized responses.
 - Voice, SMS, and summary responses now reference previous conversation turns for improved continuity.
 - **Enhanced Follow-up Detection**: Improved pattern matching to detect pet-related follow-up questions (e.g., "Do they allow pets?", "I love dogs", "Pet policy?") and other contextual follow-ups.
 - **Better Location Context Handling**: System now uses previously mentioned locations for follow-up questions instead of asking for location again.
 - **Pet Policy Responses**: Added specific handling for pet-related follow-up questions with appropriate guidance about calling shelters directly for pet accommodation policies.
-- **Enhanced Conversation Config**: Improved system prompts with better follow-up context awareness, enhanced pet policy guidance, improved location management, and better conversation continuity for more contextual and personalized responses.
+- **Enhanced Conversation Config**: Improved prompts with better context awareness, pet policy guidance, and conversation continuity instructions.
+- **Enhanced TTS Error Handling**: Added retry logic, better timeout management, and improved error recovery for Text-to-Speech generation.
+- **Enhanced Logging**: Added comprehensive logging for Tavily API calls, GPT calls, and TTS voice usage for better debugging and monitoring.
+- **Test Improvements**: Fixed mocking issues for Tavily API calls, restored full `getResponse` implementation with caching and parallel processing, and improved test isolation and coverage.
 
 ### Fixed
-- **Follow-up Detection**: Fixed issue where pet-related questions like "You be able to let me know if they use shelters. I love dogs." were not being detected as follow-ups.
-- **Location Reuse**: Fixed issue where system would ask for location again even when location was already provided in previous conversation turns.
-- New logging system with improved error tracking and debugging capabilities
-- Enhanced error handling in Twilio routes
-- Improved WebSocket server initialization and error handling
-- New health check endpoint for monitoring
-- Comprehensive test suite for all components
-- New caching mechanism for improved performance
-- Cost logging system for API usage tracking
-- Central module exports through lib/index.js
-- Enhanced Tavily API response formatting with better organization and phone number extraction
-- Comprehensive test suite for Tavily response formatting
-- Improved error handling for API responses
-- Better user feedback messages for resource searches
+- **Follow-up Detection**: Fixed issue where pet-related follow-up questions were incorrectly classified as off-topic instead of being detected as follow-ups.
+- **TTS Timeout Errors**: Fixed "Request was aborted" errors in TTS generation with better timeout handling and retry logic.
+- **Test Reliability**: Fixed test failures caused by real API calls during testing by implementing proper module mocking.
+- **Cache Implementation**: Restored full caching functionality in `getResponse` method with proper TTL and LRU cache management.
+- **Parallel Processing**: Fixed parallel execution of intent classification and Tavily API calls for improved performance.
 
 ### Changed
 - Refactored caching mechanism to use a more efficient approach

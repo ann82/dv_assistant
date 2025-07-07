@@ -573,3 +573,11 @@ export const SUPPORTED_LANGUAGES = {
 - If a language is not detected, the system defaults to English (US).
 - All TTS and ASR operations are now language-aware for improved accessibility and user experience.
 - OpenAI TTS is used as the primary TTS provider, with Twilio Polly as fallback.
+
+## Test Improvements
+
+- **Enhanced Test Reliability**: Fixed mocking issues for Tavily API calls in tests to prevent real API calls during testing.
+- **Improved Test Coverage**: Restored full `getResponse` implementation with caching, parallel processing, and routing stats for comprehensive testing.
+- **Better Test Isolation**: Implemented proper module mocking to ensure tests run independently without external dependencies.
+- **Cache Testing**: Added comprehensive tests for response caching, TTL validation, and LRU cache implementation.
+- **Performance Monitoring**: Tests now validate parallel processing of intent classification and API calls, along with routing statistics tracking.

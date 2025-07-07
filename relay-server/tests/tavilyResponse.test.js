@@ -10,7 +10,7 @@ describe('Tavily Response Formatting', () => {
       ]
     };
     const formatted = ResponseGenerator.formatTavilyResponse(response, 'web', '', 3);
-    expect(formatted.summary).toContain('I found 1 shelters');
+    expect(formatted.summary).toContain('I found 1 shelter:');
     expect(formatted.shelters).toHaveLength(1);
   });
 
@@ -49,7 +49,7 @@ describe('Tavily Response Formatting', () => {
       ]
     };
     const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
-    expect(formatted.summary).toContain('I found 1 shelters');
+    expect(formatted.summary).toContain('I found 1 shelter:');
     expect(formatted.shelters).toHaveLength(1);
   });
 
@@ -145,7 +145,7 @@ describe('Tavily Response Formatting', () => {
     };
     const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 10);
     expect(formatted.shelters).toHaveLength(1);
-    expect(formatted.summary).toContain('I found 1 shelters');
+    expect(formatted.summary).toContain('I found 1 shelter:');
   });
 
   describe('formatTavilyResponse', () => {
@@ -252,7 +252,7 @@ describe('Tavily Response Formatting', () => {
       // Only the high score result should be included
       expect(formatted.shelters).toHaveLength(1);
       expect(formatted.shelters[0].name).toContain('High Score');
-      expect(formatted.summary).toContain('I found 1 shelters');
+      expect(formatted.summary).toContain('I found 1 shelter:');
     });
   });
 }); 
