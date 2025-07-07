@@ -595,6 +595,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Enhanced conversation context handling: query rewriting and response generation now use previous queries, intents, and locations for more coherent, context-aware, and personalized responses.
 - Voice, SMS, and summary responses now reference previous conversation turns for improved continuity.
+- **Enhanced Follow-up Detection**: Improved pattern matching to detect pet-related follow-up questions (e.g., "Do they allow pets?", "I love dogs", "Pet policy?") and other contextual follow-ups.
+- **Better Location Context Handling**: System now uses previously mentioned locations for follow-up questions instead of asking for location again.
+- **Pet Policy Responses**: Added specific handling for pet-related follow-up questions with appropriate guidance about calling shelters directly for pet accommodation policies.
+
+### Fixed
+- **Follow-up Detection**: Fixed issue where pet-related questions like "You be able to let me know if they use shelters. I love dogs." were not being detected as follow-ups.
+- **Location Reuse**: Fixed issue where system would ask for location again even when location was already provided in previous conversation turns.
 - New logging system with improved error tracking and debugging capabilities
 - Enhanced error handling in Twilio routes
 - Improved WebSocket server initialization and error handling

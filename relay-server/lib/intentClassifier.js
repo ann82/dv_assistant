@@ -425,8 +425,13 @@ export async function handleFollowUp(query, lastQueryContext) {
     // Specific follow-up patterns
     'where is', 'what is the address', 'what is the phone', 'what is the number',
     'can you send', 'can you text', 'can you message',
-    // Pet-related follow-up patterns
-    'pets', 'pet', 'animals', 'pet policy', 'pet-friendly', 'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services'
+    // Pet-related follow-up patterns (enhanced)
+    'pets', 'pet', 'animals', 'pet policy', 'pet-friendly', 'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services',
+    'dogs', 'dog', 'cats', 'cat', 'if they', 'do they', 'can they', 'will they', 'allow', 'accept', 'take', 'bring', 'love dogs', 'love cats', 'have pets', 'with pets', 'pet policy', 'animal policy',
+    // Additional follow-up patterns
+    'let me know', 'tell me if', 'do you know if', 'can you tell me if', 'i want to know if', 'i need to know if',
+    'what about', 'how about', 'what if', 'what happens if', 'what do they', 'what does it', 'what is it',
+    'is there', 'are there', 'does it', 'do they', 'can it', 'will it', 'would it'
   ];
   
   const isFollowUpByPattern = followUpIndicators.some(indicator => lowerQuery.includes(indicator));
@@ -574,6 +579,34 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
   
   // Handle specific follow-up types
   const lowerQuery = userQuery.toLowerCase();
+  
+  // Pet-related follow-up questions
+  if (lowerQuery.includes('dog') || lowerQuery.includes('cat') || lowerQuery.includes('pet') || lowerQuery.includes('animal') || 
+      lowerQuery.includes('allow') || lowerQuery.includes('accept') || lowerQuery.includes('take') || lowerQuery.includes('bring') ||
+      lowerQuery.includes('love dogs') || lowerQuery.includes('love cats')) {
+    
+    if (matchedResult) {
+      const cleanTitle = cleanResultTitle(matchedResult.title);
+      return {
+        type: 'pet_policy',
+        intent: lastQueryContext.intent,
+        voiceResponse: `Regarding pet policies at ${cleanTitle}, I'd recommend calling them directly to ask about their specific pet accommodation policies. Many shelters have different rules about pets, and it's best to confirm directly. Would you like me to send you their contact information?`,
+        smsResponse: lastQueryContext.smsResponse,
+        results: lastQueryContext.results,
+        matchedResult,
+        focusTarget: cleanTitle
+      };
+    } else {
+      return {
+        type: 'pet_policy',
+        intent: lastQueryContext.intent,
+        voiceResponse: `For pet accommodation policies, I'd recommend calling the shelters directly to ask about their specific pet rules. Many domestic violence shelters have different policies regarding pets, and it's important to confirm directly with each shelter. Would you like me to send you the contact information for the shelters I found?`,
+        smsResponse: lastQueryContext.smsResponse,
+        results: lastQueryContext.results,
+        focusTarget: null
+      };
+    }
+  }
   
   // "Can you send that to me?" or "Can you text me?"
   if (lowerQuery.includes('send') || lowerQuery.includes('text') || lowerQuery.includes('email')) {

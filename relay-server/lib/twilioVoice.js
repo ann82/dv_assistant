@@ -443,8 +443,8 @@ export class TwilioVoiceHandler {
           // Call Tavily API with rewritten query
           const tavilyResponse = await callTavilyAPI(rewrittenQuery);
           
-          // Format response for voice
-          const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
+          // Format response for voice with conversation context
+          const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context);
           
           // Update conversation context
           if (callSid) {
@@ -615,11 +615,52 @@ export class TwilioVoiceHandler {
 
       // For resource-related intents (shelter, legal, counseling), extract location
       if (intent === 'find_shelter' || intent === 'legal_services' || intent === 'counseling_services' || intent === 'other_resources') {
+        // Check conversation context for previously mentioned location FIRST
+        const hasPreviousLocation = context?.lastQueryContext?.location;
+        
+        logger.info('Location context check:', {
+          requestId,
+          callSid,
+          hasPreviousLocation,
+          previousLocation: context?.lastQueryContext?.location,
+          speechResult
+        });
+
+        // If we have a previous location and this seems like a follow-up question, use the previous location
+        if (hasPreviousLocation && (speechResult.toLowerCase().includes('dog') || speechResult.toLowerCase().includes('cat') || 
+            speechResult.toLowerCase().includes('pet') || speechResult.toLowerCase().includes('animal') ||
+            speechResult.toLowerCase().includes('allow') || speechResult.toLowerCase().includes('accept') ||
+            speechResult.toLowerCase().includes('let me know') || speechResult.toLowerCase().includes('tell me if'))) {
+          
+          logger.info('Using previous location for follow-up question:', {
+            requestId,
+            callSid,
+            speechResult,
+            previousLocation: hasPreviousLocation
+          });
+          
+          // Use the previous location and proceed with the search
+          const query = `${intent.replace('_', ' ')} in ${hasPreviousLocation}`;
+          const rewrittenQuery = await rewriteQuery(query, intent, callSid);
+          
+          // Call Tavily API with rewritten query
+          const tavilyResponse = await callTavilyAPI(rewrittenQuery);
+          
+          // Format response for voice with conversation context
+          const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context);
+          
+          // Update conversation context
+          if (callSid) {
+            updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, tavilyResponse);
+          }
+          
+          return formattedResponse.voiceResponse;
+        }
+
         // Extract location from speech using enhanced location detector
         const locationInfo = await extractLocation(speechResult);
         
-        // Check conversation context for previously mentioned location
-        const hasPreviousLocation = context?.lastQueryContext?.location;
+        // Check conversation context for previously mentioned location (already declared above)
         
         logger.info('Location context check:', {
           requestId,
@@ -809,8 +850,8 @@ export class TwilioVoiceHandler {
           firstResultUrl: tavilyResponse?.results?.[0]?.url
         });
 
-        // Format response for voice
-        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio');
+        // Format response for voice with conversation context
+        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context);
         logger.info('Formatted response:', {
           requestId,
           callSid,

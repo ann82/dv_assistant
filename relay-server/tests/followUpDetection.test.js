@@ -133,4 +133,57 @@ describe('Follow-up Detection Fix', () => {
     
     
   });
+
+  it('should detect pet-related follow-up questions correctly', async () => {
+    // First, set up a conversation context with a previous search
+    const mockTavilyResults = {
+      results: [
+        {
+          title: 'Domestic Violence Shelter - San Francisco',
+          url: 'https://example.com/shelter1',
+          content: 'A safe haven for domestic violence survivors in San Francisco.',
+          score: 0.8
+        },
+        {
+          title: 'Women\'s Crisis Center',
+          url: 'https://example.com/shelter2', 
+          content: 'Emergency shelter and support services for women in crisis.',
+          score: 0.7
+        }
+      ]
+    };
+
+    // Simulate a previous search
+    updateConversationContext(
+      testCallSid,
+      'find_shelter',
+      'find shelters in San Francisco',
+      { voiceResponse: 'I found 2 shelters in San Francisco.', smsResponse: 'Shelter details...' },
+      mockTavilyResults
+    );
+
+    // Test pet-related follow-up questions that should be detected
+    const petFollowUpQueries = [
+      'You be able to let me know if they use shelters. I love dogs.',
+      'Do they allow pets?',
+      'Can I bring my dog?',
+      'Are pets allowed?',
+      'I love dogs, can they take pets?',
+      'What about pets?',
+      'Do they accept animals?',
+      'Can they take my cat?',
+      'I have a dog, will they allow it?',
+      'Pet policy?'
+    ];
+
+    for (const query of petFollowUpQueries) {
+      const followUpResponse = await handleFollowUp(query, getConversationContext(testCallSid).lastQueryContext);
+      
+      expect(followUpResponse).not.toBeNull();
+      expect(followUpResponse.type).toBe('pet_policy');
+      expect(followUpResponse.intent).toBe('find_shelter');
+      expect(followUpResponse.voiceResponse).toContain('pet');
+      expect(followUpResponse.voiceResponse).toContain('call');
+    }
+  });
 }); 

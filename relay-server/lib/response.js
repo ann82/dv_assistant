@@ -625,7 +625,7 @@ export class ResponseGenerator {
            (tavilyResponse?.answer && tavilyResponse.answer.length > 0);
   }
 
-  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3) {
+  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null) {
     // Always return a defined object for null/undefined input
     if (tavilyResponse == null) {
       return {
@@ -750,10 +750,10 @@ export class ResponseGenerator {
       };
     }
 
-    // Create voice response
-    const voiceResponse = this.createVoiceResponse(processedResults, location);
+    // Create voice response with conversation context
+    const voiceResponse = this.createVoiceResponse(processedResults, location, conversationContext);
     // Create SMS response with clickable links
-    const smsResponse = this.createSMSResponse(processedResults, location);
+    const smsResponse = this.createSMSResponse(processedResults, location, conversationContext);
 
     // Extract shelter info for web/summary with improved data
     const shelters = processedResults.map(result => {
@@ -772,10 +772,8 @@ export class ResponseGenerator {
       };
     });
 
-    // Compose summary for web
-    const summary = `I found ${shelters.length} shelters${location ? ' in ' + location : ''}:
-` +
-      shelters.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+    // Compose summary for web with conversation context
+    const summary = this.createContextualSummary(shelters, location, conversationContext);
 
     // Return the processed results
     return {
@@ -1021,81 +1019,66 @@ export class ResponseGenerator {
     return '';
   }
 
-  static createVoiceResponse(results, location) {
+  static createVoiceResponse(results, location, conversationContext = null) {
     const locationText = location ? ` in ${location}` : '';
     
-    // Handle case when there are no results
-    if (!results || results.length === 0) {
-      return `I'm sorry, I couldn't find any shelters${locationText}. Would you like me to search for resources in a different location?`;
+    // Add conversation context to make responses more personal
+    let contextPrefix = '';
+    if (conversationContext) {
+      if (conversationContext.lastIntent && conversationContext.lastIntent !== 'find_shelter') {
+        contextPrefix = `Based on your previous request for ${conversationContext.lastIntent.replace('_', ' ')}, `;
+      } else if (conversationContext.history && conversationContext.history.length > 1) {
+        contextPrefix = 'Continuing from our conversation, ';
+      }
     }
     
-    // For up to 3 results, read out name, address, and phone for each
-    if (results.length <= 3) {
-      let response = `I found ${results.length} shelter${results.length > 1 ? 's' : ''}${locationText}.
-`;
-      results.forEach((result, idx) => {
-        const title = result.processedTitle || this.cleanTitleForVoice(result.title);
-        response += `${idx + 1}. ${title}`;
-        if (result.physicalAddress && result.physicalAddress !== 'Not available') {
-          response += `. Address: ${result.physicalAddress}`;
-        }
-        const phone = this.extractPhone(result.content);
-        if (phone && phone !== 'Not available') {
-          response += `. Phone: ${phone}`;
-        }
-        response += '.\n';
-      });
-      response += 'How else can I help you today?';
-      return response;
+    if (results.length === 0) {
+      return `${contextPrefix}I'm sorry, I couldn't find any shelters${locationText}. Would you like me to search for resources in a different location?`;
     }
+
+    let voiceResponse = `${contextPrefix}I found ${results.length} shelter${results.length > 1 ? 's' : ''}${locationText}: `;
     
-    // For more than 3, summarize and offer to text the full list
-    const organizationNames = results.map(result => {
-      return result.processedTitle || this.cleanTitleForVoice(result.title);
+    results.forEach((result, index) => {
+      const title = this.cleanTitleForVoice(result.processedTitle || result.title);
+      const phone = this.extractPhone(result.content);
+      
+      voiceResponse += `${index + 1}. ${title}`;
+      if (phone) {
+        voiceResponse += `. Phone number: ${phone}`;
+      }
+      if (result.physicalAddress) {
+        voiceResponse += `. Address: ${result.physicalAddress}`;
+      }
+      voiceResponse += '. ';
     });
-    let response = `I found ${results.length} shelters${locationText}, including ${organizationNames.slice(0, 3).join(', ')}. Would you like me to text you the full list with addresses and phone numbers?`;
-    return response;
+
+    voiceResponse += 'Would you like me to send you the complete details via text message?';
+    return voiceResponse;
   }
 
-  static createSMSResponse(results, location) {
+  static createSMSResponse(results, location, conversationContext = null) {
     const locationText = location ? ` in ${location}` : '';
     let smsResponse = `Shelters${locationText}:\n\n`;
     
+    // Add conversation context reference
+    if (conversationContext && conversationContext.lastQuery) {
+      smsResponse += `Following up on: "${conversationContext.lastQuery}"\n\n`;
+    }
+    
     results.forEach((result, index) => {
-      const title = result.processedTitle || this.cleanTitleForSMS(result.title);
-      const url = result.url;
+      const title = this.cleanTitleForSMS(result.processedTitle || result.title);
+      const phone = this.extractPhone(result.content);
+      const address = result.physicalAddress || 'Address not available';
       
       smsResponse += `${index + 1}. ${title}\n`;
-      
-      // If result has multiple resources, list them
-      if (result.hasMultipleResources && result.multipleResources.length > 0) {
-        result.multipleResources.forEach((resource, resourceIndex) => {
-          if (resourceIndex > 0) { // Skip first one as it's already shown as the main title
-            smsResponse += `   - ${resource.name}\n`;
-            if (resource.address !== 'Not available') {
-              smsResponse += `     Address: ${resource.address}\n`;
-            }
-            if (resource.phone !== 'Not available') {
-              smsResponse += `     Phone: ${resource.phone}\n`;
-            }
-          }
-        });
-      } else {
-        // Show address if available
-        if (result.physicalAddress && result.physicalAddress !== 'Not available') {
-          smsResponse += `   Address: ${result.physicalAddress}\n`;
-        }
-        // Show phone number if available
-        const phone = this.extractPhone(result.content);
-        if (phone && phone !== 'Not available') {
-          smsResponse += `   Phone: ${phone}\n`;
-        }
+      smsResponse += `   📍 ${address}\n`;
+      if (phone) {
+        smsResponse += `   📞 ${phone}\n`;
       }
-      
-      smsResponse += `   ${url}\n\n`;
+      smsResponse += `   🔗 ${result.url}\n\n`;
     });
-    
-    smsResponse += "For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233";
+
+    smsResponse += 'For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233';
     return smsResponse;
   }
 
@@ -2127,6 +2110,38 @@ export class ResponseGenerator {
     }
     
     return resources;
+  }
+
+  static createContextualSummary(shelters, location, conversationContext = null) {
+    if (!shelters || shelters.length === 0) {
+      return "I'm sorry, I couldn't find any specific resources.";
+    }
+    
+    let summary = `I found ${shelters.length} shelter${shelters.length > 1 ? 's' : ''}${location ? ' in ' + location : ''}:\n`;
+    
+    // Add conversation context if available
+    if (conversationContext) {
+      if (conversationContext.lastIntent && conversationContext.lastIntent !== 'find_shelter') {
+        summary += `\nBased on your request for ${conversationContext.lastIntent.replace('_', ' ')}:\n`;
+      } else if (conversationContext.history && conversationContext.history.length > 1) {
+        summary += '\nBuilding on our previous conversation:\n';
+      }
+    }
+    
+    shelters.forEach((shelter, index) => {
+      summary += `\n${index + 1}. ${shelter.name}`;
+      if (shelter.address && shelter.address !== 'Not available') {
+        summary += `\n   Address: ${shelter.address}`;
+      }
+      if (shelter.phone && shelter.phone !== 'Not available') {
+        summary += `\n   Phone: ${shelter.phone}`;
+      }
+      if (shelter.description && shelter.description !== 'Not available') {
+        summary += `\n   Description: ${shelter.description.substring(0, 100)}...`;
+      }
+    });
+    
+    return summary;
   }
 }
 

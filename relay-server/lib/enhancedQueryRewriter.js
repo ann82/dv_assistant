@@ -89,7 +89,45 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   const locationInfo = await detectLocationWithGeocoding(cleanedQuery);
   logger.info('Location detection result:', { locationInfo, callSid });
 
-  // Step 3: Build optimized search query
+  // Step 3: Get conversation context for enhanced query building
+  let contextEnhancement = '';
+  if (callSid) {
+    const context = getConversationContext(callSid);
+    if (context) {
+      // Use previous location if current query doesn't have one
+      if (!locationInfo.location && context.lastQueryContext?.location) {
+        locationInfo.location = context.lastQueryContext.location;
+        locationInfo.isComplete = true;
+        logger.info('Using previous location from context:', { 
+          previousLocation: context.lastQueryContext.location, 
+          callSid 
+        });
+      }
+
+      // Add context from previous queries if this seems like a follow-up
+      if (context.history && context.history.length > 0) {
+        const recentQueries = context.history.slice(-2).map(h => h.query).join(' ');
+        if (recentQueries && recentQueries.length > 0) {
+          contextEnhancement = ` ${recentQueries}`;
+          logger.info('Added conversation context to query:', { 
+            contextEnhancement, 
+            callSid 
+          });
+        }
+      }
+
+      // Use previous intent context if current intent is different
+      if (context.lastIntent && context.lastIntent !== intent) {
+        contextEnhancement += ` ${context.lastIntent.replace('_', ' ')}`;
+        logger.info('Added previous intent context:', { 
+          previousIntent: context.lastIntent, 
+          callSid 
+        });
+      }
+    }
+  }
+
+  // Step 4: Build optimized search query
   let searchQuery = cleanedQuery;
 
   // Always add 'domestic violence shelter' for resource-seeking intents
@@ -107,13 +145,9 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     }
   }
 
-  // Step 4: Add conversation context if available
-  if (callSid && searchQuery !== cleanedQuery) {
-    const context = getConversationContext(callSid);
-    if (context && context.previousQuery) {
-      searchQuery = `${searchQuery} ${context.previousQuery}`;
-      logger.info('Added conversation context to query:', { searchQuery, callSid });
-    }
+  // Step 5: Add conversation context enhancement
+  if (contextEnhancement) {
+    searchQuery = `${searchQuery}${contextEnhancement}`;
   }
 
   logger.info('Final rewritten query:', { original: query, rewritten: searchQuery, callSid });
