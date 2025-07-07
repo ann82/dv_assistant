@@ -5,6 +5,8 @@ A real-time voice-based assistant designed to provide immediate support and info
 ---
 
 **Latest Update (2025-07-06):**
+- **Timeout Handling Improvements**: Enhanced error handling for Tavily API timeouts with graceful fallbacks and faster response times
+- **Simplified Location Detection**: Replaced complex regex patterns with simple, reliable location extraction for better accuracy
 - **TypeScript Migration Complete**: Full TypeScript support with proper configuration, type definitions, and error-free compilation
 - **Dependency Updates**: Installed missing packages (react-feather, react-leaflet, leaflet, realtime-api-beta, web-vitals) with proper type definitions
 - **Code Quality**: All TypeScript errors resolved, proper type annotations added throughout the codebase
@@ -32,6 +34,8 @@ A real-time voice-based assistant designed to provide immediate support and info
 - **Enhanced Tavily response formatting with improved title and address extraction**
 - **Improved Railway deployment with enhanced startup script and error handling**
 - **Enhanced speech-to-text recognition with intelligent preprocessing to reduce garbling**
+- **Timeout handling with graceful fallbacks** for external API failures
+- **Simplified location detection** with reliable pattern matching and fallback extraction
 - Voice responses never include HTTP/HTTPS URLs; users are offered to receive details (including address and link) via text message for location/address queries
 - Robust follow-up detection, even if OpenAI API key is missing
 - Improved user experience for follow-up and location/address queries
@@ -182,6 +186,64 @@ The system now includes advanced response formatting capabilities that significa
 
 These improvements ensure users receive more useful and complete information about domestic violence shelters and resources, even when the original Tavily results have poor formatting or incomplete data.
 
+## Robust Timeout Handling
+
+The system now includes comprehensive timeout handling and error recovery that ensures users always receive helpful responses, even when external services are slow or unavailable:
+
+### Key Improvements
+
+- **Faster Location Searches**: 15-second timeout specifically for location follow-ups (vs 30s default) for more responsive user experience
+- **Graceful Error Recovery**: When Tavily API fails or times out, users receive helpful fallback responses with alternative resources
+- **Emergency Resource Provision**: Always includes National Domestic Violence Hotline (1-800-799-7233) as backup when searches fail
+- **Enhanced Logging**: Better error tracking and debugging capabilities for timeout issues
+- **Promise.race() Implementation**: Custom timeout handling that's more responsive than standard API timeouts
+
+### Example Fallback Response
+When external APIs fail, users receive:
+> "I'm having trouble searching for shelter resources in Austin right now. Let me provide you with some general information about domestic violence resources in that area. You can also try calling the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance."
+
+### Technical Features
+
+- **Custom Timeout Logic**: 15-second timeout for location searches using Promise.race()
+- **Comprehensive Error Handling**: Try-catch blocks around all external API calls
+- **Helpful Fallback Messages**: Context-aware responses that guide users to alternative resources
+- **Emergency Contact Integration**: Always provides hotline number when searches fail
+- **Enhanced Monitoring**: Detailed logging for debugging timeout and API issues
+
+### Benefits
+
+- **Always Helpful**: Users never get stuck with no response when APIs fail
+- **Faster Recovery**: 15-second timeout prevents long waits for location searches
+- **Emergency Support**: Always provides alternative resources and hotline numbers
+- **Better Reliability**: System continues to function even when external services are down
+- **Improved User Experience**: Clear messaging about what went wrong and what to do next
+
+## Simplified Location Detection
+
+The system now uses a much simpler and more reliable approach to location extraction:
+
+### Key Improvements
+
+- **Simple Pattern Matching**: Replaced 15+ complex regex patterns with basic, reliable patterns
+- **Fallback Extraction**: Uses capitalized word detection when patterns don't match
+- **Conversational Support**: Works with natural language like "Yeah, but can you find some shelters near Austin, Texas?"
+- **Reduced Complexity**: Eliminated ~100 lines of complex pattern matching code
+- **Better Accuracy**: More reliable location extraction with fewer false negatives
+
+### Technical Features
+
+- **Basic Patterns**: Simple patterns like `/near\s+([^,.?]+(?:,\s*[^,.?]+)?)/i`
+- **Capitalized Word Detection**: Falls back to detecting location names from capitalized words
+- **Conversational Handling**: Works with natural speech patterns and fillers
+- **Comprehensive Testing**: Full test coverage for all location extraction scenarios
+
+### Benefits
+
+- **Higher Success Rate**: Better extraction of locations from natural speech
+- **Simpler Maintenance**: Easy to understand and modify location detection logic
+- **Reduced Errors**: Fewer false negatives and missed location extractions
+- **Better User Experience**: More reliable location recognition in conversations
+
 ## Enhanced Query Rewriting
 
 The system now includes optimized query rewriting that significantly improves search result quality and relevance:
@@ -269,6 +331,12 @@ The assistant uses a robust intent classification system:
 - **Comprehensive test coverage:** The system includes tests for medical, entertainment, and generic queries to ensure only relevant queries are handled as on-topic.
 
 See the test suite and intentClassifier.js for details.
+
+## Conversation Context Improvements
+
+- The assistant now uses previous queries, intents, and locations to rewrite user queries more intelligently, leading to better search results and follow-up handling.
+- Voice, SMS, and summary responses are now context-aware, referencing previous conversation turns for more coherent and personalized interactions.
+- All relevant API calls and response generators now pass and utilize the conversation context, improving continuity across multi-turn conversations.
 
 ## Railway Deployment
 

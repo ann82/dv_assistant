@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2025-07-06
+
+### Added
+- **Robust Timeout Handling**: Enhanced error handling for Tavily API timeouts with graceful fallbacks
+- **Faster Location Searches**: 15-second timeout specifically for location follow-ups (vs 30s default)
+- **Emergency Resource Provision**: Always includes National Domestic Violence Hotline (1-800-799-7233) as backup when searches fail
+- **Enhanced Logging**: Better error tracking and debugging capabilities for timeout issues
+- **Promise.race() Implementation**: Custom timeout handling that's more responsive than standard API timeouts
+
+### Changed
+- **Simplified Location Detection**: Replaced complex regex patterns with simple, reliable location extraction
+- **Reduced Code Complexity**: Eliminated ~100 lines of complex pattern matching code
+- **Better Location Accuracy**: More reliable location extraction with fewer false negatives
+- **Conversational Support**: Works with natural language like "Yeah, but can you find some shelters near Austin, Texas?"
+
+### Fixed
+- **Tavily API Timeout Errors**: Users now receive helpful responses even when external APIs fail
+- **Location Extraction Failures**: Simplified approach catches more location references in natural speech
+- **User Experience Issues**: No more stuck conversations when APIs are slow or unavailable
+- **Complex Pattern Matching**: Replaced error-prone complex regex with simple, reliable patterns
+
+### Technical Details
+- **Custom Timeout Logic**: 15-second timeout for location searches using Promise.race()
+- **Simple Patterns**: Basic patterns like `/near\s+([^,.?]+(?:,\s*[^,.?]+)?)/i` instead of 15+ complex regex
+- **Fallback Extraction**: Uses capitalized word detection when patterns don't match
+- **Comprehensive Error Handling**: Try-catch blocks around all external API calls with helpful fallback messages
+- **Emergency Contact Integration**: Always provides hotline number when searches fail
+
 ## [1.22.0] - 2025-07-06
 
 ### Added
@@ -565,6 +593,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enhanced conversation context handling: query rewriting and response generation now use previous queries, intents, and locations for more coherent, context-aware, and personalized responses.
+- Voice, SMS, and summary responses now reference previous conversation turns for improved continuity.
 - New logging system with improved error tracking and debugging capabilities
 - Enhanced error handling in Twilio routes
 - Improved WebSocket server initialization and error handling
