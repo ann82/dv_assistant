@@ -2093,16 +2093,6 @@ export class ResponseGenerator {
     return summary;
   }
 
-  // Add logging for Tavily API and GPT calls
-  static async getTavilyResults(query, location = null, maxResults = 3) {
-    logger.info('Calling Tavily API:', { query, location, maxResults });
-    // ... existing code ...
-  }
-
-  static async generateGPTResponse(prompt, model = 'gpt-3.5-turbo', systemPrompt = '', temperature = 0.2, maxTokens = 512) {
-    logger.info('Calling GPT model:', { model, temperature, maxTokens, systemPromptPreview: systemPrompt.slice(0, 100) });
-    // ... existing code ...
-  }
 }
 
 // Export the pattern categories and keywords

@@ -99,7 +99,7 @@ Examples:
 - "help in the Oakland area" → "Oakland"
 - "I need assistance" → "none"`;
 
-    const response = await ResponseGenerator.generateGPTResponse(prompt, 'gpt-3.5-turbo', {});
+    const response = await ResponseGenerator.generateGPTResponse(prompt, 'gpt-3.5-turbo', '');
     
     // Handle the response properly - generateGPTResponse returns an object with a text property
     let responseText;
