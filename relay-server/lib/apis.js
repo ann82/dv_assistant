@@ -42,7 +42,7 @@ export async function callTavilyAPI(query, location = null) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 30000); // 30 second timeout for Tavily API
+    }, 8000); // 8 second timeout for Tavily API (reduced for Twilio compatibility)
 
     try {
       // Make the API call with standardized parameters and timeout

@@ -266,7 +266,11 @@ async function handleSMSConsent(CallSid, SpeechResult, res) {
 router.post('/voice/process', async (req, res) => {
   logger.info('Received speech processing request');
   
-  // Set a timeout for this specific request - reduced from 90s to 45s
+  // Send immediate acknowledgment to prevent 499 errors
+  res.set('Connection', 'keep-alive');
+  res.set('Keep-Alive', 'timeout=15');
+  
+  // Set a timeout for this specific request - reduced for Twilio compatibility
   const requestTimeout = setTimeout(() => {
     if (!res.headersSent) {
       logger.error('Voice process request timeout:', {
@@ -283,7 +287,7 @@ router.post('/voice/process', async (req, res) => {
           language="en-US"/>
 </Response>`);
     }
-  }, 45000); // Reduced from 90s to 45s
+  }, 12000); // Reduced to 12 seconds for Twilio compatibility
   
   try {
     const { CallSid, SpeechResult } = req.body;
@@ -319,11 +323,11 @@ router.post('/voice/process', async (req, res) => {
     const lowerSpeech = cleanedSpeechResult.toLowerCase();
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
     
-    // Process the speech input with timeout handling - reduced from 60s to 30s
+    // Process the speech input with timeout handling - reduced for Twilio compatibility
     const processedResponse = await Promise.race([
       twilioVoiceHandler.processSpeechInput(cleanedSpeechResult, CallSid),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Processing timeout')), 30000)
+        setTimeout(() => reject(new Error('Processing timeout')), 10000)
       )
     ]);
     
@@ -351,7 +355,7 @@ router.post('/voice/process', async (req, res) => {
       twiml = await Promise.race([
         twilioVoiceHandler.generateTTSBasedTwiML(response, !shouldEndCall),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TwiML generation timeout')), 15000)
+          setTimeout(() => reject(new Error('TwiML generation timeout')), 8000)
         )
       ]);
     } catch (ttsError) {
@@ -361,7 +365,7 @@ router.post('/voice/process', async (req, res) => {
         responseLength: response.length
       });
       
-      // Fallback to Polly TTS
+      // Quick fallback to Polly TTS to prevent 499 errors
       const fallbackTwiml = new twilio.twiml.VoiceResponse();
       fallbackTwiml.say(response);
       
@@ -377,7 +381,7 @@ router.post('/voice/process', async (req, res) => {
         });
       }
       
-      twiml = fallbackTwiml.toString();
+            twiml = fallbackTwiml.toString();
     }
     
     res.type('text/xml');

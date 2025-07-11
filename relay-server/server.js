@@ -55,9 +55,9 @@ app.use(express.urlencoded({
 
 // Increase timeout for Twilio requests
 app.use((req, res, next) => {
-  // Increase timeouts for Railway deployment
-  req.setTimeout(120000); // 2 minutes
-  res.setTimeout(120000); // 2 minutes
+  // Set reasonable timeouts for Twilio compatibility
+  req.setTimeout(30000); // 30 seconds
+  res.setTimeout(30000); // 30 seconds
   
   // Add timeout error handling
   req.on('timeout', () => {
