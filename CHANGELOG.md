@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2025-01-27
+
+### Changed
+- **Twilio Voice Enhancement**: Changed default TTS voice from 'alloy' to 'nova' for Twilio phone calls
+  - Improved clarity and empathy in phone conversations
+  - Better user experience for voice interactions
+  - Maintains web-based TTS voice settings unchanged
+  - Environment variable override still supported via TTS_VOICE
+
 ## [1.25.0] - 2025-07-07
 
 ### Fixed

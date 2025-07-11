@@ -834,7 +834,7 @@ export class TwilioVoiceHandler {
         });
 
         // Get the TTS voice from config or context
-        const ttsVoice = config.TTS_VOICE || 'alloy';
+        const ttsVoice = config.TTS_VOICE || 'nova';
         logger.info('Using TTS voice for response:', { ttsVoice });
         // Format response for voice with conversation context and TTS voice
         const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context, ttsVoice);
