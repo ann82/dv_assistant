@@ -217,7 +217,7 @@ export class AudioService {
 
   // Generate TTS with caching and language support
   async generateTTS(text, languageCode = 'en-US') {
-    logger.info('Generating TTS audio with voice:', { ttsVoice: config.TTS_VOICE || 'alloy', languageCode });
+    logger.info('Generating TTS audio with voice:', { ttsVoice: config.TTS_VOICE || 'nova', languageCode });
     try {
       // Check if TTS is enabled
       if (!config.ENABLE_TTS) {

@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.26.0] - 2025-01-27
 
 ### Changed
-- **Twilio Voice Enhancement**: Changed default TTS voice from 'alloy' to 'nova' for Twilio phone calls
-  - Improved clarity and empathy in phone conversations
+- **TTS Voice Enhancement**: Changed default TTS voice from 'alloy' to 'nova' across all platforms
+  - Improved clarity and empathy in both Twilio phone calls and web interface
   - Better user experience for voice interactions
-  - Maintains web-based TTS voice settings unchanged
+  - Consistent voice quality across all platforms
   - Environment variable override still supported via TTS_VOICE
 
 ## [1.25.0] - 2025-07-07
