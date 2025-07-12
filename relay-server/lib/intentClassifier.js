@@ -280,6 +280,78 @@ Respond with only the intent name (e.g., "find_shelter").`;
 }
 
 /**
+ * Calculate intent confidence based on response characteristics
+ * @param {string} intent - The classified intent
+ * @param {string} query - The user query
+ * @param {Object} response - The GPT-3.5-turbo response
+ * @returns {number} Confidence score between 0 and 1
+ */
+function calculateIntentConfidence(intent, query, response) {
+  let confidence = 0.5; // Base confidence
+  
+  // Check if intent is valid
+  const validIntents = [
+    'find_shelter', 'legal_services', 'counseling_services', 
+    'emergency_help', 'general_information', 'other_resources', 
+    'end_conversation', 'off_topic'
+  ];
+  
+  if (!validIntents.includes(intent)) {
+    logger.warn('Invalid intent detected:', { intent, query });
+    return 0.1; // Low confidence for invalid intents
+  }
+  
+  // Boost confidence for clear keyword matches
+  const queryLower = query.toLowerCase();
+  const intentKeywords = {
+    'find_shelter': ['shelter', 'housing', 'safe', 'place to stay', 'home'],
+    'legal_services': ['legal', 'lawyer', 'attorney', 'court', 'restraining order', 'divorce'],
+    'counseling_services': ['counseling', 'therapy', 'counselor', 'therapist', 'mental health', 'emotional'],
+    'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
+    'general_information': ['what is', 'how to', 'information', 'about', 'tell me'],
+    'other_resources': ['financial', 'money', 'job', 'work', 'childcare', 'transportation'],
+    'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish', 'thank you', 'thanks'],
+    'off_topic': ['weather', 'sports', 'joke', 'funny', 'movie', 'music']
+  };
+  
+  const keywords = intentKeywords[intent] || [];
+  const keywordMatches = keywords.filter(keyword => queryLower.includes(keyword)).length;
+  
+  if (keywordMatches > 0) {
+    confidence += 0.3; // Boost for keyword matches
+  }
+  
+  // Boost confidence for longer, more specific queries
+  if (query.length > 20) {
+    confidence += 0.1;
+  }
+  
+  // Reduce confidence for very short or vague queries
+  if (query.length < 5) {
+    confidence -= 0.2;
+  }
+  
+  // Boost confidence for emergency-related queries
+  if (intent === 'emergency_help') {
+    confidence += 0.2; // Higher confidence for emergency detection
+  }
+  
+  // Cap confidence at 1.0
+  return Math.min(confidence, 1.0);
+}
+
+/**
+ * Get confidence level based on confidence score
+ * @param {number} confidence - The confidence score
+ * @returns {string} Confidence level
+ */
+function getConfidenceLevel(confidence) {
+  if (confidence >= 0.8) return 'High';
+  if (confidence >= 0.5) return 'Medium';
+  return 'Low';
+}
+
+/**
  * Fallback intent classification using pattern matching when OpenAI API is unavailable
  * @param {string} query - The user query to classify
  * @returns {string} The classified intent
