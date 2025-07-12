@@ -4,7 +4,17 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2025-07-06):**
+**Latest Update (2025-01-27):**
+- **TTS Timeout Optimizations**: Increased TTS timeout from 10s to 15s with faster fallback to Polly for better reliability
+- **Enhanced Follow-up Detection**: Improved location statement recognition and AI prompt optimization to prevent incorrect "No." responses
+- **Performance Improvements**: Reduced timeout errors and faster response times for better user experience
+- **Dynamic Conversation Context System**: Real-time conversation context generation from stored history for personalized AI responses
+- **Empathetic Voice System**: Enhanced emotional support with validation, supportive language, and safety-first approach
+- **Enhanced AI Response Quality**: Context-aware instructions that adapt based on user's conversation history and current needs
+- **Language and Cultural Awareness**: Automatic language detection and cultural sensitivity for appropriate responses
+- **System-wide Empathy Integration**: All components incorporate empathetic communication and emotional support guidelines
+
+**Previous Update (2025-07-06):**
 - **Console Log Cleanup**: Removed unnecessary console statements for cleaner output and better production readiness
 - **Timeout Handling Improvements**: Enhanced error handling for Tavily API timeouts with graceful fallbacks and faster response times
 - **Simplified Location Detection**: Replaced complex regex patterns with simple, reliable location extraction for better accuracy
@@ -12,10 +22,6 @@ A real-time voice-based assistant designed to provide immediate support and info
 - **Dependency Updates**: Installed missing packages (react-feather, react-leaflet, leaflet, realtime-api-beta, web-vitals) with proper type definitions
 - **Code Quality**: All TypeScript errors resolved, proper type annotations added throughout the codebase
 - **Enhanced Development Experience**: Clean TypeScript configuration with React/JSX support, esModuleInterop, and strict type checking
-
-**Previous Update (2025-07-01):**
-- **Codebase Cleanup**: Removed deprecated modules (`enhancedContextManager.js`, `contextIntegration.js`, `tavilyIntegration.js`, `utils.js`) and their associated tests for clarity and maintainability
-- **Test Suite Green**: All tests now pass (21 test files, 263 tests, 2 skipped, 100% pass rate)
 
 ---
 
@@ -45,6 +51,60 @@ A real-time voice-based assistant designed to provide immediate support and info
 - All other markdown documentation files except README.md and CHANGELOG.md have been removed for clarity
 - **Comprehensive Conversation Guidelines**: Detailed instructions for emergency protocols, cultural sensitivity, safety planning, and conversation structure
 - **Unified Configuration**: Shared conversation config between web and voice interfaces ensures consistency
+
+## Dynamic Conversation Context System
+
+The system now includes advanced conversation context management that significantly improves AI response quality and personalization:
+
+### Key Improvements
+
+- **Real-time Context Generation**: Builds conversation context dynamically from stored conversation history
+- **Multi-dimensional Context**: Includes location, family concerns, language preference, emotional tone, current needs, and resource focus
+- **Context Injection**: Seamlessly injects dynamic context into voice instructions for personalized AI responses
+- **Call-specific Context**: Each call maintains isolated context with callSid and language detection
+
+### Technical Features
+
+- **Dynamic Context Building**: Real-time generation of conversation context from stored history
+- **Context-Aware Instructions**: Voice instructions include dynamic conversation context for better AI understanding
+- **Personalized Responses**: AI responses adapt based on user's conversation history and current needs
+- **Multi-turn Context Preservation**: Maintains understanding across multiple conversation turns
+- **Resource Memory**: Tracks and remembers previously discussed resources and user preferences
+
+### Benefits
+
+- **Better AI Understanding**: Context-aware instructions lead to more relevant and helpful responses
+- **Personalized Experience**: Responses adapt to user's specific situation and needs
+- **Improved Continuity**: Multi-turn conversations maintain context and flow naturally
+- **Enhanced Resource Tracking**: System remembers and references previously discussed resources
+- **Language and Cultural Awareness**: Automatic language detection and cultural sensitivity
+
+## Empathetic Voice System
+
+The system now incorporates comprehensive emotional support and empathetic communication throughout all interactions:
+
+### Key Improvements
+
+- **Emotional Validation**: Voice system validates and acknowledges user emotions
+- **Supportive Language**: Uses warm, compassionate language throughout conversations
+- **Safety-First Approach**: Prioritizes user safety and well-being in all interactions
+- **Non-judgmental Tone**: Maintains supportive, non-judgmental communication style
+
+### Technical Features
+
+- **Enhanced Conversation Instructions**: Include emotional support guidelines and safety protocols
+- **System-wide Empathy**: All components incorporate empathetic communication
+- **Safety Protocols**: Clear guidelines for emergency situations and safety planning
+- **Privacy Protection**: Strong emphasis on user privacy and confidentiality
+- **Cultural Sensitivity**: Improved cultural awareness and appropriate responses
+
+### Benefits
+
+- **Better User Experience**: More empathetic and supportive interactions
+- **Improved Safety**: Proper emergency protocols and safety planning
+- **Professional Standards**: Consistent, compassionate communication across all interactions
+- **Accessibility**: Support for diverse user needs and communication styles
+- **Risk Reduction**: Better handling reduces liability and improves outcomes
 
 ## Configurable Welcome Message
 

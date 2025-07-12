@@ -2,11 +2,33 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.21.2** (Updated: January 27, 2025)
+**Current Version: 1.21.3** (Updated: January 27, 2025)
 
 ## Features
 
-### Conversation Management System & Error Handling (v1.21.2) - NEW
+### Location Extraction Bug Resolution (v1.21.3) - NEW
+- **🐛 Critical Bug Fix**
+  - **False Location Detection**: Fixed critical bug where "Accept" was incorrectly extracted as a location
+  - **Follow-up Question Handling**: Improved detection of follow-up questions to prevent false location extraction
+  - **Conversation Context Preservation**: Enhanced conversation context handling for better location continuity
+  - **Search Query Quality**: Improved search query generation to exclude problematic words
+- **🎯 Enhanced Location Detection**
+  - **Conservative Extraction**: More conservative fallback location extraction with strong location indicators
+  - **Follow-up Recognition**: Better recognition of follow-up questions that shouldn't trigger location extraction
+  - **Context Prioritization**: Prioritizes conversation context over new location extraction for follow-ups
+  - **Strong Indicators**: Only extracts locations with city/town/state keywords or city/state comma patterns
+- **🔧 Query Rewriter Improvements**
+  - **Context Filtering**: Filters out non-location-related context from search queries
+  - **Word Cleaning**: Removes common problematic words that could affect search quality
+  - **Location Continuity**: Better preservation of location context across conversation turns
+  - **Selective Enhancement**: Only adds location-related context to search queries
+- **🚀 Technical Improvements**
+  - **Reduced False Positives**: Significantly reduced false location extractions from follow-up questions
+  - **Better Search Quality**: Cleaner search queries that focus on actual location and resource information
+  - **Conversation Flow**: Improved conversation flow with proper location context preservation
+  - **User Experience**: Users get relevant results based on their actual location, not false extractions
+
+### Conversation Management System & Error Handling (v1.21.2)
 - **🧠 Conversation Flow Management**
   - **Intelligent Flow Control**: Smart conversation flow management based on intent and context
   - **Off-topic Handling**: Intelligent handling of off-topic conversations with appropriate redirections

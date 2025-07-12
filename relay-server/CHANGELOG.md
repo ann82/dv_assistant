@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.3] - 2025-01-27
+
+### 🚀 Major Fix: Location Extraction Bug Resolution
+- **False Location Detection**: Fixed critical bug where "Accept" was incorrectly extracted as a location
+- **Follow-up Question Handling**: Improved detection of follow-up questions to prevent false location extraction
+- **Conversation Context Preservation**: Enhanced conversation context handling for better location continuity
+- **Search Query Quality**: Improved search query generation to exclude problematic words
+
+### Fixed
+- **Critical Location Bug**: Fixed issue where "Accept" from "Do any of them? Accept pets..." was incorrectly extracted as a location
+  - **Root Cause**: Fallback location extraction was too aggressive, picking up any capitalized word
+  - **Solution**: Implemented targeted follow-up detection and conservative location extraction
+  - **Impact**: Prevents incorrect geocoding (e.g., "Accept" being geocoded to Slovakia instead of user's actual location)
+- **Follow-up Question Detection**: Enhanced detection of follow-up questions about services and features
+  - **Pet-related Questions**: Correctly identifies questions about pet acceptance as follow-ups
+  - **Service Questions**: Recognizes questions about insurance, accessibility, etc. as follow-ups
+  - **Location Context**: Uses previous location context for follow-up questions instead of extracting new locations
+- **Query Rewriting**: Improved search query generation to exclude problematic words
+  - **Context Cleaning**: Removes words like "Accept", "Allow", "Let" from search queries
+  - **Selective Enhancement**: Only adds location-related context to search queries
+  - **Conversation Continuity**: Maintains proper location context throughout conversations
+
+### Changed
+- **Location Detection Logic**: More conservative fallback location extraction with strong location indicators
+  - **Strong Indicators**: Only extracts locations with city/town/state keywords or city/state comma patterns
+  - **Follow-up Recognition**: Better recognition of follow-up questions that shouldn't trigger location extraction
+  - **Context Prioritization**: Prioritizes conversation context over new location extraction for follow-ups
+- **Query Rewriter**: Enhanced to better handle conversation context and clean problematic words
+  - **Context Filtering**: Filters out non-location-related context from search queries
+  - **Word Cleaning**: Removes common problematic words that could affect search quality
+  - **Location Continuity**: Better preservation of location context across conversation turns
+
+### Technical Improvements
+- **Reduced False Positives**: Significantly reduced false location extractions from follow-up questions
+- **Better Search Quality**: Cleaner search queries that focus on actual location and resource information
+- **Conversation Flow**: Improved conversation flow with proper location context preservation
+- **User Experience**: Users get relevant results based on their actual location, not false extractions
+
 ## [1.21.2] - 2025-01-27
 
 ### 🚀 Major Enhancement: Conversation Management System & Error Handling

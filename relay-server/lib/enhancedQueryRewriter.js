@@ -94,8 +94,23 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   if (callSid) {
     const context = getConversationContext(callSid);
     if (context) {
-      // Use previous location if current query doesn't have one
-      if (!locationInfo.location && context.lastQueryContext?.location) {
+      // Check if this is a follow-up question (doesn't contain location keywords)
+      const isFollowUpQuestion = !cleanedQuery.toLowerCase().match(/\b(?:in|at|near|around|close to|within)\b/);
+      const hasPreviousLocation = context.lastQueryContext?.location;
+      
+      // For follow-up questions, prioritize conversation context over new location extraction
+      if (isFollowUpQuestion && hasPreviousLocation) {
+        // Use previous location instead of trying to extract from follow-up question
+        locationInfo.location = context.lastQueryContext.location;
+        locationInfo.isComplete = true;
+        locationInfo.scope = 'complete';
+        logger.info('Using previous location for follow-up question:', { 
+          previousLocation: context.lastQueryContext.location,
+          isFollowUpQuestion,
+          callSid 
+        });
+      } else if (!locationInfo.location && hasPreviousLocation) {
+        // Use previous location if current query doesn't have one
         locationInfo.location = context.lastQueryContext.location;
         locationInfo.isComplete = true;
         logger.info('Using previous location from context:', { 
@@ -108,11 +123,20 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
       if (context.history && context.history.length > 0) {
         const recentQueries = context.history.slice(-2).map(h => h.query).join(' ');
         if (recentQueries && recentQueries.length > 0) {
-          contextEnhancement = ` ${recentQueries}`;
-          logger.info('Added conversation context to query:', { 
-            contextEnhancement, 
-            callSid 
-          });
+          // Only add location-related context, not general conversation
+          const locationKeywords = /\b(?:shelter|housing|safe|place|home|location|city|town|state|area|near|in|at)\b/i;
+          if (locationKeywords.test(recentQueries)) {
+            contextEnhancement = ` ${recentQueries}`;
+            logger.info('Added location-related conversation context to query:', { 
+              contextEnhancement, 
+              callSid 
+            });
+          } else {
+            logger.info('Skipped adding non-location conversation context:', { 
+              recentQueries, 
+              callSid 
+            });
+          }
         }
       }
 
@@ -142,6 +166,31 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
       searchQuery += ' "legal aid" "attorney" "lawyer"';
     } else if (intent === 'counseling_services') {
       searchQuery += ' "counseling" "therapy" "support group"';
+    }
+  }
+
+  // Step 4.5: Clean up any problematic words that might have been added from context
+  // This prevents words like "Accept" from being added to search queries
+  if (contextEnhancement) {
+    // Remove common non-search words that might have been added from context
+    const problematicWords = ['accept', 'allow', 'let', 'permit', 'enable', 'provide', 'offer', 'give', 'take', 'have', 'get', 'want', 'need', 'like', 'love'];
+    let cleanedContext = contextEnhancement;
+    
+    problematicWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi');
+      cleanedContext = cleanedContext.replace(regex, '');
+    });
+    
+    // Clean up extra spaces
+    cleanedContext = cleanedContext.replace(/\s+/g, ' ').trim();
+    
+    if (cleanedContext && cleanedContext !== contextEnhancement) {
+      logger.info('Cleaned context enhancement:', { 
+        original: contextEnhancement, 
+        cleaned: cleanedContext, 
+        callSid 
+      });
+      contextEnhancement = cleanedContext;
     }
   }
 

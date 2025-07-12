@@ -209,6 +209,11 @@ export function extractLocationFromQuery(query) {
   if (isIncompleteLocationQuery(text)) {
     return { location: null, scope: 'incomplete' };
   }
+  
+  // Check for follow-up questions that shouldn't trigger location extraction
+  if (isFollowUpQuestion(text)) {
+    return { location: null, scope: 'follow-up' };
+  }
 
   // Simple pattern: look for "near [location]" or "in [location]" or "at [location]"
   const simplePatterns = [
@@ -237,21 +242,23 @@ export function extractLocationFromQuery(query) {
   }
 
   // Fallback: look for capitalized words that might be locations
+  // This is more conservative and focuses on actual location patterns
   const words = query.split(/\s+/);
   const potentialLocations = [];
   
   for (let i = 0; i < words.length; i++) {
     const word = words[i].replace(/[^\w]/g, '');
     
-    // Check if it's a capitalized word (potential location)
-    if (word.length > 2 && word.charAt(0) === word.charAt(0).toUpperCase()) {
+    // More conservative check: must be capitalized, longer than 3 chars
+    if (word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) {
+      
       // Look for consecutive capitalized words
       let location = word;
       let j = i + 1;
       
       while (j < words.length) {
         const nextWord = words[j].replace(/[^\w]/g, '');
-        if (nextWord.length > 2 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) {
+        if (nextWord.length > 3 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) {
           location += ' ' + nextWord;
           j++;
         } else {
@@ -259,7 +266,24 @@ export function extractLocationFromQuery(query) {
         }
       }
       
-      if (location.length > 2) {
+      // Only consider it a location if it has strong location indicators
+      const locationLower = location.toLowerCase();
+      
+      // Must have at least one strong location indicator
+      const strongLocationIndicators = [
+        /city|town|state|county|province|country/i,
+        /street|avenue|road|drive|lane|place|boulevard|highway|freeway|interstate/i,
+        /park|center|plaza|mall|building|complex|district|neighborhood/i,
+        /new\s+\w+|north\s+\w+|south\s+\w+|east\s+\w+|west\s+\w+/i,
+        /upper\s+\w+|lower\s+\w+|central\s+\w+|downtown|uptown|midtown/i
+      ];
+      
+      const hasStrongIndicator = strongLocationIndicators.some(pattern => pattern.test(locationLower));
+      
+      // Or must be a known city/state pattern (like "Portland, Oregon")
+      const hasCommaPattern = /^[A-Z][a-z]+,\s*[A-Z][a-z]+$/.test(location);
+      
+      if (hasStrongIndicator || hasCommaPattern) {
         potentialLocations.push(location);
       }
       
@@ -267,7 +291,7 @@ export function extractLocationFromQuery(query) {
     }
   }
   
-  // Return the longest potential location
+  // Return the longest potential location only if we found something that looks like a real location
   if (potentialLocations.length > 0) {
     const bestLocation = potentialLocations.sort((a, b) => b.length - a.length)[0];
     logger.info('Fallback location extraction found:', { query, location: bestLocation });
@@ -295,11 +319,12 @@ function cleanExtractedLocation(location) {
 
   let cleaned = location.trim();
   
-  // Remove common words that shouldn't be treated as locations
+  // Only remove very basic non-location words
+  const basicNonLocationWords = ['me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere'];
   const words = cleaned.toLowerCase().split(/\s+/);
   const filteredWords = words.filter(word => {
     const cleanWord = word.replace(/[^\w]/g, '');
-    return !FILTER_WORDS.includes(cleanWord) && cleanWord.length > 1;
+    return !basicNonLocationWords.includes(cleanWord) && cleanWord.length > 1;
   });
   
   if (filteredWords.length === 0) {
@@ -362,6 +387,46 @@ function isCurrentLocationQuery(query) {
   ];
   
   return currentLocationPatterns.some(pattern => pattern.test(lowerQuery));
+}
+
+/**
+ * Check if query is a follow-up question that shouldn't trigger location extraction
+ * @param {string} query - The query to check
+ * @returns {boolean} True if follow-up question
+ */
+function isFollowUpQuestion(query) {
+  if (!query || typeof query !== 'string') {
+    return false;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  
+  // More targeted patterns for follow-up questions that are clearly not location requests
+  const followUpPatterns = [
+    // Questions about specific services/features of previously mentioned resources
+    /\b(?:do|does|can|will|are|is|have|has)\s+(?:any|some|they|them|it|this|that)\s+(?:accept|allow|let|permit|enable|provide|offer)\b/i,
+    /\b(?:what\s+about|how\s+about|tell\s+me\s+about)\s+(?:pets?|dogs?|cats?|children|kids?|family|elders?|seniors?)\b/i,
+    
+    // Questions about specific details of resources
+    /\b(?:do|does|can|will|are|is|have|has)\s+(?:they|them|it|this|that)\s+(?:accept|allow|let|permit|enable|provide|offer)\s+(?:pets?|dogs?|cats?|children|kids?|family|elders?|seniors?)\b/i,
+    
+    // Questions about contact/accessibility information
+    /\b(?:what|how)\s+(?:is|are)\s+(?:the|their)\s+(?:phone|number|contact|address|hours|open|close|available)\b/i,
+    
+    // Questions about costs/payment
+    /\b(?:what|how)\s+(?:is|are)\s+(?:the|their)\s+(?:cost|price|free|payment|insurance|medicaid|medicare)\b/i,
+    
+    // Questions about transportation
+    /\b(?:what|how)\s+(?:is|are)\s+(?:the|their)\s+(?:transportation|bus|train|car|drive|walk|distance)\b/i,
+    
+    // Questions about language support
+    /\b(?:do|does|can|will|are|is|have|has)\s+(?:they|them|it|this|that)\s+(?:speak|support|offer)\s+(?:language|spanish|french|german|translator|interpreter)\b/i,
+    
+    // Questions about accessibility
+    /\b(?:do|does|can|will|are|is|have|has)\s+(?:they|them|it|this|that)\s+(?:have|offer|support)\s+(?:wheelchair|accessible|disability|special\s+needs)\b/i
+  ];
+  
+  return followUpPatterns.some(pattern => pattern.test(lowerQuery));
 }
 
 /**
