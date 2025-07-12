@@ -13,9 +13,11 @@ const MIN_CONFIDENCE_SCORE = 0.7;
 /**
  * Handle a user query through the complete processing pipeline
  * @param {string} query - The user's query
+ * @param {string} callSid - Optional call SID for context enhancement
+ * @param {string} detectedLanguage - Optional detected language code
  * @returns {Promise<{ response: string, source: 'tavily' | 'gpt' }>} The response and its source
  */
-export async function handleUserQuery(query) {
+export async function handleUserQuery(query, callSid = null, detectedLanguage = 'en-US') {
   try {
     // Validate query parameter
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -66,7 +68,7 @@ export async function handleUserQuery(query) {
     // If no results, use GPT fallback
     if (!tavilyData.results || tavilyData.results.length === 0) {
       logger.info('No Tavily results, using GPT fallback');
-      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent);
+      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent, callSid, detectedLanguage);
       
       // Log query handling
       await logQueryHandling({
@@ -89,7 +91,7 @@ export async function handleUserQuery(query) {
         topScore,
         threshold: MIN_CONFIDENCE_SCORE
       });
-      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent);
+      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent, callSid, detectedLanguage);
       
       // Log query handling
       await logQueryHandling({
@@ -118,7 +120,7 @@ export async function handleUserQuery(query) {
   } catch (error) {
     logger.error('Error handling user query:', error);
     // Use GPT fallback on any error
-    const gptResponse = await fallbackResponse(query, 'general_query');
+    const gptResponse = await fallbackResponse(query, 'general_query', callSid, detectedLanguage);
     
     // Log query handling with error
     await logQueryHandling({

@@ -5,6 +5,7 @@ import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { gptCache } from './queryCache.js';
 import { voiceInstructions } from './conversationConfig.js';
+import { getEnhancedVoiceInstructions } from './conversationContextBuilder.js';
 import { callTavilyAPI } from './apis.js';
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
@@ -409,8 +410,8 @@ export class ResponseGenerator {
     return (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2);
   }
 
-  static async getResponse(query, context, requestType = 'web', maxResults = 3, voice = null) {
-    logger.info('getResponse called:', { query, requestType, voice });
+  static async getResponse(query, context, requestType = 'web', maxResults = 3, voice = null, callSid = null, detectedLanguage = 'en-US') {
+    logger.info('getResponse called:', { query, requestType, voice, callSid });
     
     // Check cache first
     const cacheKey = this.generateCacheKey(query);
@@ -571,7 +572,7 @@ export class ResponseGenerator {
            (tavilyResponse?.answer && tavilyResponse.answer.length > 0);
   }
 
-  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null, ttsVoice = null) {
+  static formatTavilyResponse(tavilyResponse, requestType = 'web', userQuery = '', maxResults = 3, conversationContext = null, ttsVoice = null, enhancedVoiceInstructions = null) {
     if (ttsVoice) {
       logger.info('Formatting response with TTS voice:', { ttsVoice });
     }

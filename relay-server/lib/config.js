@@ -63,6 +63,13 @@ export const config = {
   GPT4_MODEL: 'gpt-4',
   GPT35_MODEL: 'gpt-3.5-turbo',
   
+  // Tavily API Settings
+  TAVILY_SEARCH_DEPTH: process.env.TAVILY_SEARCH_DEPTH || 'basic',
+  TAVILY_SEARCH_TYPE: process.env.TAVILY_SEARCH_TYPE || 'basic',
+  TAVILY_MAX_RESULTS: parseInt(process.env.TAVILY_MAX_RESULTS) || 8,
+  TAVILY_TIMEOUT: parseInt(process.env.TAVILY_TIMEOUT) || 8000,
+  TAVILY_CACHE_ENABLED: process.env.TAVILY_CACHE_ENABLED !== 'false',
+  
   // Logging
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
 

@@ -342,6 +342,22 @@ export class TwilioVoiceHandler {
       // Get conversation context for this call
       const context = callSid ? getConversationContext(callSid) : null;
       
+      // Get enhanced voice instructions with dynamic context
+      let enhancedVoiceInstructions = null;
+      if (callSid) {
+        try {
+          const { getEnhancedVoiceInstructions } = await import('./conversationContextBuilder.js');
+          enhancedVoiceInstructions = await getEnhancedVoiceInstructions(callSid, speechResult, languageCode);
+        } catch (contextError) {
+          logger.error('Error getting enhanced voice instructions:', {
+            requestId,
+            callSid,
+            error: contextError.message
+          });
+          // Continue with default instructions if context enhancement fails
+        }
+      }
+      
       // Check for follow-up questions BEFORE intent classification
       let followUpResponse = null;
       if (context && context.lastQueryContext) {
@@ -833,11 +849,33 @@ export class TwilioVoiceHandler {
           firstResultUrl: tavilyResponse?.results?.[0]?.url
         });
 
+        // If no Tavily results, use fallback with enhanced context
+        if (!tavilyResponse || !tavilyResponse.results || tavilyResponse.results.length === 0) {
+          logger.info('No Tavily results, using fallback with enhanced context:', {
+            requestId,
+            callSid,
+            query: rewrittenQuery
+          });
+          
+          const { fallbackResponse } = await import('./fallbackResponder.js');
+          const fallbackResult = await fallbackResponse(rewrittenQuery, intent, callSid, languageCode);
+          
+          // Update conversation context with fallback response
+          if (callSid) {
+            updateConversationContext(callSid, intent, rewrittenQuery, {
+              voiceResponse: fallbackResult,
+              smsResponse: fallbackResult
+            });
+          }
+          
+          return fallbackResult;
+        }
+
         // Get the TTS voice from config or context
         const ttsVoice = config.TTS_VOICE || 'nova';
         logger.info('Using TTS voice for response:', { ttsVoice });
         // Format response for voice with conversation context and TTS voice
-        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context, ttsVoice);
+        const formattedResponse = ResponseGenerator.formatTavilyResponse(tavilyResponse, 'twilio', rewrittenQuery, 3, context, ttsVoice, enhancedVoiceInstructions);
         logger.info('Formatted response:', {
           requestId,
           callSid,

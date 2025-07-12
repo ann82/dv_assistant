@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Consistent voice quality across all platforms
   - Environment variable override still supported via TTS_VOICE
 
+### Enhanced
+- **Empathy and Compassion**: Significantly enhanced nova voice responses with emotional support
+  - Added comprehensive empathy guidelines for voice responses
+  - Enhanced conversation instructions with emotional validation techniques
+  - Improved language prompts with more supportive and understanding language
+  - Enhanced response generation with acknowledgment of caller feelings
+  - Updated fallback responder with warmer, more compassionate tone
+  - Enhanced audio service with empathetic system prompts
+  - All changes focus on making nova voice more emotionally supportive while maintaining professional boundaries
+
 ## [1.25.0] - 2025-07-07
 
 ### Fixed

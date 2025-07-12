@@ -1,8 +1,27 @@
 import logger from './logger.js';
 import { filterConfig } from './filterConfig.js';
+import { config } from './config.js';
 
-export async function callTavilyAPI(query, location = null) {
+// Cache for Tavily API responses
+const tavilyCache = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+const MAX_CACHE_SIZE = 1000;
+
+export async function callTavilyAPI(query, location = null, useCache = null) {
   try {
+    // Use config default if not specified
+    const shouldUseCache = useCache !== null ? useCache : config.TAVILY_CACHE_ENABLED;
+    
+    // Check cache first if enabled
+    if (shouldUseCache) {
+      const cacheKey = `${query}:${location || 'no-location'}`;
+      const cached = tavilyCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+        logger.info('Using cached Tavily response:', { query, location });
+        return cached.data;
+      }
+    }
+
     // Validate query parameter
     if (!query || typeof query !== 'string' || query.trim() === '') {
       logger.error('Invalid query parameter for Tavily API:', {
@@ -33,16 +52,16 @@ export async function callTavilyAPI(query, location = null) {
       firstChars: apiKey.substring(0, 8) + '...'
     });
 
-    // Standardized query format for domestic violence shelters
+    // Enhanced query standardization for better results
     const standardizedQuery = location 
-      ? `List domestic violence shelters in ${location}. Include name, address, phone number, services offered, and 24-hour hotline if available. Prioritize .org and .gov sources.`
+      ? `domestic violence shelters ${location} contact information address phone services`
       : cleanQuery;
 
     // Create AbortController for timeout handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 8000); // 8 second timeout for Tavily API (reduced for Twilio compatibility)
+    }, config.TAVILY_TIMEOUT); // Configurable timeout for Tavily API
 
     try {
       // Make the API call with standardized parameters and timeout
@@ -54,23 +73,45 @@ export async function callTavilyAPI(query, location = null) {
         },
         body: JSON.stringify({
           query: standardizedQuery,
-          search_depth: 'advanced',
-          search_type: 'advanced',
+          search_depth: config.TAVILY_SEARCH_DEPTH,
+          search_type: config.TAVILY_SEARCH_TYPE,
           include_answer: true,
           include_results: true,
           include_raw_content: false,
           include_images: false,
-          include_sources: true,
-          max_results: 10,
+          include_sources: false, // Disabled to reduce response size
+          max_results: config.TAVILY_MAX_RESULTS,
           exclude_domains: [
             "yellowpages.com",
             "tripadvisor.com", 
             "city-data.com",
             "yelp.com",
+            "facebook.com",
+            "instagram.com",
+            "twitter.com",
+            "linkedin.com",
+            "pinterest.com",
+            "tiktok.com",
+            "youtube.com",
+            "reddit.com",
+            "zillow.com",
+            "realtor.com",
+            "trulia.com",
+            "hotels.com",
+            "booking.com",
+            "airbnb.com",
+            "vrbo.com",
+            "expedia.com",
+            "orbitz.com",
+            "priceline.com",
+            "hotwire.com",
+            "kayak.com",
+            "cheaptickets.com",
+            "travelocity.com",
             ...(filterConfig.excludeDomains || [])
           ],
           context: location 
-            ? `Return detailed contact info for domestic violence shelters in ${location}, including name, address, phone number, services offered, and 24-hour hotline.`
+            ? `Find domestic violence shelters in ${location}. Focus on organizations with direct contact information, addresses, and services. Prioritize .org and .gov sources.`
             : undefined
         }),
         signal: controller.signal
@@ -91,6 +132,28 @@ export async function callTavilyAPI(query, location = null) {
 
       const data = await response.json();
       logger.info('Tavily API response received:', data);
+
+      // Cache the response if enabled
+      if (shouldUseCache) {
+        const cacheKey = `${query}:${location || 'no-location'}`;
+        
+        // Manage cache size
+        if (tavilyCache.size >= MAX_CACHE_SIZE) {
+          const firstKey = tavilyCache.keys().next().value;
+          tavilyCache.delete(firstKey);
+        }
+        
+        tavilyCache.set(cacheKey, {
+          data,
+          timestamp: Date.now()
+        });
+        
+        logger.info('Cached Tavily response:', { 
+          query, 
+          location, 
+          cacheSize: tavilyCache.size 
+        });
+      }
 
       return data;
     } catch (fetchError) {

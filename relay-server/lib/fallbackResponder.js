@@ -54,14 +54,31 @@ const intentExamples = {
  * @param {string} intent - The detected intent
  * @returns {Promise<string>} A helpful response
  */
-export async function fallbackResponse(query, intent) {
+export async function fallbackResponse(query, intent, callSid = null, detectedLanguage = 'en-US') {
   try {
-    logger.info('Generating fallback response:', { query, intent });
+    logger.info('Generating fallback response:', { query, intent, callSid });
+
+    // Get enhanced voice instructions if callSid is provided
+    let systemContent = `You are a compassionate domestic violence support assistant. Provide warm, empathetic, and supportive responses that validate the caller's feelings and experiences. Use gentle, reassuring language and show understanding of their situation. Always include the National Domestic Violence Hotline number (1-800-799-7233) in your response. Focus on immediate safety, emotional support, and practical next steps. Acknowledge their courage in reaching out and reassure them that help is available.`;
+    
+    if (callSid) {
+      try {
+        const { getEnhancedVoiceInstructions } = await import('./conversationContextBuilder.js');
+        const enhancedInstructions = await getEnhancedVoiceInstructions(callSid, query, detectedLanguage);
+        systemContent = enhancedInstructions;
+      } catch (contextError) {
+        logger.error('Error getting enhanced voice instructions for fallback:', {
+          callSid,
+          error: contextError.message
+        });
+        // Continue with default system content if enhancement fails
+      }
+    }
 
     const messages = [
       {
         role: 'system',
-        content: `You are a compassionate domestic violence support assistant. Provide warm, empathetic, and supportive responses that validate the caller's feelings and experiences. Use gentle, reassuring language and show understanding of their situation. Always include the National Domestic Violence Hotline number (1-800-799-7233) in your response. Focus on immediate safety, emotional support, and practical next steps. Acknowledge their courage in reaching out and reassure them that help is available.`
+        content: systemContent
       },
       // Add few-shot example if available for the intent
       ...(intentExamples[intent] || []),
