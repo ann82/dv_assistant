@@ -43,10 +43,11 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   context.lastResponse = response;
 
   // Update lastQueryContext with structured data for follow-ups
-  // Set lastQueryContext for resource requests even if no results yet
+  let location = extractLocationFromQuery(query);
+  if (location) location = toTitleCase(location);
+  
+  // Case 1: We have Tavily results - always update context with results
   if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
-    let location = extractLocationFromQuery(query);
-    if (location) location = toTitleCase(location);
     context.lastQueryContext = {
       intent: intent,
       location: location,
@@ -54,32 +55,33 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       timestamp: Date.now(),
       smsResponse: response.smsResponse || null,
       voiceResponse: response.voiceResponse || null,
-      needsLocation: !location && isResourceQuery(intent), // Needs location if no location found and it's a resource query
-      lastQuery: query // Store the original query for context
+      needsLocation: !location && isResourceQuery(intent),
+      lastQuery: query
     };
-  } else if (isResourceQuery(intent)) {
-    // For resource queries without Tavily results, preserve context if we need location
-    let location = extractLocationFromQuery(query);
-    if (location) location = toTitleCase(location);
-    
-    // If we have a previous context that needs location, preserve it
+  }
+  // Case 2: Resource query without results - preserve or create context
+  else if (isResourceQuery(intent)) {
+    // If we have a previous context that needs location and current query doesn't provide one, preserve it
     if (context.lastQueryContext && context.lastQueryContext.needsLocation && !location) {
       // Update timestamp but keep the context for location follow-up
       context.lastQueryContext.timestamp = Date.now();
       context.lastQueryContext.lastQuery = query;
-    } else if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
+    }
+    // If we have location but no results, create context with location
+    else if (location) {
       context.lastQueryContext = {
         intent: intent,
         location: location,
-        results: tavilyResults.results,
+        results: [],
         timestamp: Date.now(),
         smsResponse: response.smsResponse || null,
         voiceResponse: response.voiceResponse || null,
-        needsLocation: !location && isResourceQuery(intent), // Needs location if no location found and it's a resource query
+        needsLocation: false,
         lastQuery: query
       };
-    } else if (!location && isResourceQuery(intent)) {
-      // Create context for resource queries that need location but have no results yet
+    }
+    // If no location and no previous context, create context that needs location
+    else if (!context.lastQueryContext) {
       context.lastQueryContext = {
         intent: intent,
         location: null,
@@ -90,31 +92,24 @@ export function updateConversationContext(callSid, intent, query, response, tavi
         needsLocation: true,
         lastQuery: query
       };
-    } else {
-      context.lastQueryContext = null;
     }
-  } else if (matchedResult) {
-    // Update context with focus tracking for follow-up responses
-    if (context.lastQueryContext) {
-      context.lastQueryContext.focusResultTitle = cleanResultTitle(matchedResult.title);
-      context.lastQueryContext.matchedResult = matchedResult;
-      context.lastQueryContext.timestamp = Date.now(); // Refresh timestamp
+    // Otherwise, update timestamp of existing context
+    else {
+      context.lastQueryContext.timestamp = Date.now();
+      context.lastQueryContext.lastQuery = query;
     }
-  } else if (isResourceQuery(intent)) {
-    // Ensure we create context for resource queries even without Tavily results
-    let location = extractLocationFromQuery(query);
-    if (location) location = toTitleCase(location);
-    
-    context.lastQueryContext = {
-      intent: intent,
-      location: location,
-      results: [],
-      timestamp: Date.now(),
-      smsResponse: response.smsResponse || null,
-      voiceResponse: response.voiceResponse || null,
-      needsLocation: !location, // Needs location if no location found
-      lastQuery: query
-    };
+  }
+  // Case 3: Follow-up with matched result - update existing context
+  else if (matchedResult && context.lastQueryContext) {
+    context.lastQueryContext.focusResultTitle = cleanResultTitle(matchedResult.title);
+    context.lastQueryContext.matchedResult = matchedResult;
+    context.lastQueryContext.timestamp = Date.now(); // Refresh timestamp
+  }
+  // Case 4: Non-resource query - preserve context if it exists, don't clear it
+  else if (context.lastQueryContext) {
+    // Update timestamp to keep context alive
+    context.lastQueryContext.timestamp = Date.now();
+    context.lastQueryContext.lastQuery = query;
   }
 
   logger.info('Updated conversation context:', {
@@ -137,10 +132,10 @@ function extractLocationFromQuery(query) {
 export function getConversationContext(callSid) {
   const context = conversationContexts.get(callSid);
   
-  // Check timeout for lastQueryContext (5 minutes)
+  // Check timeout for lastQueryContext (15 minutes - more reasonable for ongoing conversations)
   if (context && context.lastQueryContext) {
     const timeSinceLastQuery = Date.now() - context.lastQueryContext.timestamp;
-    const timeoutMs = 5 * 60 * 1000; // 5 minutes
+    const timeoutMs = 15 * 60 * 1000; // 15 minutes
     
     if (timeSinceLastQuery > timeoutMs) {
       logger.info('Clearing lastQueryContext due to timeout:', {

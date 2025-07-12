@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.21.5] - 2024-12-19
+
+### Fixed
+- **Conversation Context Management**: Fixed critical issues with conversation context getting lost or not being set properly
+  - **Logic Error in Context Updates**: Fixed complex nested if-else structure in `updateConversationContext` that was causing context to be incorrectly cleared
+  - **Context Preservation**: Improved logic to preserve conversation context across different types of queries instead of clearing it
+  - **Timeout Extension**: Increased conversation context timeout from 5 minutes to 15 minutes for more reasonable ongoing conversations
+  - **Follow-up Context**: Enhanced context preservation for follow-up questions to prevent the "I don't have the previous search results available" message
+  - **Resource Query Handling**: Fixed logic for resource queries without results to properly maintain context instead of clearing it
+
+### Technical Details
+- **Simplified Context Logic**: Replaced complex nested conditions with clear case-based logic:
+  - Case 1: Tavily results available - always update context with results
+  - Case 2: Resource query without results - preserve or create context appropriately
+  - Case 3: Follow-up with matched result - update existing context
+  - Case 4: Non-resource query - preserve context if it exists, don't clear it
+- **Context Timeout**: Extended from 5 minutes to 15 minutes to better support ongoing conversations
+- **Location Context**: Improved preservation of location context across conversation turns
+- **Result Preservation**: Fixed issue where context was being cleared when no new results were available
+
+### Impact
+- **Before**: Users would get "I don't have the previous search results available" message when asking follow-up questions
+- **After**: Conversation context is properly maintained, allowing seamless follow-up questions about previous search results
+- **User Experience**: Follow-up questions now work correctly, providing better conversation continuity
+
 ## [1.21.4] - 2025-01-27
 
 ### 🚀 Major Enhancement: Intent Classification Improvement
