@@ -123,7 +123,7 @@ describe('Follow-up Detection Fix', () => {
       intent: 'find_shelter',
       query: 'find shelters in San Francisco',
       results: [{ title: 'Test Shelter', url: 'https://test.com', content: 'Test content', score: 0.8 }],
-      timestamp: Date.now() - (6 * 60 * 1000), // 6 minutes ago (older than 5-minute timeout)
+      timestamp: Date.now() - (16 * 60 * 1000), // 16 minutes ago (older than 15-minute timeout)
       location: 'San Francisco'
     };
 

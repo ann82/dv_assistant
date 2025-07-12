@@ -470,9 +470,9 @@ export async function handleFollowUp(query, lastQueryContext) {
     return null;
   }
 
-  // Check if lastQueryContext is recent (within 5 minutes)
+  // Check if lastQueryContext is recent (within 15 minutes)
   const timeSinceLastQuery = Date.now() - lastQueryContext.timestamp;
-  const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+  const maxAgeMs = 15 * 60 * 1000; // 15 minutes
   
   if (timeSinceLastQuery > maxAgeMs) {
     logger.info('Follow-up context too old:', {
@@ -486,20 +486,11 @@ export async function handleFollowUp(query, lastQueryContext) {
   const lowerQuery = query.toLowerCase();
   
   // Check if this is a NEW request with location (not a follow-up)
+  // Only treat as new request if it's a complete sentence with location AND no follow-up indicators
   const newRequestLocationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'];
   const hasNewRequestLocationKeywords = newRequestLocationKeywords.some(keyword => lowerQuery.includes(keyword));
-  const isNewRequestWithLocation = hasNewRequestLocationKeywords && query.trim().length <= 100;
   
-  // If this is a location statement, it's likely a NEW request, not a follow-up
-  if (isNewRequestWithLocation) {
-    logger.info('Detected new request with location - treating as new request, not follow-up:', { 
-      query, 
-      hasNewRequestLocationKeywords,
-      isNewRequestWithLocation
-    });
-    return null;
-  }
-  
+  // Check for follow-up indicators that would make this a follow-up even with location keywords
   const followUpIndicators = [
     // General follow-up words
     'more', 'details', 'information', 'about', 'tell me', 'what about',
@@ -526,6 +517,24 @@ export async function handleFollowUp(query, lastQueryContext) {
     'what about', 'how about', 'what if', 'what happens if', 'what do they', 'what does it', 'what is it',
     'is there', 'are there', 'does it', 'do they', 'can it', 'will it', 'would it'
   ];
+  
+  const hasFollowUpIndicators = followUpIndicators.some(indicator => lowerQuery.includes(indicator));
+  
+  // Only treat as new request if it has location keywords AND no follow-up indicators AND is a complete statement
+  const isCompleteLocationStatement = hasNewRequestLocationKeywords && query.trim().length >= 10 && query.trim().length <= 100;
+  const isNewRequestWithLocation = isCompleteLocationStatement && !hasFollowUpIndicators;
+  
+  // If this is a location statement, it's likely a NEW request, not a follow-up
+  if (isNewRequestWithLocation) {
+    logger.info('Detected new request with location - treating as new request, not follow-up:', { 
+      query, 
+      hasNewRequestLocationKeywords,
+      hasFollowUpIndicators,
+      isCompleteLocationStatement,
+      isNewRequestWithLocation
+    });
+    return null;
+  }
   
   const isFollowUpByPattern = followUpIndicators.some(indicator => lowerQuery.includes(indicator));
   

@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.21.7] - 2024-12-19
+
+### Fixed
+- **Follow-up Detection Logic**: Fixed critical issue where location follow-ups were incorrectly treated as new requests
+  - **Location Follow-up Recognition**: Fixed overly aggressive logic that was treating legitimate location follow-ups as new requests
+  - **Follow-up Indicator Detection**: Enhanced logic to check for follow-up indicators even when location keywords are present
+  - **Context Timeout Alignment**: Fixed mismatch between `updateConversationContext` (15 minutes) and `handleFollowUp` (5 minutes) timeouts
+  - **Test Reliability**: Fixed failing follow-up detection tests by aligning timeout values and improving test logic
+
+### Technical Details
+- **Follow-up Detection Logic**: Improved logic to distinguish between new requests and location follow-ups:
+  - **Before**: Any query with location keywords (like "I live near San Francisco") was treated as a new request
+  - **After**: Only treats as new request if it has location keywords AND no follow-up indicators AND is a complete statement
+  - **Follow-up Indicators**: Added comprehensive check for follow-up indicators even when location keywords are present
+  - **Timeout Alignment**: Extended `handleFollowUp` timeout from 5 minutes to 15 minutes to match `updateConversationContext`
+- **Test Improvements**: Updated test timeout values and improved test reliability:
+  - **Timeout Test**: Updated test to use 16-minute old context (older than 15-minute timeout)
+  - **Test Isolation**: Improved test setup to prevent interference between test cases
+
+### Impact
+- **Before**: Location follow-ups like "I live near San Francisco California." were incorrectly classified as `off_topic` instead of being recognized as location follow-ups
+- **After**: Location follow-ups are properly detected and handled as follow-ups, maintaining conversation context
+- **User Experience**: Users can now provide location information in follow-up responses without losing conversation context
+
 ## [v1.21.6] - 2024-12-19
 
 ### Fixed

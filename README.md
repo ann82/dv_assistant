@@ -4,7 +4,14 @@ A real-time voice-based assistant designed to provide immediate support and info
 
 ---
 
-**Latest Update (2025-01-27):**
+**Latest Update (2024-12-19):**
+- **Follow-up Detection Fix**: Fixed critical issue where location follow-ups were incorrectly treated as new requests
+- **Context Timeout Alignment**: Fixed mismatch between conversation context timeouts for better follow-up handling
+- **Test Reliability**: Fixed failing follow-up detection tests and improved test coverage
+- **Enhanced Location Follow-up Recognition**: Improved logic to distinguish between new requests and location follow-ups
+- **Conversation Context Preservation**: Better maintenance of conversation context across multiple turns
+
+**Previous Update (2025-01-27):**
 - **TTS Timeout Optimizations**: Increased TTS timeout from 10s to 15s with faster fallback to Polly for better reliability
 - **Enhanced Follow-up Detection**: Improved location statement recognition and AI prompt optimization to prevent incorrect "No." responses
 - **Performance Improvements**: Reduced timeout errors and faster response times for better user experience
