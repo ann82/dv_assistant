@@ -198,20 +198,23 @@ export async function getIntent(query) {
     const prompt = `Classify the following user query into one of these predefined intents for a domestic violence support assistant:
 
 Available intents:
-- find_shelter: For requests to find domestic violence shelters, safe houses, or emergency housing
-- legal_services: For requests about legal help, restraining orders, court assistance, or legal representation
-- counseling_services: For requests about therapy, counseling, mental health support, or emotional help
-- emergency_help: For urgent requests, immediate danger, or crisis situations
-- general_information: For general questions about domestic violence, resources, or support
-- other_resources: For requests about financial assistance, job training, childcare, or other support services
-- end_conversation: For requests to end the call, hang up, or stop the conversation
-- off_topic: For requests unrelated to domestic violence support
+- find_shelter: For requests to find domestic violence shelters, safe houses, or emergency housing — including questions about shelter policies (pet accommodation, family accommodation, accessibility), planning to leave safely, or bringing children, pets, or elders.
+- legal_services: For requests about legal help, restraining orders, court assistance, or legal representation.
+- counseling_services: For requests about therapy, counseling, mental health support, or emotional help.
+- emergency_help: For urgent requests, immediate danger, or crisis situations.
+- general_information: For general questions about domestic violence, recognizing abuse, or available support resources.
+- other_resources: For non-shelter support like financial assistance, job training, child care (not related to entering a shelter), or unrelated services.
+- end_conversation: For requests to end the call, hang up, or stop the conversation.
+- off_topic: For requests unrelated to domestic violence support (e.g., entertainment, weather, personal issues not involving abuse).
 
-IMPORTANT: If the query is about ANY topic other than domestic violence support (medical questions, entertainment, weather, sports, jokes, personal problems, etc.), classify it as "off_topic". Only classify as one of the other intents if the query is specifically about domestic violence support, shelters, legal help, counseling, or related resources.
+IMPORTANT:
+- Any query involving safety, housing, planning to leave, shelter access, bringing pets/kids/elders, or understanding resource needs related to shelters — should be classified as **find_shelter**.
+- Only classify as "off_topic" if the query is completely unrelated to domestic violence, shelter, legal help, counseling, or support resources.
+- Respond with only the intent name (e.g., find_shelter), without quotes or extra text.
 
 User query: "${query}"
 
-Respond with only the intent name (e.g., "find_shelter").`;
+Respond with only the intent name.`;
 
     const startTime = Date.now();
     const response = await openai.chat.completions.create({
