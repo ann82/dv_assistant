@@ -25,7 +25,7 @@ export const SUPPORTED_LANGUAGES = {
       confirmLocation: `I found a location you mentioned earlier: {{location}}. Would you like me to search for resources in that area? Please say yes or no.`,
       usePreviousLocation: `I found a location you mentioned earlier: {{location}}. Would you like me to use that location for your search, or would you prefer to provide a different location?`,
       emergency: `This is an emergency situation. Please call 911 immediately. You can also call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance. They are available 24/7 and can help you with safety planning and emergency resources.`,
-      fallback: `I'm sorry, I didn't understand your request. Could you please rephrase that or ask for help finding shelters, legal services, or general information about domestic violence?`,
+      fallback: `I'm sorry, I didn't understand your request. Could you please rephrase that or ask for help finding shelters, legal services, or general information about domestic violence? I'm here to listen and help you.`,
       error: `I'm sorry, I encountered an error processing your request. Please try again.`,
       processingError: `I'm sorry, I couldn't process your request. Please try rephrasing your question with a specific location.`
     }

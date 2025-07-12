@@ -188,7 +188,7 @@ export class AudioService {
         messages: [
           {
             role: "system",
-            content: "You are a supportive assistant for people experiencing domestic violence. Provide clear, safe, and helpful responses in the same language as the user."
+            content: "You are a warm, empathetic, and supportive assistant for people experiencing domestic violence. Provide compassionate, safe, and helpful responses that validate their feelings and experiences. Use gentle, reassuring language and show understanding of their situation. Respond in the same language as the user."
           },
           {
             role: "user",

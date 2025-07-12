@@ -982,7 +982,7 @@ export class ResponseGenerator {
     }
     
     if (results.length === 0) {
-      return `${contextPrefix}I'm sorry, I couldn't find any shelters${locationText}. Would you like me to search for resources in a different location?`;
+      return `${contextPrefix}I'm sorry, I couldn't find any shelters${locationText}. I understand this can be frustrating, and I want to help. Would you like me to search for resources in a different location, or would you prefer to call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance?`;
     }
 
     let voiceResponse = `${contextPrefix}I found ${results.length} shelter${results.length > 1 ? 's' : ''}${locationText}: `;
