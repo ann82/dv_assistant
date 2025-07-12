@@ -484,6 +484,22 @@ export async function handleFollowUp(query, lastQueryContext) {
 
   // Step 1: Try fast pattern matching first (cost-effective)
   const lowerQuery = query.toLowerCase();
+  
+  // Check if this is a NEW request with location (not a follow-up)
+  const newRequestLocationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'];
+  const hasNewRequestLocationKeywords = newRequestLocationKeywords.some(keyword => lowerQuery.includes(keyword));
+  const isNewRequestWithLocation = hasNewRequestLocationKeywords && query.trim().length <= 100;
+  
+  // If this is a location statement, it's likely a NEW request, not a follow-up
+  if (isNewRequestWithLocation) {
+    logger.info('Detected new request with location - treating as new request, not follow-up:', { 
+      query, 
+      hasNewRequestLocationKeywords,
+      isNewRequestWithLocation
+    });
+    return null;
+  }
+  
   const followUpIndicators = [
     // General follow-up words
     'more', 'details', 'information', 'about', 'tell me', 'what about',
@@ -498,9 +514,10 @@ export async function handleFollowUp(query, lastQueryContext) {
     // Specific follow-up patterns
     'where is', 'what is the address', 'what is the phone', 'what is the number',
     'can you send', 'can you text', 'can you message',
-    // Pet-related follow-up patterns (enhanced)
-    'pets', 'pet', 'animals', 'pet policy', 'pet-friendly', 'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services',
-    'dogs', 'dog', 'cats', 'cat', 'if they', 'do they', 'can they', 'will they', 'allow', 'accept', 'take', 'bring', 'love dogs', 'love cats', 'have pets', 'with pets', 'pet policy', 'animal policy',
+    // Pet-related follow-up patterns (enhanced) - more specific to questions
+    'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet policy', 'pet-friendly', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services',
+    'do they allow dogs', 'can i bring my dog', 'are dogs allowed', 'do they allow cats', 'can i bring my cat', 'are cats allowed',
+    'if they', 'do they', 'can they', 'will they', 'allow', 'accept', 'take', 'bring',
     // Enhanced pet policy patterns
     'let me know if', 'tell me if', 'do you know if', 'can you tell me if', 'i want to know if', 'i need to know if',
     'allow pets', 'accept pets', 'take pets', 'bring pets', 'pet friendly', 'pet policy',
@@ -650,6 +667,19 @@ export async function generateFollowUpResponse(userQuery, lastQueryContext) {
   }
 
   if (!lastQueryContext || !lastQueryContext.results || lastQueryContext.results.length === 0) {
+    logger.info('No context available for follow-up response:', {
+      hasLastQueryContext: !!lastQueryContext,
+      hasResults: !!lastQueryContext?.results,
+      resultCount: lastQueryContext?.results?.length || 0,
+      lastQueryContext: lastQueryContext ? {
+        intent: lastQueryContext.intent,
+        location: lastQueryContext.location,
+        needsLocation: lastQueryContext.needsLocation,
+        timestamp: lastQueryContext.timestamp,
+        hasResults: !!lastQueryContext.results,
+        resultCount: lastQueryContext.results?.length || 0
+      } : null
+    });
     return {
       voiceResponse: "I don't have the previous search results available. Could you please repeat your location or question?",
       type: 'no_context'

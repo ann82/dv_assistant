@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.21.6] - 2024-12-19
+
+### Fixed
+- **Follow-up Detection Logic**: Fixed critical issue where new requests with location were incorrectly detected as follow-up questions
+  - **New Request Detection**: Added logic to detect when a query contains location keywords (like "I live in", "I'm in") and treat it as a new request, not a follow-up
+  - **Pet-related Pattern Refinement**: Made pet-related follow-up patterns more specific to actual questions (like "Do they allow pets?") rather than general pet mentions
+  - **Context Debugging**: Added detailed logging to understand why follow-up responses return "no_context" when context exists
+  - **Location Statement Recognition**: Enhanced detection of location statements to prevent them from being treated as follow-ups
+
+### Technical Details
+- **New Request Detection**: Added check for location keywords before follow-up detection:
+  - Keywords: 'live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'
+  - If query contains these keywords and is under 100 characters, treat as new request
+- **Follow-up Pattern Refinement**: Made pet-related patterns more specific:
+  - Removed broad patterns like 'pets', 'dogs', 'cats', 'love dogs', 'love cats'
+  - Added specific question patterns like 'do they allow pets', 'can i bring my pet', 'are pets allowed'
+- **Context Debugging**: Added detailed logging in `generateFollowUpResponse` to show why context is considered empty
+- **Variable Naming**: Fixed variable redeclaration issues in follow-up detection logic
+
+### Impact
+- **Before**: Queries like "I live in San Francisco, California. I'm looking for shelter homes that I love dogs." were incorrectly detected as follow-ups and returned "I don't have the previous search results available"
+- **After**: Such queries are correctly recognized as new requests with location information and processed normally
+- **User Experience**: Users no longer get confusing fallback messages when making new requests with location and pet information
+
 ## [v1.21.5] - 2024-12-19
 
 ### Fixed
