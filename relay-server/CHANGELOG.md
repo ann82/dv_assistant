@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.2] - 2025-01-27
+
+### 🚀 Major Enhancement: Conversation Management System & Error Handling
+- **Conversation Flow Management**: Intelligent conversation flow control based on intent and context
+- **Re-engagement System**: Smart re-engagement logic for off-topic conversations
+- **Robust Error Handling**: Enhanced error handling with graceful fallbacks
+- **Production Reliability**: Fixed critical production errors with missing function imports
+
+### Added
+- **Conversation Management Functions**: Complete conversation flow management system
+  - **manageConversationFlow**: Intelligent conversation flow control based on intent and context
+    - **Off-topic Handling**: Smart handling of off-topic conversations with appropriate redirections
+    - **End Conversation Logic**: Graceful conversation ending with safety information
+    - **Emergency Priority**: High-priority handling for emergency help requests
+    - **Context Awareness**: Uses conversation context for personalized flow decisions
+  - **shouldAttemptReengagement**: Smart re-engagement logic based on conversation history
+    - **History Analysis**: Analyzes conversation history to determine re-engagement need
+    - **Off-topic Detection**: Identifies when user has multiple off-topic interactions
+    - **Threshold-based Logic**: Re-engages when more than 50% of recent interactions are off-topic
+    - **Context Validation**: Handles null/undefined context gracefully
+  - **generateReengagementMessage**: Dynamic re-engagement message generation
+    - **Multiple Message Variations**: 5 different empathetic re-engagement messages
+    - **Random Selection**: Randomly selects messages to avoid repetition
+    - **Empathetic Tone**: All messages maintain supportive, empathetic communication
+    - **Context Awareness**: Adapts messages based on conversation context
+- **Enhanced Error Handling**: Robust error handling throughout the system
+  - **Import Error Handling**: Enhanced getDep function with detailed error logging
+  - **Graceful Fallbacks**: Automatic fallback to default behavior when functions fail
+  - **Detailed Logging**: Comprehensive error logging with context information
+  - **Production Resilience**: System continues functioning even with missing dependencies
+
+### Changed
+- **Twilio Voice Handler**: Enhanced with robust error handling and conversation management
+  - **Error Handling**: Added try-catch blocks around conversation management functions
+  - **Fallback Logic**: Automatic fallback to default conversation flow when errors occur
+  - **Import Validation**: Enhanced dependency import validation with detailed error reporting
+  - **Production Reliability**: Fixed critical production errors with missing function imports
+- **Dependency Management**: Improved dynamic import handling with better error reporting
+  - **Detailed Error Logging**: Enhanced error messages with available exports and module information
+  - **Import Validation**: Validates imported functions before use
+  - **Graceful Degradation**: System continues functioning with fallback behavior
+
+### Fixed
+- **Critical Production Error**: Fixed "manageConversationFlow is not a function" error in production
+- **Missing Function Imports**: Added missing conversation management functions to intentClassifier.js
+- **Module Import Issues**: Resolved dynamic import failures in production environment
+- **Error Propagation**: Prevented unhandled errors from crashing the application
+
+### Technical Improvements
+- **Production Reliability**: Significantly improved production stability and error handling
+- **Code Quality**: Enhanced error handling and graceful degradation throughout the system
+- **Developer Experience**: Better error messages and debugging information
+- **System Resilience**: System continues functioning even with missing or failed dependencies
+
 ## [1.21.1] - 2025-01-27
 
 ### 🚀 Major Enhancement: TTS Timeout Optimizations & Follow-up Detection

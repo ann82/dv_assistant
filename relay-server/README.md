@@ -2,11 +2,34 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.21.1** (Updated: January 27, 2025)
+**Current Version: 1.21.2** (Updated: January 27, 2025)
 
 ## Features
 
-### TTS Timeout Optimizations & Follow-up Detection (v1.21.1) - NEW
+### Conversation Management System & Error Handling (v1.21.2) - NEW
+- **🧠 Conversation Flow Management**
+  - **Intelligent Flow Control**: Smart conversation flow management based on intent and context
+  - **Off-topic Handling**: Intelligent handling of off-topic conversations with appropriate redirections
+  - **End Conversation Logic**: Graceful conversation ending with safety information and hotline numbers
+  - **Emergency Priority**: High-priority handling for emergency help requests
+  - **Context Awareness**: Uses conversation context for personalized flow decisions
+- **🔄 Re-engagement System**
+  - **Smart Re-engagement Logic**: Analyzes conversation history to determine re-engagement need
+  - **Off-topic Detection**: Identifies when user has multiple off-topic interactions
+  - **Threshold-based Logic**: Re-engages when more than 50% of recent interactions are off-topic
+  - **Dynamic Message Generation**: 5 different empathetic re-engagement messages with random selection
+- **🛡️ Robust Error Handling**
+  - **Import Error Handling**: Enhanced dependency import validation with detailed error logging
+  - **Graceful Fallbacks**: Automatic fallback to default behavior when functions fail
+  - **Production Resilience**: System continues functioning even with missing dependencies
+  - **Detailed Logging**: Comprehensive error logging with context information for debugging
+- **🚀 Production Reliability**
+  - **Critical Error Fix**: Fixed "manageConversationFlow is not a function" error in production
+  - **Missing Function Imports**: Added missing conversation management functions to intentClassifier.js
+  - **Module Import Issues**: Resolved dynamic import failures in production environment
+  - **System Stability**: Significantly improved production stability and error handling
+
+### TTS Timeout Optimizations & Follow-up Detection (v1.21.1)
 - **🔧 Enhanced TTS Reliability**
   - **Increased Timeout**: TTS timeout increased from 10s to 15s for better reliability
   - **Faster Fallback**: Reduced retry attempts from 3 to 2 for quicker Polly fallback

@@ -1410,6 +1410,147 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
   }
 }
 
+/**
+ * Manages conversation flow based on intent and context
+ * @param {string} intent - The classified intent
+ * @param {string} query - The user query
+ * @param {Object} context - Conversation context
+ * @returns {Object} Flow management result
+ */
+export function manageConversationFlow(intent, query, context) {
+  // Handle null/undefined context gracefully
+  if (!context) {
+    return {
+      shouldContinue: true,
+      shouldEndCall: false,
+      shouldReengage: false,
+      redirectionMessage: null,
+      confidence: 0.5
+    };
+  }
+
+  // Use context confidence if available
+  const confidence = context.confidence || 0.5;
+
+  // Handle off-topic intents
+  if (intent === 'off_topic') {
+    const lowerQuery = query.toLowerCase();
+    
+    // Check if user wants to end conversation
+    const endKeywords = ['goodbye', 'bye', 'end', 'stop', 'hang up', 'go'];
+    const wantsToEnd = endKeywords.some(keyword => lowerQuery.includes(keyword));
+    
+    if (wantsToEnd) {
+      return {
+        shouldContinue: false,
+        shouldEndCall: false,
+        shouldReengage: false,
+        redirectionMessage: "Before we end this call, I want to make sure you have the support you need. If you're experiencing domestic violence, please know that help is available 24/7. You can call the National Domestic Violence Hotline at 1-800-799-SAFE (7233) anytime.",
+        confidence
+      };
+    }
+    
+    // Check if user is trying to re-engage with domestic violence topic
+    const dvKeywords = ['domestic violence', 'abuse', 'shelter', 'help', 'support', 'safety'];
+    const isReengaging = dvKeywords.some(keyword => lowerQuery.includes(keyword));
+    
+    if (isReengaging) {
+      return {
+        shouldContinue: true,
+        shouldEndCall: false,
+        shouldReengage: true,
+        redirectionMessage: "I understand you're asking about domestic violence support. Let me help you find the resources you need. What specific type of help are you looking for?",
+        confidence
+      };
+    }
+    
+    // General redirection for off-topic queries
+    return {
+      shouldContinue: true,
+      shouldEndCall: false,
+      shouldReengage: false,
+      redirectionMessage: "I'm here to help with domestic violence support and resources. How can I assist you today?",
+      confidence
+    };
+  }
+
+  // Handle end conversation intent
+  if (intent === 'end_conversation') {
+    return {
+      shouldContinue: false,
+      shouldEndCall: false,
+      shouldReengage: false,
+      redirectionMessage: "Before we end this call, I want to make sure you have the support you need. If you're experiencing domestic violence, please know that help is available 24/7. You can call the National Domestic Violence Hotline at 1-800-799-SAFE (7233) anytime.",
+      confidence
+    };
+  }
+
+  // Handle emergency help with high priority
+  if (intent === 'emergency_help') {
+    return {
+      shouldContinue: true,
+      shouldEndCall: false,
+      shouldReengage: false,
+      redirectionMessage: null,
+      confidence,
+      priority: 'high'
+    };
+  }
+
+  // Continue conversation for regular intents
+  return {
+    shouldContinue: true,
+    shouldEndCall: false,
+    shouldReengage: false,
+    redirectionMessage: null,
+    confidence
+  };
+}
+
+/**
+ * Determines if we should attempt to re-engage the user based on conversation history
+ * @param {Object} context - Conversation context
+ * @returns {boolean} Whether to attempt re-engagement
+ */
+export function shouldAttemptReengagement(context) {
+  // Handle null/undefined context
+  if (!context) return false;
+  
+  // Check if context has history
+  if (!context.history || !Array.isArray(context.history)) return false;
+  
+  // Need at least 2 interactions to consider re-engagement
+  if (context.history.length < 2) return false;
+  
+  // Count off-topic interactions
+  const offTopicCount = context.history.filter(interaction => 
+    interaction.intent === 'off_topic'
+  ).length;
+  
+  // Attempt re-engagement if more than 50% of recent interactions are off-topic
+  const offTopicRatio = offTopicCount / context.history.length;
+  return offTopicRatio > 0.5;
+}
+
+/**
+ * Generates a re-engagement message to redirect user back to domestic violence support
+ * @param {Object} context - Conversation context
+ * @returns {string} Re-engagement message
+ */
+export function generateReengagementMessage(context) {
+  const messages = [
+    "I'm here specifically to help with domestic violence support and resources. How can I assist you today?",
+    "Let me help you find the domestic violence support you need. What type of assistance are you looking for?",
+    "I understand you might have other questions, but I'm here to help with domestic violence resources. Can I help you find shelter, legal services, or other support?",
+    "If you're experiencing domestic violence or know someone who is, I can help you find resources and support. What would be most helpful for you right now?",
+    "I'm your domestic violence support assistant. Let me help you find the resources and information you need. What can I help you with today?"
+  ];
+  
+  // Return a random message
+  const randomIndex = Math.floor(Math.random() * messages.length);
+  return messages[randomIndex];
+}
+
 // Helper function to capitalize location (title case)
 function toTitleCase(str) {
   if (!str) return str;

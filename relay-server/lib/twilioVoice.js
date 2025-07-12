@@ -309,8 +309,28 @@ export class TwilioVoiceHandler {
       if (process.env.NODE_ENV === 'test') {
         throw new Error(`Missing injected dependency: ${name}`);
       }
-      const mod = await import(importPath);
-      return exportName ? mod[exportName] : mod.default;
+      try {
+        const mod = await import(importPath);
+        const result = exportName ? mod[exportName] : mod.default;
+        
+        if (!result) {
+          logger.error(`Failed to import ${name} from ${importPath}:`, {
+            exportName,
+            availableExports: Object.keys(mod),
+            moduleType: typeof mod
+          });
+          throw new Error(`Function ${name} not found in ${importPath}`);
+        }
+        
+        return result;
+      } catch (importError) {
+        logger.error(`Error importing ${name} from ${importPath}:`, {
+          error: importError.message,
+          stack: importError.stack,
+          exportName
+        });
+        throw importError;
+      }
     };
 
     try {
@@ -484,7 +504,26 @@ export class TwilioVoiceHandler {
       }
 
       // Manage conversation flow based on intent
-      const conversationFlow = manageConversationFlow(intent, speechResult, context);
+      let conversationFlow;
+      try {
+        conversationFlow = manageConversationFlow(intent, speechResult, context);
+      } catch (flowError) {
+        logger.error('Error in conversation flow management, using fallback:', {
+          requestId,
+          callSid,
+          intent,
+          error: flowError.message
+        });
+        // Fallback conversation flow
+        conversationFlow = {
+          shouldContinue: true,
+          shouldEndCall: false,
+          shouldReengage: false,
+          redirectionMessage: null,
+          confidence: 0.5
+        };
+      }
+      
       logger.info('Conversation flow management:', {
         requestId,
         callSid,
@@ -548,16 +587,26 @@ export class TwilioVoiceHandler {
       }
 
       // Check for re-engagement based on context
-      if (context && shouldAttemptReengagement(context)) {
-        const reengagementMessage = generateReengagementMessage(context);
-        logger.info('Attempting re-engagement based on context:', {
+      try {
+        if (context && shouldAttemptReengagement(context)) {
+          const reengagementMessage = generateReengagementMessage(context);
+          logger.info('Attempting re-engagement based on context:', {
+            requestId,
+            callSid,
+            intent,
+            speechResult,
+            reengagementMessage
+          });
+          return reengagementMessage;
+        }
+      } catch (reengagementError) {
+        logger.error('Error in re-engagement logic, continuing with normal flow:', {
           requestId,
           callSid,
           intent,
-          speechResult,
-          reengagementMessage
+          error: reengagementError.message
         });
-        return reengagementMessage;
+        // Continue with normal flow if re-engagement fails
       }
 
       // Handle different intents appropriately
