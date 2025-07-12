@@ -266,7 +266,7 @@ export class AudioService {
       });
       
       // Enhanced retry logic with exponential backoff
-      const maxRetries = 3;
+      const maxRetries = 2; // Reduced from 3 to 2 for faster fallback
       let lastError = null;
       
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -285,7 +285,7 @@ export class AudioService {
               input: text
             }, {
               signal: controller.signal,
-              timeout: config.TTS_TIMEOUT + 5000 // Add 5 seconds buffer
+              timeout: config.TTS_TIMEOUT + 2000 // Reduced buffer from 5s to 2s
             });
 
             clearTimeout(timeoutId);
@@ -363,13 +363,13 @@ export class AudioService {
               lastError = fetchError;
             }
             
-            // If this is the last attempt, throw the error
+            // If this is the last attempt, throw the error immediately
             if (attempt === maxRetries) {
               throw lastError;
             }
             
-            // Wait before retrying with exponential backoff
-            const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+            // Reduced wait time for faster fallback
+            const waitTime = Math.min(500 * Math.pow(2, attempt - 1), 2000); // Max 2 seconds
             logger.info(`Retrying TTS generation in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
@@ -377,13 +377,13 @@ export class AudioService {
         } catch (attemptError) {
           lastError = attemptError;
           
-          // If this is the last attempt, throw the error
+          // If this is the last attempt, throw the error immediately
           if (attempt === maxRetries) {
             throw attemptError;
           }
           
-          // Wait before retrying with exponential backoff
-          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
+          // Reduced wait time for faster fallback
+          const waitTime = Math.min(500 * Math.pow(2, attempt - 1), 2000); // Max 2 seconds
           logger.info(`Retrying TTS generation in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }

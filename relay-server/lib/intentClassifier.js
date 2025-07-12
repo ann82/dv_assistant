@@ -477,7 +477,7 @@ export async function handleFollowUp(query, lastQueryContext) {
   }
   
   // Additional check for location statements that might not be caught by geocoding
-  const locationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at'];
+  const locationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'];
   const hasLocationKeywords = locationKeywords.some(keyword => lowerQuery.includes(keyword));
   const isShortLocationStatement = query.trim().length <= 50 && hasLocationKeywords;
   
@@ -501,8 +501,8 @@ export async function handleFollowUp(query, lastQueryContext) {
   // Step 3: If pattern matching is uncertain, use AI for better accuracy
   let isFollowUp = isFollowUpByPattern || isLikelyShortFollowUp || isLocationFollowUp;
   
-  // Use AI if pattern matching is unclear or if we want to be extra sure
-  if (!isFollowUpByPattern || lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this') || isLikelyShortFollowUp) {
+  // Use AI if pattern matching is unclear AND it's not already a location follow-up
+  if (!isFollowUpByPattern && !isLocationFollowUp && (lowerQuery.includes('one') || lowerQuery.includes('that') || lowerQuery.includes('this') || isLikelyShortFollowUp)) {
     try {
       const aiResult = await determineIfFollowUpWithAI(query, lastQueryContext);
       // Only use AI result if it's true, otherwise fall back to pattern matching
@@ -522,6 +522,15 @@ export async function handleFollowUp(query, lastQueryContext) {
       logger.error('AI follow-up detection failed, using pattern result:', error);
       // Fall back to pattern matching result - don't override with false
     }
+  } else if (isLocationFollowUp) {
+    // Skip AI detection for location follow-ups since we already know it's a follow-up
+    logger.info('Skipping AI detection for confirmed location follow-up:', { 
+      query, 
+      patternResult: isFollowUpByPattern,
+      isLikelyShortFollowUp,
+      isLocationFollowUp,
+      finalResult: isFollowUp
+    });
   }
   
   if (!isFollowUp) {
@@ -1031,6 +1040,8 @@ Consider if the user is:
 - Referring to specific items from previous results (like "the third one", "that shelter")
 - Asking for clarification or additional information
 - Making a vague reference that requires context
+- Providing a location in response to a previous request that needed location (like "I'm in San Jose" or "I live in Austin")
+- Confirming or correcting location information
 
 Respond with only "yes" or "no".`;
 
@@ -1224,175 +1235,6 @@ function extractDetailedInfo(content) {
   return { services, highlights };
 }
 
-/**
- * Calculate intent confidence based on response characteristics
- * @param {string} intent - The classified intent
- * @param {string} query - The user query
- * @param {Object} response - The GPT-3.5-turbo response
- * @returns {number} Confidence score between 0 and 1
- */
-function calculateIntentConfidence(intent, query, response) {
-  let confidence = 0.5; // Base confidence
-  
-  // Check if intent is valid
-  const validIntents = [
-    'find_shelter', 'legal_services', 'counseling_services', 
-    'emergency_help', 'general_information', 'other_resources', 
-    'end_conversation', 'off_topic'
-  ];
-  
-  if (!validIntents.includes(intent)) {
-    logger.warn('Invalid intent detected:', { intent, query });
-    return 0.1; // Low confidence for invalid intents
-  }
-  
-  // Boost confidence for clear keyword matches
-  const queryLower = query.toLowerCase();
-  const intentKeywords = {
-    'find_shelter': ['shelter', 'housing', 'safe', 'place to stay', 'home', 'live'],
-    'legal_services': ['legal', 'lawyer', 'attorney', 'court', 'restraining order', 'divorce'],
-    'counseling_services': ['counseling', 'therapy', 'counselor', 'therapist', 'mental health', 'emotional'],
-    'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
-    'general_information': ['what is', 'how to', 'information', 'about', 'tell me'],
-    'other_resources': ['financial', 'money', 'job', 'work', 'childcare', 'transportation'],
-    'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish', 'thank you', 'thanks'],
-    'off_topic': ['weather', 'sports', 'joke', 'funny', 'movie', 'music']
-  };
-  
-  const keywords = intentKeywords[intent] || [];
-  const keywordMatches = keywords.filter(keyword => queryLower.includes(keyword)).length;
-  
-  if (keywordMatches > 0) {
-    confidence += 0.3; // Boost for keyword matches
-  }
-  
-  // Boost confidence for longer, more specific queries
-  if (query.length > 20) {
-    confidence += 0.1;
-  }
-  
-  // Reduce confidence for very short or vague queries
-  if (query.length < 5) {
-    confidence -= 0.2;
-  }
-  
-  // Boost confidence for emergency-related queries
-  if (intent === 'emergency_help') {
-    confidence += 0.2; // Higher confidence for emergency detection
-  }
-  
-  // Cap confidence at 1.0
-  return Math.min(confidence, 1.0);
-}
-
-/**
- * Get confidence level based on confidence score
- * @param {number} confidence - The confidence score
- * @returns {string} Confidence level
- */
-function getConfidenceLevel(confidence) {
-  if (confidence >= 0.8) return 'High';
-  if (confidence >= 0.5) return 'Medium';
-  return 'Low';
-}
-
-/**
- * Manage conversation flow based on intent and context
- * @param {string} intent - The detected intent
- * @param {string} query - The user query
- * @param {Object} context - Conversation context
- * @returns {Object} Conversation management response
- */
-export function manageConversationFlow(intent, query, context = {}) {
-  const response = {
-    shouldContinue: true,
-    shouldEndCall: false,
-    shouldReengage: false,
-    redirectionMessage: null,
-    confidence: (context && context.confidence) ? context.confidence : 0.5
-  };
-
-  // Handle off-topic intents
-  if (intent === 'off_topic') {
-    const queryLower = query.toLowerCase();
-    
-    // Check for conversation end requests
-    if (queryLower.includes('goodbye') || queryLower.includes('bye') || 
-        queryLower.includes('end call') || queryLower.includes('hang up') ||
-        queryLower.includes('thank you') || queryLower.includes('thanks')) {
-      response.shouldEndCall = false; // Don't end immediately, ask for SMS consent first
-      response.shouldContinue = false;
-      response.redirectionMessage = "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
-      return response;
-    }
-    
-    // Check for re-engagement attempts
-    if (queryLower.includes('help') || queryLower.includes('support') || 
-        queryLower.includes('domestic') || queryLower.includes('violence')) {
-      response.shouldReengage = true;
-      response.redirectionMessage = "I'm here to help with domestic violence support and resources. What specific information or assistance do you need today?";
-      return response;
-    }
-    
-    // Handle general off-topic with gentle redirection
-    response.redirectionMessage = "I'm specifically designed to help with domestic violence support and resources. If you have questions about that, I'd be happy to help. Otherwise, you might want to try a different service for other topics.";
-    return response;
-  }
-
-  // Handle end conversation intent
-  if (intent === 'end_conversation') {
-    response.shouldEndCall = false; // Don't end immediately, ask for SMS consent first
-    response.shouldContinue = false;
-    response.redirectionMessage = "Before we end this call, would you like to receive a summary of our conversation and follow-up resources via text message? Please say yes or no.";
-    return response;
-  }
-
-  // Handle emergency situations with high priority
-  if (intent === 'emergency_help') {
-    response.shouldContinue = true;
-    response.priority = 'high';
-    return response;
-  }
-
-  // Default: continue conversation
-  return response;
-}
-
-/**
- * Check if conversation should be re-engaged based on user behavior
- * @param {Object} context - Conversation context
- * @returns {boolean} Whether to attempt re-engagement
- */
-export function shouldAttemptReengagement(context) {
-  if (!context || !context.history || !Array.isArray(context.history)) {
-    return false;
-  }
-
-  const recentIntents = context.history.slice(-3).map(h => h.intent);
-  const offTopicCount = recentIntents.filter(intent => intent === 'off_topic').length;
-  
-  // Attempt re-engagement if user has been off-topic for multiple interactions
-  return offTopicCount >= 2;
-}
-
-/**
- * Generate re-engagement message based on context
- * @param {Object} context - Conversation context
- * @returns {string} Re-engagement message
- */
-export function generateReengagementMessage(context) {
-  const messages = [
-    "I'm here specifically to help with domestic violence support and resources. Is there anything related to that I can assist you with?",
-    "I want to make sure you get the help you need. Do you have questions about domestic violence resources, shelters, legal help, or counseling services?",
-    "I'm designed to help with domestic violence support. If you're experiencing domestic violence or know someone who is, I can help you find resources and information.",
-    "Let me know if you need help finding shelters, legal services, counseling, or other domestic violence resources. I'm here to help."
-  ];
-  
-  // Randomly select a message to avoid repetition
-  const randomIndex = Math.floor(Math.random() * messages.length);
-  return messages[randomIndex];
-}
-
 // Helper function to generate response for location-only follow-ups
 async function generateLocationFollowUpResponse(locationQuery, lastQueryContext, locationData) {
   try {
@@ -1500,4 +1342,4 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
 function toTitleCase(str) {
   if (!str) return str;
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
-} 
+}

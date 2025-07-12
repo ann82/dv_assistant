@@ -1403,7 +1403,7 @@ export class TwilioVoiceHandler {
         const ttsResult = await Promise.race([
           this.audioService.generateTTS(textString, languageCode),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('TTS timeout')), config.TTS_TIMEOUT + 2000)
+            setTimeout(() => reject(new Error('TTS timeout')), config.TTS_TIMEOUT + 1000)
           )
         ]);
         

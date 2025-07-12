@@ -2,11 +2,66 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.20.0** (Updated: January 27, 2025)
+**Current Version: 1.21.1** (Updated: January 27, 2025)
 
 ## Features
 
-### Enhanced Context System (v1.20.0) - NEW
+### TTS Timeout Optimizations & Follow-up Detection (v1.21.1) - NEW
+- **🔧 Enhanced TTS Reliability**
+  - **Increased Timeout**: TTS timeout increased from 10s to 15s for better reliability
+  - **Faster Fallback**: Reduced retry attempts from 3 to 2 for quicker Polly fallback
+  - **Optimized Retry Delays**: Maximum retry delay reduced from 5s to 2s
+  - **Consistent Timeout Handling**: Unified timeout management across all TTS generation points
+- **🎯 Improved Follow-up Detection**
+  - **Enhanced GPT Prompt**: Updated AI prompt to specifically recognize location statements as follow-ups
+  - **Expanded Location Keywords**: Added more patterns like "i'm from", "i am from", "i live in"
+  - **Smart Logic Flow**: Prioritizes location follow-up detection over AI detection to avoid incorrect responses
+  - **Location Statement Recognition**: Better handling of statements like "I'm in Santa Clara, San Jose, California."
+- **🚀 Performance Improvements**
+  - **Reduced Timeout Errors**: Significantly fewer TTS generation timeout errors
+  - **Faster Response Times**: Quicker fallback to Polly when TTS fails
+  - **Better User Experience**: More reliable follow-up detection and response generation
+  - **Improved Reliability**: Enhanced error handling and graceful degradation
+
+### Dynamic Conversation Context System (v1.21.0)
+- **🧠 Dynamic Context Building**
+  - **Real-time Context Generation**: Builds conversation context dynamically from stored conversation history
+  - **Multi-dimensional Context**: Includes location, family concerns, language preference, emotional tone, current needs, and resource focus
+  - **Context Injection**: Seamlessly injects dynamic context into voice instructions for personalized AI responses
+  - **Call-specific Context**: Each call maintains isolated context with callSid and language detection
+- **🎯 Enhanced AI Response Quality**
+  - **Context-Aware Instructions**: Voice instructions now include dynamic conversation context for better AI understanding
+  - **Personalized Responses**: AI responses adapt based on user's conversation history and current needs
+  - **Multi-turn Context Preservation**: Maintains understanding across multiple conversation turns
+  - **Resource Memory**: Tracks and remembers previously discussed resources and user preferences
+- **🌍 Language and Cultural Awareness**
+  - **Language Detection**: Automatically detects user's language preference and includes in context
+  - **Cultural Sensitivity**: Context includes cultural and regional considerations for appropriate responses
+  - **Accessibility Support**: Adapts responses based on user's communication style and needs
+- **🔄 Seamless Integration**
+  - **Backward Compatibility**: Works alongside existing conversation system without breaking changes
+  - **Graceful Fallbacks**: Automatic fallback to standard instructions if context building fails
+  - **Performance Optimized**: Efficient context building with minimal overhead
+  - **Comprehensive Testing**: Full test coverage for context builder functionality
+
+### Empathetic Voice System (v1.20.1) - NEW
+- **💝 Enhanced Emotional Support**
+  - **Emotional Validation**: Voice system now validates and acknowledges user emotions
+  - **Supportive Language**: Uses warm, compassionate language throughout conversations
+  - **Safety-First Approach**: Prioritizes user safety and well-being in all interactions
+  - **Non-judgmental Tone**: Maintains supportive, non-judgmental communication style
+- **🎭 Improved Conversation Instructions**
+  - **Empathy Integration**: Enhanced conversation instructions include emotional support guidelines
+  - **Safety Protocols**: Clear safety protocols and emergency response procedures
+  - **Family Considerations**: Special handling for family-related concerns and children
+  - **Privacy Protection**: Strong emphasis on user privacy and confidentiality
+- **🔧 System-wide Empathy**
+  - **Fallback Responder**: Enhanced fallback responses with empathetic language
+  - **Audio Service**: TTS system prompts include emotional support guidelines
+  - **Response Generation**: All response types incorporate empathetic communication
+  - **Error Handling**: Graceful error responses with supportive language
+
+### Enhanced Context System (v1.20.0)
 - **🧠 Semantic Conversation Understanding**
   - **AI-Powered Analysis**: Uses GPT to understand conversation context, user needs, and sentiment
   - **Multi-Turn Context**: Maintains understanding across multiple conversation turns

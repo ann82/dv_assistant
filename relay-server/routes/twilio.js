@@ -355,7 +355,7 @@ router.post('/voice/process', async (req, res) => {
       twiml = await Promise.race([
         twilioVoiceHandler.generateTTSBasedTwiML(response, !shouldEndCall),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TwiML generation timeout')), 8000)
+          setTimeout(() => reject(new Error('TwiML generation timeout')), 12000)
         )
       ]);
     } catch (ttsError) {
@@ -381,7 +381,7 @@ router.post('/voice/process', async (req, res) => {
         });
       }
       
-            twiml = fallbackTwiml.toString();
+      twiml = fallbackTwiml.toString();
     }
     
     res.type('text/xml');

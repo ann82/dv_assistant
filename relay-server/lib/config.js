@@ -47,7 +47,7 @@ export const config = {
   ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID || 'default_voice_id',
   ENABLE_TTS: process.env.ENABLE_TTS !== 'false', // Default to true, set to 'false' to disable
   TTS_VOICE: process.env.TTS_VOICE || 'nova', // OpenAI TTS voice: nova, alloy, echo, fable, onyx, shimmer
-  TTS_TIMEOUT: parseInt(process.env.TTS_TIMEOUT) || 10000, // TTS timeout in milliseconds (reduced for Twilio compatibility)
+  TTS_TIMEOUT: parseInt(process.env.TTS_TIMEOUT) || 15000, // TTS timeout in milliseconds (increased for better reliability)
   FALLBACK_TO_POLLY: process.env.FALLBACK_TO_POLLY !== 'false', // Default to true
   
   // Response Settings

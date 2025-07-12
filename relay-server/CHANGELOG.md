@@ -2,6 +2,121 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.1] - 2025-01-27
+
+### 🚀 Major Enhancement: TTS Timeout Optimizations & Follow-up Detection
+- **Enhanced TTS Reliability**: Increased timeouts and faster fallback mechanisms
+- **Improved Follow-up Detection**: Better location statement recognition and AI prompt optimization
+- **Performance Improvements**: Reduced timeout errors and faster response times
+
+### Added
+- **Enhanced TTS Reliability**: Improved TTS generation with better timeout handling
+  - **Increased Timeout**: TTS timeout increased from 10s to 15s for better reliability
+  - **Faster Fallback**: Reduced retry attempts from 3 to 2 for quicker Polly fallback
+  - **Optimized Retry Delays**: Maximum retry delay reduced from 5s to 2s
+  - **Consistent Timeout Handling**: Unified timeout management across all TTS generation points
+- **Improved Follow-up Detection**: Enhanced location statement recognition and AI integration
+  - **Enhanced GPT Prompt**: Updated AI prompt to specifically recognize location statements as follow-ups
+  - **Expanded Location Keywords**: Added more patterns like "i'm from", "i am from", "i live in"
+  - **Smart Logic Flow**: Prioritizes location follow-up detection over AI detection to avoid incorrect responses
+  - **Location Statement Recognition**: Better handling of statements like "I'm in Santa Clara, San Jose, California."
+
+### Changed
+- **TTS Configuration**: Increased default TTS timeout from 10s to 15s in config.js
+- **Audio Service**: Optimized retry logic with faster fallback and reduced delays
+- **Twilio Voice Handler**: Improved TTS timeout handling in TwiML generation
+- **Voice Processing Routes**: Increased TwiML generation timeout from 8s to 12s
+- **Follow-up Detection Logic**: Enhanced to prioritize location follow-up detection over AI detection
+
+### Fixed
+- **TTS Timeout Errors**: Significantly reduced TTS generation timeout errors in production
+- **Follow-up Detection**: Fixed issue where location statements were incorrectly getting "No." responses from AI
+- **Template Literal Error**: Fixed unterminated template literal in intentClassifier.js
+- **Missing Functions**: Restored accidentally truncated functions in intentClassifier.js
+
+### Technical Improvements
+- **Performance**: Reduced timeout errors and faster response times
+- **User Experience**: More reliable follow-up detection and response generation
+- **Error Handling**: Enhanced error handling and graceful degradation
+- **Code Quality**: Improved code organization and error prevention
+
+## [1.21.0] - 2025-01-27
+
+### 🚀 Major Enhancement: Dynamic Conversation Context System
+- **Dynamic Context Building**: Real-time conversation context generation from stored history
+- **Enhanced AI Response Quality**: Context-aware instructions for personalized AI responses
+- **Language and Cultural Awareness**: Automatic language detection and cultural sensitivity
+- **Seamless Integration**: Backward compatible with existing conversation system
+
+### Added
+- **Conversation Context Builder**: New module for dynamic context generation
+  - **Real-time Context Generation**: Builds conversation context dynamically from stored conversation history
+  - **Multi-dimensional Context**: Includes location, family concerns, language preference, emotional tone, current needs, and resource focus
+  - **Context Injection**: Seamlessly injects dynamic context into voice instructions for personalized AI responses
+  - **Call-specific Context**: Each call maintains isolated context with callSid and language detection
+- **Enhanced Voice Instructions**: Dynamic context integration into voice instructions
+  - **Context-Aware Instructions**: Voice instructions now include dynamic conversation context for better AI understanding
+  - **Personalized Responses**: AI responses adapt based on user's conversation history and current needs
+  - **Multi-turn Context Preservation**: Maintains understanding across multiple conversation turns
+  - **Resource Memory**: Tracks and remembers previously discussed resources and user preferences
+- **Language and Cultural Awareness**: Enhanced language detection and cultural sensitivity
+  - **Language Detection**: Automatically detects user's language preference and includes in context
+  - **Cultural Sensitivity**: Context includes cultural and regional considerations for appropriate responses
+  - **Accessibility Support**: Adapts responses based on user's communication style and needs
+- **Comprehensive Test Suite**: Full test coverage for context builder functionality
+  - **Context Building Tests**: Tests for dynamic context generation and injection
+  - **Integration Tests**: Tests for seamless integration with existing systems
+  - **Fallback Tests**: Tests for graceful fallback when context building fails
+  - **Performance Tests**: Tests for efficient context building with minimal overhead
+
+### Changed
+- **Twilio Voice Handler**: Enhanced to pass callSid and detected language for context-aware responses
+- **Fallback Responder**: Updated to use dynamic context for more personalized fallback responses
+- **Query Handler**: Modified to include conversation context in query processing
+- **Response Generation**: Enhanced to incorporate dynamic context for better response quality
+
+### Technical Improvements
+- **Backward Compatibility**: Works alongside existing conversation system without breaking changes
+- **Graceful Fallbacks**: Automatic fallback to standard instructions if context building fails
+- **Performance Optimized**: Efficient context building with minimal overhead
+- **Comprehensive Testing**: Full test coverage for context builder functionality
+
+## [1.20.1] - 2025-01-27
+
+### 🚀 Major Enhancement: Empathetic Voice System
+- **Enhanced Emotional Support**: Voice system now validates and acknowledges user emotions
+- **Improved Conversation Instructions**: Enhanced instructions include emotional support guidelines
+- **System-wide Empathy**: All system components incorporate empathetic communication
+
+### Added
+- **Emotional Support Features**: Enhanced emotional validation and supportive language
+  - **Emotional Validation**: Voice system now validates and acknowledges user emotions
+  - **Supportive Language**: Uses warm, compassionate language throughout conversations
+  - **Safety-First Approach**: Prioritizes user safety and well-being in all interactions
+  - **Non-judgmental Tone**: Maintains supportive, non-judgmental communication style
+- **Enhanced Conversation Instructions**: Comprehensive empathy integration
+  - **Empathy Integration**: Enhanced conversation instructions include emotional support guidelines
+  - **Safety Protocols**: Clear safety protocols and emergency response procedures
+  - **Family Considerations**: Special handling for family-related concerns and children
+  - **Privacy Protection**: Strong emphasis on user privacy and confidentiality
+- **System-wide Empathy Integration**: All components incorporate empathetic communication
+  - **Fallback Responder**: Enhanced fallback responses with empathetic language
+  - **Audio Service**: TTS system prompts include emotional support guidelines
+  - **Response Generation**: All response types incorporate empathetic communication
+  - **Error Handling**: Graceful error responses with supportive language
+
+### Changed
+- **Voice Instructions**: Updated to include emotional support guidelines and safety protocols
+- **Fallback Responder**: Enhanced with empathetic language and supportive responses
+- **Audio Service**: Updated system prompts to include emotional support guidelines
+- **Response Generation**: Modified to incorporate empathetic communication throughout
+
+### Technical Improvements
+- **Comprehensive Empathy**: System-wide integration of empathetic communication
+- **Safety Protocols**: Clear guidelines for emergency situations and safety planning
+- **Privacy Protection**: Enhanced emphasis on user privacy and confidentiality
+- **Cultural Sensitivity**: Improved cultural awareness and appropriate responses
+
 ## [1.20.0] - 2025-01-27
 
 ### 🚀 Major Enhancement: Enhanced Context System
