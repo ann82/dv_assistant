@@ -18,26 +18,20 @@ import { v4 as uuidv4 } from 'uuid';
 // Legacy speech processor and filter config imports removed - now using HandlerManager
 import { UnifiedResponseHandler } from '../lib/unifiedResponseHandler.js';
 import { welcomeMessage } from '../lib/conversationConfig.js';
-import { handlerManager } from '../server.js';
-import { 
-  fetchCallDetails, 
-  cleanupAudioFile, 
-  handleSMSConsent, 
-  getRequestType,
-  handleConsent,
-  handleSMS,
-  handleCallStatus,
-  handleRecording,
-  handleInterimSpeech,
-  processSpeechResult
-} from '../controllers/twilioController.js';
+// Remove circular import - handlerManager will be injected
+import { createTwilioController } from '../controllers/twilioController.js';
 import { validateRequest, rateLimiter } from '../middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, performanceLogger } from '../middleware/logging.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const router = express.Router();
+// Create a factory function to create the router with injected dependencies
+function createTwilioRouter(handlerManager) {
+  const router = express.Router();
+  
+  // Create the Twilio controller with injected handlerManager
+  const twilioController = createTwilioController(handlerManager);
 
 // Initialize TwilioVoiceHandler
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -314,24 +308,24 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
  */
 router.post('/voice/interim', validateRequest('twilioVoice'), async (req, res) => {
   const { CallSid, SpeechResult } = req.body;
-  await handleInterimSpeech(CallSid, SpeechResult, res);
+      await twilioController.handleInterimSpeech(CallSid, SpeechResult, res);
 });
 
 
 
 router.post('/status', validateRequest('callStatus'), async (req, res) => {
   const { CallSid, CallStatus } = req.body;
-  await handleCallStatus(CallSid, CallStatus, res);
+      await twilioController.handleCallStatus(CallSid, CallStatus, res);
 });
 
 router.post('/recording', validateRequest('recording'), (req, res) => {
   const { RecordingSid, RecordingUrl, CallSid } = req.body;
-  handleRecording(RecordingSid, RecordingUrl, CallSid, res);
+      twilioController.handleRecording(RecordingSid, RecordingUrl, CallSid, res);
 });
 
 router.post('/sms', validateRequest('twilioSMS'), async (req, res) => {
   const { From, Body } = req.body;
-  await handleSMS(From, Body, res);
+      await twilioController.handleSMS(From, Body, res);
 });
 
 // ============================================================================
@@ -350,7 +344,7 @@ router.post('/sms', validateRequest('twilioSMS'), async (req, res) => {
  */
 router.post('/consent', validateRequest('twilioVoice'), async (req, res) => {
   const { CallSid, SpeechResult } = req.body;
-  await handleConsent(CallSid, SpeechResult, res);
+      await twilioController.handleConsent(CallSid, SpeechResult, res);
 });
 
 // ============================================================================
@@ -391,7 +385,7 @@ router.post('/web/process', validateRequest('webSpeech'), async (req, res) => {
     }
 
     // Process the speech result as web request (same logic as Twilio but for web clients)
-    const response = await processSpeechResult(null, speechResult, requestId, 'web');
+    const response = await twilioController.processSpeechResult(null, speechResult, requestId, 'web');
     
     res.json({ response });
   } catch (error) {
@@ -404,14 +398,18 @@ router.post('/web/process', validateRequest('webSpeech'), async (req, res) => {
   }
 });
 
-// Add method to get active calls count for health monitoring
-router.getActiveCallsCount = () => {
-  return handlerManager ? handlerManager.activeCalls.size : 0;
-};
+  // Add method to get active calls count for health monitoring
+  router.getActiveCallsCount = () => {
+    return handlerManager ? handlerManager.activeCalls.size : 0;
+  };
 
-// Add method to get WebSocket server for health monitoring
-router.getWebSocketServer = () => {
-  return wsServer;
-};
+  // Add method to get WebSocket server for health monitoring
+  router.getWebSocketServer = () => {
+    return wsServer;
+  };
 
-export default router;
+  return router;
+}
+
+// Export the factory function
+export default createTwilioRouter;

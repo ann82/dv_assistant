@@ -3,19 +3,21 @@ import logger from '../lib/logger.js';
 import { logControllerOperation, logApiEndpoint } from '../middleware/logging.js';
 import fs from 'fs/promises';
 import fsSync from 'fs';
-import { handlerManager } from '../server.js';
+// Remove circular import - handlerManager will be injected
 import { getIntent, rewriteQuery } from '../lib/intentClassifier.js';
 import { extractLocation, generateLocationPrompt } from '../lib/speechProcessor.js';
 import { UnifiedResponseHandler } from '../lib/unifiedResponseHandler.js';
 
-// Fetch and log Twilio call details
-export async function fetchCallDetails(callSid) {
+// Create a factory function to create controller functions with injected dependencies
+export function createTwilioController(handlerManager) {
+  // Fetch and log Twilio call details
+  async function fetchCallDetails(callSid) {
   logControllerOperation('fetchCallDetails', { callSid });
   return TwilioIntegration.fetchCallDetails(callSid);
 }
 
-// Clean up audio files
-export async function cleanupAudioFile(audioPath) {
+  // Clean up audio files
+  async function cleanupAudioFile(audioPath) {
   try {
     logControllerOperation('cleanupAudioFile', { audioPath });
     if (fsSync.existsSync(audioPath)) {
@@ -28,8 +30,8 @@ export async function cleanupAudioFile(audioPath) {
   }
 }
 
-// Helper function to determine request type (web vs Twilio)
-export function getRequestType(req) {
+  // Helper function to determine request type (web vs Twilio)
+  function getRequestType(req) {
   // Check if it's a Twilio request (has Twilio-specific headers or body fields)
   if (req.body.CallSid || req.body.From || req.headers['x-twilio-signature']) {
     return 'twilio';
@@ -44,8 +46,8 @@ export function getRequestType(req) {
   return 'web';
 }
 
-// Handle SMS consent logic
-export async function handleSMSConsent(CallSid, SpeechResult, res) {
+  // Handle SMS consent logic
+  async function handleSMSConsent(CallSid, SpeechResult, res) {
   const requestId = res.req?.requestContext?.requestId || 'unknown';
   logControllerOperation('handleSMSConsent', { CallSid, SpeechResult, requestId });
   
@@ -102,8 +104,8 @@ export async function handleSMSConsent(CallSid, SpeechResult, res) {
   logControllerOperation('handleSMSConsent.completed', { CallSid, hasConsent, requestId });
 }
 
-// Handle consent endpoint
-export async function handleConsent(CallSid, SpeechResult, res) {
+  // Handle consent endpoint
+  async function handleConsent(CallSid, SpeechResult, res) {
   const requestId = res.req?.requestContext?.requestId || 'unknown';
   
   try {
@@ -183,8 +185,8 @@ export async function handleConsent(CallSid, SpeechResult, res) {
   }
 }
 
-// Handle SMS endpoint
-export async function handleSMS(From, Body, res) {
+  // Handle SMS endpoint
+  async function handleSMS(From, Body, res) {
   const requestId = res.req?.requestContext?.requestId || 'unknown';
   
   try {
@@ -224,8 +226,8 @@ export async function handleSMS(From, Body, res) {
   }
 }
 
-// Handle call status updates
-export async function handleCallStatus(CallSid, CallStatus, res) {
+  // Handle call status updates
+  async function handleCallStatus(CallSid, CallStatus, res) {
   const requestId = res.req?.requestContext?.requestId || 'unknown';
   
   try {
@@ -253,25 +255,25 @@ export async function handleCallStatus(CallSid, CallStatus, res) {
   }
 }
 
-// Handle recording completion
-export function handleRecording(recordingSid, recordingUrl, callSid, res) {
-  try {
-    logControllerOperation('handleRecording', { recordingSid, recordingUrl, callSid });
-    logger.info(`Recording completed for call ${callSid}`);
-    logger.info(`Recording SID: ${recordingSid}`);
-    logger.info(`Recording URL: ${recordingUrl}`);
+  // Handle recording completion
+  function handleRecording(recordingSid, recordingUrl, callSid, res) {
+    try {
+      logControllerOperation('handleRecording', { recordingSid, recordingUrl, callSid });
+      logger.info(`Recording completed for call ${callSid}`);
+      logger.info(`Recording SID: ${recordingSid}`);
+      logger.info(`Recording URL: ${recordingUrl}`);
 
-    res.status(200).send('OK');
-    logControllerOperation('handleRecording.completed', { recordingSid, recordingUrl, callSid });
-  } catch (error) {
-    logControllerOperation('handleRecording.error', { recordingSid, recordingUrl, callSid, error: error.message }, 'error');
-    logger.error('Error handling recording:', error);
-    res.status(500).send('Error processing recording');
+      res.status(200).send('OK');
+      logControllerOperation('handleRecording.completed', { recordingSid, recordingUrl, callSid });
+    } catch (error) {
+      logControllerOperation('handleRecording.error', { recordingSid, recordingUrl, callSid, error: error.message }, 'error');
+      logger.error('Error handling recording:', error);
+      res.status(500).send('Error processing recording');
+    }
   }
-}
 
-// Handle interim speech results
-export async function handleInterimSpeech(CallSid, SpeechResult, res) {
+  // Handle interim speech results
+  async function handleInterimSpeech(CallSid, SpeechResult, res) {
   try {
     if (CallSid && SpeechResult) {
       logControllerOperation('handleInterimSpeech', { CallSid, SpeechResult });
@@ -302,8 +304,8 @@ export async function handleInterimSpeech(CallSid, SpeechResult, res) {
   }
 }
 
-// Main process function that routes to appropriate handler based on request type
-export async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+  // Main process function that routes to appropriate handler based on request type
+  async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
   logControllerOperation('processSpeechResult', { callSid, speechResult, requestId, requestType });
   logger.info('Processing speech result:', {
     requestId,
@@ -475,9 +477,24 @@ export async function processSpeechResult(callSid, speechResult, requestId, requ
   }
 }
 
-// Helper function to handle follow-up questions
-async function handleFollowUp(speechResult, lastQueryContext) {
-  // This function should be implemented based on the existing follow-up logic
-  // For now, returning null to indicate no follow-up handling
-  return null;
+  // Helper function to handle follow-up questions
+  async function handleFollowUp(speechResult, lastQueryContext) {
+    // This function should be implemented based on the existing follow-up logic
+    // For now, returning null to indicate no follow-up handling
+    return null;
+  }
+
+  // Return all controller functions
+  return {
+    fetchCallDetails,
+    cleanupAudioFile,
+    getRequestType,
+    handleSMSConsent,
+    handleConsent,
+    handleSMS,
+    handleCallStatus,
+    handleRecording,
+    handleInterimSpeech,
+    processSpeechResult
+  };
 } 

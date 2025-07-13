@@ -181,6 +181,21 @@ The system now includes comprehensive conversation guidelines that significantly
 
 These improvements ensure users receive the highest quality support possible, with proper emergency handling, cultural sensitivity, and professional conversation management.
 
+## Troubleshooting
+
+### Punycode Deprecation Warning
+
+If you see a warning like `(node:14) [DEP0040] DeprecationWarning: The 'punycode' module is deprecated`, this is a harmless warning from Node.js dependencies. The system is configured to suppress these warnings automatically.
+
+**To avoid the warning:**
+- Use `npm start` instead of `node server.js` directly
+- The `--no-deprecation` flag is already configured in all npm scripts
+- This warning doesn't affect functionality and can be safely ignored
+
+**Alternative solutions:**
+- Set `NODE_OPTIONS=--no-deprecation` in your environment
+- Update to the latest Node.js version (recommended: 18.0.0+)
+
 ## Enhanced Speech-to-Text Recognition
 
 The system now includes advanced speech recognition capabilities that significantly reduce garbled speech and improve user experience:

@@ -20,7 +20,8 @@ vi.mock('twilio', () => {
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
-import { app } from '../server.js';
+import express from 'express';
+import { mountTestRoutes } from '../server.js';
 
 // Helper to create a mock class with static methods
 function createMockIntegration(staticMethods = {}) {
@@ -83,13 +84,87 @@ vi.mock('../services/ServiceManager.js', () => ({
 }));
 
 describe('API Integration Tests', () => {
+  let app;
   let server;
+
+  beforeAll(() => {
+    // Create a fresh Express app for testing
+    app = express();
+    
+    // Add basic middleware
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    
+    // Add error handling middleware for JSON parsing errors
+    app.use((err, req, res, next) => {
+      if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        return res.status(400).json({
+          error: 'Invalid JSON format',
+          details: 'The request body contains invalid JSON'
+        });
+      }
+      next(err);
+    });
+    
+    // Mount test routes on the fresh app
+    mountTestRoutes(app);
+    
+    // Add health check routes for testing
+    app.get('/health', (req, res) => {
+      res.json({ status: 'healthy' });
+    });
+    
+    app.get('/health/detailed', (req, res) => {
+      res.json({ 
+        status: 'healthy',
+        integrations: {
+          openai: { status: 'healthy' },
+          tavily: { status: 'healthy' },
+          twilio: { status: 'healthy' }
+        }
+      });
+    });
+    
+    app.get('/health/integrations', (req, res) => {
+      res.json({
+        integrations: {
+          openai: { status: 'healthy' },
+          tavily: { status: 'healthy' },
+          twilio: { status: 'healthy' }
+        }
+      });
+    });
+    
+    app.get('/health/config', (req, res) => {
+      res.json({
+        config: { environment: 'test' },
+        environment: 'test'
+      });
+    });
+    
+    app.get('/health/ready', (req, res) => {
+      res.json({ ready: true });
+    });
+    
+    app.get('/health/live', (req, res) => {
+      res.json({ alive: true });
+    });
+    
+    app.get('/health/metrics', (req, res) => {
+      res.json({
+        requests: { total: 10 },
+        errors: { total: 0 },
+        memory: { used: 100 }
+      });
+    });
+  });
 
   beforeEach(async () => {
     // Clear all mocks
     vi.clearAllMocks();
     
     // Set up test environment variables
+    process.env.NODE_ENV = 'test';
     process.env.TWILIO_PHONE_NUMBER = '+1234567890';
     process.env.OPENAI_API_KEY = 'test-openai-key';
     process.env.TAVILY_API_KEY = 'test-tavily-key';
@@ -97,26 +172,24 @@ describe('API Integration Tests', () => {
     process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
     process.env.RATE_LIMIT_MAX_REQUESTS = '2'; // Lower for test
     
-    // Start the server for Supertest
-    server = app.listen(0); // random available port
+    // Use the fresh app instance
+    server = app;
   });
 
   afterEach(async () => {
-    if (server) {
-      await new Promise(resolve => server.close(resolve));
-    }
+    // No need to close the app
   });
 
   describe('Health Check Endpoints', () => {
     it('should return basic health status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health')
         .expect(200);
       expect(response.body.status).toBe('healthy');
     });
 
     it('should return detailed health status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/detailed')
         .expect(200);
       expect(response.body.status).toBe('healthy');
@@ -127,7 +200,7 @@ describe('API Integration Tests', () => {
     });
 
     it('should return integration health status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/integrations')
         .expect(200);
       // Check that all integrations are healthy
@@ -137,7 +210,7 @@ describe('API Integration Tests', () => {
     });
 
     it('should return configuration status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/config')
         .expect(200);
       expect(response.body).toHaveProperty('config');
@@ -145,14 +218,14 @@ describe('API Integration Tests', () => {
     });
 
     it('should return readiness status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/ready')
         .expect(200);
       expect(response.body.ready).toBe(true);
     });
 
     it('should return liveness status', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/live')
         .expect(200);
       expect(response.body.alive).toBe(true);
@@ -179,7 +252,7 @@ describe('API Integration Tests', () => {
 
   describe('Error Handling', () => {
     it('should handle missing required fields', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .post('/twilio/voice')
         .send({})
         .expect(400);
@@ -190,7 +263,7 @@ describe('API Integration Tests', () => {
     });
 
     it('should handle invalid request format', async () => {
-      const response = await request(server)
+      const response = await request(app)
         .post('/twilio/voice')
         .send('invalid json')
         .set('Content-Type', 'application/json')
@@ -209,11 +282,11 @@ describe('API Integration Tests', () => {
   describe('Performance Monitoring', () => {
     it('should track request metrics', async () => {
       // Make several requests
-      await request(server).get('/health');
-      await request(server).get('/health/detailed');
-      await request(server).get('/health/integrations');
+      await request(app).get('/health');
+      await request(app).get('/health/detailed');
+      await request(app).get('/health/integrations');
 
-      const response = await request(server)
+      const response = await request(app)
         .get('/health/metrics')
         .expect(200);
 

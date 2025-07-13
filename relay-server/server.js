@@ -29,7 +29,7 @@ import http from 'http';
 
 // Application-specific imports
 import { config } from './lib/config.js';
-import twilioRoutes from './routes/twilio.js';
+import createTwilioRouter from './routes/twilio.js';
 import healthRoutes from './routes/health.js';
 import { TwilioWebSocketServer } from './websocketServer.js';
 import logger from './lib/logger.js';
@@ -41,6 +41,7 @@ import { errorHandler } from './middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, skipHealthCheckLogging } from './middleware/logging.js';
 import { performanceMonitoring, errorTracking, startMemoryMonitoring } from './middleware/performanceMonitoring.js';
 import { OpenAIIntegration } from './integrations/openaiIntegration.js';
+import { vi } from 'vitest';
 
 // ES Module compatibility: Get the directory name for __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -189,8 +190,7 @@ app.use('/audio', express.static(audioDir));
  * Mounts application routes for different functionality areas.
  */
 
-// Twilio voice and SMS processing routes
-app.use('/twilio', twilioRoutes);
+// Twilio voice and SMS processing routes - will be mounted after handlerManager is initialized
 
 // Health check and monitoring routes
 app.use('/health', healthRoutes);
@@ -261,13 +261,32 @@ logger.debug('Server object details:', {
 const serviceManager = new ServiceManager();
 let handlerManager;
 
+// Exported function to mount test routes with a mock handlerManager
+function mountTestRoutes(appInstance) {
+  handlerManager = {
+    processVoiceCall: () => Promise.resolve({ twiml: '<Response><Say>Test response</Say></Response>' }),
+    generateTTSBasedTwiML: () => Promise.resolve('<Response><Say>Test response</Say></Response>'),
+    activeCalls: new Map(),
+    getConversationContext: () => Promise.resolve(null),
+    updateConversationContext: () => {},
+    cleanupCall: () => {},
+    sendSMSWithRetry: () => Promise.resolve(),
+    setWebSocketServer: () => {}
+  };
+  const twilioRoutes = createTwilioRouter(handlerManager);
+  appInstance.use('/twilio', twilioRoutes);
+  logger.info('Test environment: Mock HandlerManager and routes initialized');
+  console.log('DEBUG: Twilio routes mounted in test environment');
+}
+
 /**
- * Server Initialization (Skip during tests)
+ * Server Initialization
  * 
- * Initializes services and handlers, but skips during test environment
- * to avoid Twilio SDK issues and reduce test complexity.
+ * Initializes services and handlers. In test environment, creates a mock handlerManager
+ * to ensure routes are available for testing.
  */
 if (process.env.NODE_ENV !== 'test') {
+  // Production/development initialization
   (async () => {
     // Initialize all application services
     await serviceManager.initialize();
@@ -300,11 +319,35 @@ if (process.env.NODE_ENV !== 'test') {
     // Initialize the handler manager with all dependencies
     handlerManager = new HandlerManager(Object.fromEntries(serviceManager.getAllServices()), dependencies);
     
+    // Create and mount Twilio routes with injected handlerManager
+    const twilioRoutes = createTwilioRouter(handlerManager);
+    app.use('/twilio', twilioRoutes);
+    
     logger.info('ServiceManager and HandlerManager initialized successfully');
   })().catch(error => {
     logger.error('Failed to initialize services:', error);
     process.exit(1);
   });
+} else {
+  // Test environment - synchronous initialization
+  // Create a mock handlerManager for tests
+  handlerManager = {
+    processVoiceCall: () => Promise.resolve({ twiml: '<Response><Say>Test response</Say></Response>' }),
+    generateTTSBasedTwiML: () => Promise.resolve('<Response><Say>Test response</Say></Response>'),
+    activeCalls: new Map(),
+    getConversationContext: () => Promise.resolve(null),
+    updateConversationContext: () => {},
+    cleanupCall: () => {},
+    sendSMSWithRetry: () => Promise.resolve(),
+    setWebSocketServer: () => {}
+  };
+  
+  // Create and mount Twilio routes with injected handlerManager
+  const twilioRoutes = createTwilioRouter(handlerManager);
+  app.use('/twilio', twilioRoutes);
+  
+  logger.info('Test environment: Mock HandlerManager and routes initialized');
+  console.log('DEBUG: Twilio routes mounted in test environment');
 }
 
 /**
@@ -385,4 +428,4 @@ process.on('SIGINT', () => {
 
 // Export the server, app, and handlerManager for testing purposes
 export default server;
-export { app, handlerManager }; 
+export { app, handlerManager, mountTestRoutes }; // Export the new function 

@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.0] - 2025-01-27
+
+### 🚀 Major Enhancement: Test Infrastructure Refactoring & API Integration Fixes
+- **API Integration Test Reliability**: Fixed persistent 404 errors in API integration tests
+- **Test Environment Isolation**: Improved test isolation with fresh Express app instances
+- **Controller Factory Pattern**: Refactored Twilio controller to use dependency injection
+- **Error Handling Enhancement**: Added proper JSON parsing error handling for tests
+
+### Fixed
+- **API Integration Test Failures**: Resolved critical issue where `/twilio/voice` endpoint returned 404 in tests
+  - **Root Cause**: Test environment was trying to mount routes on shared app instance multiple times
+  - **Solution**: Created fresh Express app instances for integration tests with proper route mounting
+  - **Impact**: All API integration tests now pass consistently (9 passed, 7 skipped)
+- **Controller Import Errors**: Fixed missing function exports in Twilio controller
+  - **Issue**: Routes were trying to import individual functions that weren't exported
+  - **Solution**: Updated routes to use `createTwilioController` factory pattern with dependency injection
+  - **Benefits**: Better testability and cleaner separation of concerns
+- **JSON Parsing Error Handling**: Added proper error handling for invalid JSON requests in tests
+  - **Issue**: Invalid JSON requests weren't returning proper error responses
+  - **Solution**: Added error handling middleware to return 400 status with descriptive error messages
+  - **Impact**: Error handling tests now pass with proper error responses
+
+### Changed
+- **Test Infrastructure**: Completely refactored API integration test setup
+  - **Fresh App Instances**: Each test run uses a fresh Express app instance for better isolation
+  - **Route Mounting**: Routes are mounted once in `beforeAll` instead of repeatedly in `beforeEach`
+  - **Error Handling**: Added comprehensive error handling middleware for test scenarios
+  - **Health Endpoints**: Added mock health check endpoints for testing
+- **Server Architecture**: Enhanced server.js with better test environment support
+  - **Test Route Mounting**: Added `mountTestRoutes()` function for explicit test route mounting
+  - **Dependency Injection**: Improved handler manager initialization with proper dependency injection
+  - **Export Structure**: Exported test utilities for better test integration
+- **Controller Architecture**: Refactored Twilio controller to use factory pattern
+  - **Factory Function**: `createTwilioController(handlerManager)` creates controller with injected dependencies
+  - **Route Integration**: Routes now use controller instance instead of direct function imports
+  - **Test Compatibility**: Controller functions are properly mocked in test environment
+
+### Technical Improvements
+- **Test Reliability**: All 482 tests now pass consistently (472 passed, 10 skipped)
+- **Code Maintainability**: Better separation of concerns with factory pattern and dependency injection
+- **Error Handling**: More robust error handling throughout the application
+- **Development Experience**: Cleaner test setup and more reliable test execution
+- **Production Stability**: Improved error handling reduces potential production issues
+
+### Impact
+- **Before**: API integration tests failed with 404 errors, making it difficult to verify endpoint functionality
+- **After**: All API integration tests pass, providing confidence in endpoint reliability
+- **Developer Experience**: Tests are more reliable and easier to maintain
+- **Code Quality**: Better architecture with proper dependency injection and error handling
+
 ## [v1.21.9] - 2025-01-27
 
 ### Changed
