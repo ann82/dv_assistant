@@ -231,7 +231,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **Endpoint:** `POST /twilio/voice`
 
-**Description:** Handles incoming Twilio voice calls and manages conversation flow.
+**Description:** Handles incoming Twilio voice calls and manages conversation flow. The system provides comprehensive error handling and logging for all speech processing steps.
 
 **Request Body:**
 ```json
@@ -250,8 +250,8 @@ Authorization: Bearer YOUR_API_KEY
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">Hello, I'm here to help you find domestic violence support resources. Please tell me what you need.</Say>
-  <Gather input="speech" action="/twilio/voice" method="POST" speechTimeout="auto">
+  <Say voice="alice">Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need.</Say>
+  <Gather input="speech" action="/twilio/voice/process" method="POST" speechTimeout="auto">
     <Say voice="alice">I'm listening...</Say>
   </Gather>
 </Response>
@@ -261,9 +261,60 @@ Authorization: Bearer YOUR_API_KEY
 ```json
 {
   "error": "Missing required field: CallSid",
-  "statusCode": 400
+  "statusCode": 400,
+  "requestId": "req_123456789",
+  "timestamp": "2025-01-27T10:30:00.000Z"
 }
 ```
+
+**Enhanced Features:**
+- **Configurable Welcome Message**: Welcome message is now configurable per language using the language configuration system
+- **Comprehensive Logging**: All requests are logged with unique requestId and CallSid for complete traceability
+- **Error Resilience**: System continues to function even when individual components encounter errors
+- **Graceful Degradation**: Fallback mechanisms ensure users receive responses even during partial system failures
+
+### Process Speech Input
+
+**Endpoint:** `POST /twilio/voice/process`
+
+**Description:** Processes speech input from voice calls with enhanced error handling and logging.
+
+**Request Body:**
+```json
+{
+  "CallSid": "CA123456789",
+  "SpeechResult": "I need shelter in San Francisco",
+  "Confidence": "0.9"
+}
+```
+
+**Response:** TwiML XML response with processed speech result
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">I found several shelters in San Francisco that can help you...</Say>
+  <Gather input="speech" action="/twilio/voice/process" method="POST" speechTimeout="auto">
+    <Say voice="alice">Is there anything else you need help with?</Say>
+  </Gather>
+</Response>
+```
+
+**Error Handling:**
+The system implements comprehensive error handling for each processing step:
+- **Context Retrieval**: Graceful handling of context service failures
+- **Intent Classification**: Fallback to 'general_information' intent on errors
+- **Location Extraction**: Continues processing even if location extraction fails
+- **Query Rewriting**: Falls back to original query if rewriting fails
+- **Response Generation**: Proper error propagation with detailed logging
+- **Context Updates**: Non-blocking context updates with error logging
+
+**Logging:**
+All processing steps are logged with:
+- `requestId`: Unique identifier for request tracking
+- `callSid`: Twilio Call SID for call-specific tracking
+- `timestamp`: ISO timestamp for chronological tracking
+- `error`: Detailed error information with stack traces
+- `component`: Specific component that encountered the error
 
 ## Twilio SMS Endpoints
 
@@ -330,6 +381,26 @@ All error responses follow this format:
 }
 ```
 
+### Enhanced Error Handling
+
+The system implements comprehensive error handling with graceful degradation:
+
+**Speech Processing Pipeline:**
+- **Context Service Failures**: System continues without context if context service is unavailable
+- **Intent Classification Failures**: Falls back to 'general_information' intent
+- **Location Extraction Failures**: Continues processing with location prompts
+- **Query Rewriting Failures**: Uses original query as fallback
+- **Response Generation Failures**: Provides fallback responses with detailed error logging
+- **Context Update Failures**: Non-blocking updates with error logging
+
+**Error Logging:**
+All errors are logged with complete context:
+- `requestId`: Unique request identifier for tracking
+- `callSid`: Twilio Call SID for call-specific debugging
+- `component`: Specific component that encountered the error
+- `stack`: Full stack trace for debugging
+- `timestamp`: ISO timestamp for chronological analysis
+
 ### Common Error Codes
 
 | Status Code | Description |
@@ -349,6 +420,10 @@ All error responses follow this format:
 - **TimeoutError**: Request timeout
 - **ConfigurationError**: Missing or invalid configuration
 - **AuthenticationError**: Authentication failure
+- **ContextError**: Conversation context service error
+- **IntentError**: Intent classification error
+- **LocationError**: Location extraction error
+- **ResponseError**: Response generation error
 
 ## Rate Limiting
 

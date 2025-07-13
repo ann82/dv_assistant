@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.4] - 2025-01-27
+
+### Fixed
+- **Enhanced Error Handling in Speech Processing**: Added comprehensive error handling throughout the speech processing pipeline
+  - **Context Retrieval**: Added try-catch blocks around context service calls with detailed error logging
+  - **Follow-up Detection**: Added error handling for follow-up question processing with graceful fallbacks
+  - **Intent Classification**: Added error handling with fallback to 'general_information' intent
+  - **Location Extraction**: Added error handling for location extraction with graceful degradation
+  - **Query Rewriting**: Added error handling with fallback to original query if rewriting fails
+  - **Response Generation**: Added error handling for UnifiedResponseHandler calls with proper error propagation
+  - **Context Updates**: Added error handling for conversation context updates
+  - **Impact**: Speech processing now continues gracefully even when individual components fail
+
+### Added
+- **Configurable Welcome Message**: Replaced hardcoded welcome message with configurable language-specific prompt
+  - **Language Configuration**: Welcome message now uses `SUPPORTED_LANGUAGES[language].prompts.welcome` from language config
+  - **Dynamic Language Support**: Welcome message adapts to the selected language (currently defaults to English)
+  - **Logging**: Added detailed logging for welcome message selection and TwiML generation
+  - **Impact**: Welcome messages are now consistent with language configuration and can be easily customized
+- **Enhanced Route-Level Debugging**: Added comprehensive console logging for route entry points
+  - **Request Tracking**: Added detailed logging when route handlers are called with CallSid and SpeechResult
+  - **Timestamp Tracking**: Added timestamps to route entry logs for better request flow tracking
+  - **Impact**: Improved debugging capabilities for tracking request flow through the system
+
+### Enhanced
+- **Speech Processing Robustness**: Significantly improved error resilience in speech processing
+  - **Graceful Degradation**: System continues to function even when individual components encounter errors
+  - **Detailed Error Logging**: Each error is logged with requestId, callSid, and stack traces for debugging
+  - **Fallback Mechanisms**: Multiple fallback strategies ensure system continues to provide responses
+  - **Error Isolation**: Errors in one component don't cascade to break the entire processing pipeline
+
+### Technical Improvements
+- **Error Handling Patterns**: Implemented consistent error handling patterns throughout the controller
+- **Logging Consistency**: All error logs include requestId and callSid for complete traceability
+- **Fallback Strategies**: Multiple layers of fallbacks ensure system reliability
+- **Code Maintainability**: Better error handling makes the codebase more maintainable and debuggable
+
+### Impact
+- **Before**: Individual component failures could crash the entire speech processing pipeline
+- **After**: Speech processing continues gracefully with detailed error logging and fallback mechanisms
+- **User Experience**: Users receive responses even when some system components encounter issues
+- **Developer Experience**: Comprehensive error logging makes debugging much easier
+
 ## [v1.22.3] - 2025-01-27
 
 ### Fixed
