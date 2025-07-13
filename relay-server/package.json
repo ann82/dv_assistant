@@ -9,6 +9,8 @@
   },
   "scripts": {
     "start": "node --no-deprecation server.js",
+    "dev": "node --no-deprecation server.js",
+    "server": "node --no-deprecation server.js",
     "test": "NODE_OPTIONS='--no-deprecation' vitest run",
     "test:watch": "NODE_OPTIONS='--no-deprecation' vitest",
     "test:coverage": "NODE_OPTIONS='--no-deprecation' vitest run --coverage"

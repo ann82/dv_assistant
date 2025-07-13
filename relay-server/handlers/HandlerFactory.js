@@ -34,7 +34,7 @@ export class HandlerFactory {
     } = options;
 
     // Create integrations if not provided
-    const twilioIntegration = dependencies.twilioIntegration || new TwilioIntegration();
+    const twilioIntegration = dependencies.twilioIntegration || TwilioIntegration;
     const openaiIntegration = dependencies.openaiIntegration || new OpenAIIntegration();
     const ttsIntegration = dependencies.ttsIntegration || TTSIntegration;
 
@@ -98,7 +98,7 @@ export class HandlerFactory {
 
     // Create integrations if not provided
     const openaiIntegration = dependencies.openaiIntegration || new OpenAIIntegration();
-    const searchIntegration = dependencies.searchIntegration || new SearchIntegration();
+    const searchIntegration = dependencies.searchIntegration || SearchIntegration;
 
     const handlerDependencies = {
       ...dependencies,
@@ -145,8 +145,8 @@ export class HandlerFactory {
     // Create shared integrations
     const sharedDependencies = {
       openaiIntegration: dependencies.openaiIntegration || new OpenAIIntegration(),
-      searchIntegration: dependencies.searchIntegration || new SearchIntegration(),
-      twilioIntegration: dependencies.twilioIntegration || new TwilioIntegration(),
+      searchIntegration: dependencies.searchIntegration || SearchIntegration,
+      twilioIntegration: dependencies.twilioIntegration || TwilioIntegration,
       ttsIntegration: dependencies.ttsIntegration || TTSIntegration,
       speechRecognitionIntegration: dependencies.speechRecognitionIntegration || new SpeechRecognitionIntegration(),
       ...dependencies
