@@ -41,10 +41,8 @@ export const config = {
   // API Keys
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'sk-test-key',
   TAVILY_API_KEY: process.env.TAVILY_API_KEY,
-  ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
   
   // Voice Settings
-  ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID || 'default_voice_id',
   ENABLE_TTS: process.env.ENABLE_TTS !== 'false', // Default to true, set to 'false' to disable
   TTS_VOICE: process.env.TTS_VOICE || 'nova', // OpenAI TTS voice: nova, alloy, echo, fable, onyx, shimmer
   TTS_TIMEOUT: parseInt(process.env.TTS_TIMEOUT) || 15000, // TTS timeout in milliseconds (increased for better reliability)
@@ -101,7 +99,6 @@ export const config = {
 logger.info('API Key Status:', {
   hasOpenAIKey: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'sk-test-key'),
   hasTavilyKey: !!process.env.TAVILY_API_KEY,
-  hasElevenLabsKey: !!process.env.ELEVENLABS_API_KEY,
   openAIKeyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 7) : 'none',
   nodeEnv: process.env.NODE_ENV
 }); 

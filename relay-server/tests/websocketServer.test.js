@@ -11,14 +11,35 @@ vi.mock('../lib/logger.js', () => ({
     error: vi.fn()
   }
 }));
-// Mock OpenAI
-vi.mock('openai', () => {
-  const OpenAI = vi.fn().mockImplementation(() => ({
-    audio: { speech: { create: vi.fn() } },
-    chat: { completions: { create: vi.fn() } }
-  }));
-  return { OpenAI, default: OpenAI };
-});
+// Mock OpenAI Integration
+vi.mock('../integrations/openaiIntegration.js', () => ({
+  OpenAIIntegration: vi.fn().mockImplementation(() => ({
+    createChatCompletion: vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Test response' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+    }),
+    createTTS: vi.fn().mockResolvedValue(Buffer.from('test audio')),
+    transcribeAudio: vi.fn().mockResolvedValue('Test transcription'),
+    createEmbedding: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+    getStatus: vi.fn().mockReturnValue({
+      available: true,
+      keyPrefix: 'sk-test',
+      timeout: 30000,
+      maxRetries: 3,
+      maxTokens: 150
+    }),
+    testConnection: vi.fn().mockResolvedValue(true)
+  })),
+  openAIIntegration: {
+    createChatCompletion: vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Test response' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+    }),
+    createTTS: vi.fn().mockResolvedValue(Buffer.from('test audio')),
+    transcribeAudio: vi.fn().mockResolvedValue('Test transcription'),
+    createEmbedding: vi.fn().mockResolvedValue([0.1, 0.2, 0.3])
+  }
+}));
 // Mock Twilio
 vi.mock('twilio', () => ({
   default: vi.fn().mockImplementation(() => ({

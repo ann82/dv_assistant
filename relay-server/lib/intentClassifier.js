@@ -1,13 +1,14 @@
-import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
 import { extractLocationFromQuery as enhancedExtractLocation } from './enhancedLocationDetector.js';
 import { rewriteQuery } from './enhancedQueryRewriter.js';
+import { SearchIntegration } from '../integrations/searchIntegration.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 
 // Re-export rewriteQuery for backward compatibility
 export { rewriteQuery };
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+const openAIIntegration = new OpenAIIntegration();
 
 
 
@@ -212,10 +213,10 @@ User query: "${query}"
 Respond with only the intent name.`;
 
     const startTime = Date.now();
-    const response = await openai.chat.completions.create({
+    const response = await openAIIntegration.createChatCompletion({
       model: config.GPT35_MODEL,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 50,
+      maxTokens: 50,
       temperature: 0.1
     });
     const responseTime = Date.now() - startTime;
@@ -1134,7 +1135,8 @@ function generateGenericFollowUpResponse(lastQueryContext) {
  */
 async function determineIfFollowUpWithAI(query, lastQueryContext) {
   try {
-    const { callGPT } = await import('./apis.js');
+    const { OpenAIIntegration } = await import('../integrations/openaiIntegration.js');
+    const openAI = new OpenAIIntegration();
     
     const prompt = `Given this conversation context:
 Previous question: "${lastQueryContext.query || 'unknown'}"
@@ -1154,19 +1156,20 @@ Consider if the user is:
 
 Respond with only "yes" or "no".`;
 
-    const response = await callGPT(prompt, 'gpt-3.5-turbo');
+    const response = await openAI.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      systemPrompt: 'You are a helpful assistant that determines if queries are follow-up questions. Respond with only "yes" or "no".',
+      maxTokens: 10,
+      temperature: 0.1
+    });
     
-    // Handle the response properly - callGPT returns an object with a text property
-    let responseText;
-    if (typeof response === 'string') {
-      responseText = response;
-    } else if (response && typeof response === 'object' && response.text) {
-      responseText = response.text;
-    } else {
-      logger.error('Unexpected response format from callGPT:', { response, type: typeof response });
-      return false;
-    }
-    
+    const responseText = response.choices[0].message.content;
     const isFollowUp = responseText.toLowerCase().includes('yes');
     
     return isFollowUp;
@@ -1373,25 +1376,30 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
     });
     
     // Import required functions for processing
-    const { callTavilyAPI } = await import('./apis.js');
     const { ResponseGenerator } = await import('./response.js');
     
     // Process the combined query with timeout handling
     let tavilyResponse;
     try {
       // Use a shorter timeout for location follow-ups to be more responsive
-      const { callTavilyAPI } = await import('./apis.js');
+      const { SearchIntegration } = await import('../integrations/searchIntegration.js');
       
       // Create a timeout promise for faster response
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Location search timeout')), 15000); // 15 second timeout
       });
       
-      // Race between Tavily API call and timeout
-      tavilyResponse = await Promise.race([
-        callTavilyAPI(combinedQuery, location),
+      // Race between SearchIntegration call and timeout
+      const searchResult = await Promise.race([
+        SearchIntegration.search(combinedQuery),
         timeoutPromise
       ]);
+      
+      if (!searchResult.success) {
+        throw new Error(searchResult.error || 'Search failed');
+      }
+      
+      tavilyResponse = searchResult.data;
       
       // If we get here, Tavily succeeded, so format the response
       if (tavilyResponse && tavilyResponse.results && tavilyResponse.results.length > 0) {
@@ -1407,9 +1415,9 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
           location: location
         };
       }
-    } catch (tavilyError) {
+    } catch (error) {
       logger.error('Tavily API error in location follow-up:', {
-        error: tavilyError.message,
+        error: error.message,
         query: combinedQuery,
         location
       });
@@ -1422,7 +1430,7 @@ async function generateLocationFollowUpResponse(locationQuery, lastQueryContext,
         smsResponse: `I couldn't search for ${lastQueryContext.intent.replace('_', ' ')} resources in ${location} due to a technical issue. For immediate help, call the National Domestic Violence Hotline: 1-800-799-7233 or visit thehotline.org`,
         results: [],
         location: location,
-        error: tavilyError.message
+        error: error.message
       };
     }
     

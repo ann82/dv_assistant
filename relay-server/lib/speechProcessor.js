@@ -1,7 +1,7 @@
 import logger from './logger.js';
 import { cleanConversationalFillers, rewriteQuery } from './enhancedQueryRewriter.js';
 import { extractLocationFromQuery } from './enhancedLocationDetector.js';
-import { callTavilyAPI } from './apis.js';
+import { SearchIntegration } from '../integrations/searchIntegration.js';
 
 /**
  * Extract location from speech input using hybrid approach
@@ -166,18 +166,27 @@ export async function processSpeechResult(speechInput, callSid) {
     const rewrittenQuery = await rewriteQuery(cleanedInput, 'find_shelter', callSid);
     logger.info('Query rewritten:', { original: cleanedInput, rewritten: rewrittenQuery, callSid });
 
-    // Process with Tavily using standardized API with location
-    const tavilyResult = await callTavilyAPI(rewrittenQuery, locationInfo.location);
+    // Process with Tavily using SearchIntegration
+    const searchResult = await SearchIntegration.search(rewrittenQuery);
+    
+    if (!searchResult.success) {
+      logger.error('Search integration failed:', { error: searchResult.error, callSid });
+      return {
+        success: false,
+        error: searchResult.error,
+        callSid
+      };
+    }
 
     logger.info('Tavily processing complete:', { 
-      success: tavilyResult.success, 
-      resultCount: tavilyResult.results?.length || 0,
+      success: searchResult.success, 
+      resultCount: searchResult.data.results?.length || 0,
       callSid 
     });
 
     return {
       success: true,
-      results: tavilyResult.results || [],
+      results: searchResult.data.results || [],
       query: rewrittenQuery,
       location: locationInfo.location,
       callSid

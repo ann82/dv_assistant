@@ -1,10 +1,10 @@
-import { OpenAI } from 'openai';
 import { config } from '../lib/config.js';
 import logger from '../lib/logger.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 
 export class CallSummaryService {
-  constructor(openaiClient = new OpenAI({ apiKey: config.OPENAI_API_KEY })) {
-    this.openai = openaiClient;
+  constructor(openAIIntegrationInstance = new OpenAIIntegration()) {
+    this.openAI = openAIIntegrationInstance;
     this.callHistory = new Map();
   }
 
@@ -28,19 +28,16 @@ ${history.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
 
 Summary:`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAI.createChatCompletion({
         model: config.GPT35_MODEL,
         messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that summarizes conversations. Focus on key points, resources provided, and any action items.'
-          },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 500,
+        systemPrompt: 'You are a helpful assistant that summarizes conversations. Focus on key points, resources provided, and any action items.',
+        maxTokens: 500,
         temperature: 0.7
       });
 

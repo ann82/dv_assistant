@@ -1,3 +1,24 @@
+/**
+ * Domestic Violence Support Assistant - Main Server
+ * 
+ * This is the primary server for the Domestic Violence Support Assistant application.
+ * It handles Twilio voice calls, web requests, WebSocket connections, and provides
+ * comprehensive domestic violence support resources through AI-powered conversations.
+ * 
+ * Key Features:
+ * - Twilio voice call processing with speech recognition
+ * - WebSocket server for real-time communication
+ * - AI-powered conversation management
+ * - Resource search and recommendation
+ * - Health monitoring and logging
+ * - Rate limiting and security
+ * 
+ * @author Domestic Violence Support Assistant Team
+ * @version 1.21.3
+ * @since 2024-03-15
+ */
+
+// Core Node.js and Express imports
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -5,21 +26,35 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import http from 'http';
+
+// Application-specific imports
 import { config } from './lib/config.js';
 import twilioRoutes from './routes/twilio.js';
+import healthRoutes from './routes/health.js';
 import { TwilioWebSocketServer } from './websocketServer.js';
 import logger from './lib/logger.js';
-import { callTavilyAPI } from './lib/apis.js';
+import { SearchIntegration } from './integrations/searchIntegration.js';
 import rateLimit from 'express-rate-limit';
+import { ServiceManager } from './services/ServiceManager.js';
+import { HandlerManager } from './handlers/HandlerManager.js';
+import { errorHandler } from './middleware/validation.js';
+import { enhancedRequestLogger, enhancedErrorLogger, skipHealthCheckLogging } from './middleware/logging.js';
+import { performanceMonitoring, errorTracking, startMemoryMonitoring } from './middleware/performanceMonitoring.js';
+import { OpenAIIntegration } from './integrations/openaiIntegration.js';
 
-// Get the directory name
+// ES Module compatibility: Get the directory name for __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
+// Load environment variables from .env file
 dotenv.config();
 
-// Verify required environment variables
+/**
+ * Environment Variable Validation
+ * 
+ * Ensures all required environment variables are present before starting the server.
+ * This prevents runtime errors and provides clear feedback about missing configuration.
+ */
 const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'TAVILY_API_KEY', 'OPENAI_API_KEY'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
@@ -28,7 +63,7 @@ if (missingEnvVars.length > 0) {
   throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
 
-// Log environment variables (without sensitive data)
+// Log environment configuration (with sensitive data masked)
 logger.info('Environment loaded:', {
   NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT,
@@ -40,12 +75,19 @@ logger.info('Environment loaded:', {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' + process.env.OPENAI_API_KEY.slice(-4) : undefined
 });
 
+// Initialize Express application
 const app = express();
 
-// Use Railway's PORT or fallback to 3000
+// Server configuration: Use Railway's PORT or fallback to 3000
 const port = process.env.PORT || 3000;
 
-// Configure Express
+/**
+ * Express Middleware Configuration
+ * 
+ * Sets up essential middleware for request processing, security, and monitoring.
+ */
+
+// Body parsing middleware with increased limits for audio data
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ 
   limit: '50mb',
@@ -53,13 +95,24 @@ app.use(express.urlencoded({
   parameterLimit: 50000
 }));
 
-// Increase timeout for Twilio requests
+// Performance monitoring middleware for request tracking
+app.use(performanceMonitoring);
+
+// Enhanced request logging (skips health check endpoints to reduce noise)
+app.use(skipHealthCheckLogging);
+
+/**
+ * Request Timeout Configuration
+ * 
+ * Sets reasonable timeouts for Twilio compatibility and prevents hanging requests.
+ * Twilio has specific timeout requirements that must be met for proper operation.
+ */
 app.use((req, res, next) => {
-  // Set reasonable timeouts for Twilio compatibility
-  req.setTimeout(30000); // 30 seconds
-  res.setTimeout(30000); // 30 seconds
+  // Set 30-second timeouts for Twilio compatibility
+  req.setTimeout(30000);
+  res.setTimeout(30000);
   
-  // Add timeout error handling
+  // Handle request timeouts
   req.on('timeout', () => {
     logger.error('Request timeout:', {
       url: req.originalUrl,
@@ -71,6 +124,7 @@ app.use((req, res, next) => {
     }
   });
   
+  // Handle response timeouts
   res.on('timeout', () => {
     logger.error('Response timeout:', {
       url: req.originalUrl,
@@ -84,7 +138,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configure CORS
+/**
+ * CORS Configuration
+ * 
+ * Enables Cross-Origin Resource Sharing for web client access.
+ * Configured to allow all origins for development and production flexibility.
+ */
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -93,10 +152,15 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
-// Configure rate limiting
+/**
+ * Rate Limiting Configuration
+ * 
+ * Prevents abuse by limiting requests per IP address.
+ * Essential for protecting against DoS attacks and API abuse.
+ */
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100, // Limit each IP to 100 requests per window
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -105,62 +169,41 @@ const limiter = rateLimit({
 // Apply rate limiting to all routes
 app.use(limiter);
 
-// Create audio directory if it doesn't exist
+/**
+ * Static File Serving
+ * 
+ * Creates and serves audio files directory for TTS-generated audio.
+ * Audio files are generated during voice calls and cached for reuse.
+ */
 const audioDir = path.join(__dirname, 'public', 'audio');
 if (!fs.existsSync(audioDir)) {
   fs.mkdirSync(audioDir, { recursive: true });
 }
 
-// Serve audio files
+// Serve audio files from the public/audio directory
 app.use('/audio', express.static(audioDir));
 
-// Mount Twilio routes
+/**
+ * Route Configuration
+ * 
+ * Mounts application routes for different functionality areas.
+ */
+
+// Twilio voice and SMS processing routes
 app.use('/twilio', twilioRoutes);
 
-// Add health check endpoint
-app.get('/health', (req, res) => {
-  try {
-    // Check if server is running
-    const healthStatus = {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      port: port,
-      memory: process.memoryUsage(),
-      pid: process.pid,
-      // Add Railway-specific info
-      railway: {
-        staticUrl: process.env.RAILWAY_STATIC_URL,
-        serviceId: process.env.RAILWAY_SERVICE_ID,
-        environment: process.env.RAILWAY_ENVIRONMENT
-      },
-      // Add timeout configuration
-      timeouts: {
-        requestTimeout: 120000,
-        responseTimeout: 120000,
-        healthCheckTimeout: 1200
-      },
-      // Add active connections info
-      connections: {
-        activeCalls: twilioRoutes.getActiveCallsCount ? twilioRoutes.getActiveCallsCount() : 'unknown',
-        wsConnections: wsServer ? wsServer.getConnectionCount() : 'unknown'
-      }
-    };
-    
-    logger.info('Health check requested:', healthStatus);
-    res.status(200).json(healthStatus);
-  } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
-  }
-});
+// Health check and monitoring routes
+app.use('/health', healthRoutes);
 
-// Add a simple root endpoint for basic connectivity testing
+// Start memory monitoring for performance tracking
+startMemoryMonitoring();
+
+/**
+ * Root Endpoint
+ * 
+ * Simple connectivity test endpoint for basic health verification.
+ * Used by load balancers and monitoring systems.
+ */
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Domestic Violence Support Assistant API',
@@ -169,16 +212,23 @@ app.get('/', (req, res) => {
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  logger.error('Application error:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
-  });
-});
+/**
+ * Error Handling Middleware Stack
+ * 
+ * Comprehensive error handling with logging, tracking, and graceful degradation.
+ * Order is important: specific handlers first, then general fallbacks.
+ */
 
-// Handle 404 errors
+// Enhanced error logging middleware
+app.use(enhancedErrorLogger);
+
+// Error tracking for monitoring and alerting
+app.use(errorTracking);
+
+// General error handler for uncaught exceptions
+app.use(errorHandler);
+
+// 404 handler for unmatched routes
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -186,30 +236,138 @@ app.use((req, res) => {
   });
 });
 
-// Create HTTP server with Express app
+/**
+ * HTTP Server Creation
+ * 
+ * Creates the HTTP server instance that will handle all incoming requests.
+ * Separate from Express app to allow WebSocket server attachment.
+ */
 const server = http.createServer(app);
 
-// Debug log to confirm server object
+// Debug logging to confirm server object creation
 logger.debug('Server object details:', { 
   type: typeof server, 
   keys: Object.keys(server) 
 });
 
-// Initialize WebSocket server
-const wsServer = new TwilioWebSocketServer(server);
+/**
+ * Service and Handler Management
+ * 
+ * Initializes the core application services and request handlers.
+ * These provide the business logic for domestic violence support functionality.
+ */
 
-// Set WebSocket server in Twilio routes
-twilioRoutes.setWebSocketServer(wsServer);
+// Initialize the service manager for core application services
+const serviceManager = new ServiceManager();
+let handlerManager;
 
-// Start the server
-server.listen(port, '0.0.0.0', () => {
-  logger.info(`Server running on port ${port}`);
+/**
+ * Server Initialization (Skip during tests)
+ * 
+ * Initializes services and handlers, but skips during test environment
+ * to avoid Twilio SDK issues and reduce test complexity.
+ */
+if (process.env.NODE_ENV !== 'test') {
+  (async () => {
+    // Initialize all application services
+    await serviceManager.initialize();
+    
+    /**
+     * Dependency Injection Configuration
+     * 
+     * Creates a comprehensive dependencies object that provides all necessary
+     * services and utilities to the handler manager and other components.
+     */
+    const dependencies = {
+      // Integration dependencies for external APIs
+      openaiIntegration: new OpenAIIntegration(),
+      searchIntegration: new SearchIntegration(),
+      twilioIntegration: null, // Will be initialized in HandlerManager
+      
+      // Core service dependencies
+      audioService: serviceManager.getService('audio'),
+      ttsService: serviceManager.getService('tts'),
+      searchService: serviceManager.getService('search'),
+      contextService: serviceManager.getService('context'),
+      
+      // Utility dependencies
+      logger: logger,
+      
+      // Configuration dependencies
+      config: config
+    };
+    
+    // Initialize the handler manager with all dependencies
+    handlerManager = new HandlerManager(Object.fromEntries(serviceManager.getAllServices()), dependencies);
+    
+    logger.info('ServiceManager and HandlerManager initialized successfully');
+  })().catch(error => {
+    logger.error('Failed to initialize services:', error);
+    process.exit(1);
+  });
+}
+
+/**
+ * WebSocket Server Initialization
+ * 
+ * Sets up the WebSocket server for real-time communication with web clients.
+ * Only initialized in non-test environments to avoid Twilio SDK issues.
+ */
+let wsServer;
+if (process.env.NODE_ENV !== 'test') {
+  wsServer = new TwilioWebSocketServer(server);
+  if (handlerManager) {
+    handlerManager.setWebSocketServer(wsServer);
+  }
+}
+
+/**
+ * Server Startup
+ * 
+ * Starts the HTTP server and begins listening for incoming requests.
+ * Includes comprehensive error handling and logging.
+ */
+server.listen(port, () => {
+  logger.info(`🚀 Domestic Violence Support Assistant server started successfully`);
+  logger.info(`📡 Server listening on port ${port}`);
+  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🔗 Health check: http://localhost:${port}/health`);
+  logger.info(`📞 Twilio webhook: http://localhost:${port}/twilio/voice`);
+  logger.info(`🔊 Audio files: http://localhost:${port}/audio/`);
+  
+  // Log service status
+  if (serviceManager) {
+    const services = Array.from(serviceManager.getAllServices().keys());
+    logger.info(`⚙️  Services initialized: ${services.join(', ')}`);
+  }
+  
+  logger.info('✅ Server startup complete');
+}).on('error', (err) => {
+  logger.error('❌ Failed to start server:', err);
+  process.exit(1);
 });
 
-// Handle server shutdown
+/**
+ * Graceful Shutdown Handling
+ * 
+ * Ensures the server shuts down cleanly when receiving termination signals.
+ * This prevents data loss and ensures proper cleanup of resources.
+ */
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
+  logger.info('🛑 Received SIGTERM, shutting down gracefully...');
   server.close(() => {
-    logger.info('HTTP server closed');
+    logger.info('✅ Server closed successfully');
+    process.exit(0);
   });
-}); 
+});
+
+process.on('SIGINT', () => {
+  logger.info('🛑 Received SIGINT, shutting down gracefully...');
+  server.close(() => {
+    logger.info('✅ Server closed successfully');
+    process.exit(0);
+  });
+});
+
+// Export the server for testing purposes
+export default server; 

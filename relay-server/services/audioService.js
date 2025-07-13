@@ -1,4 +1,3 @@
-import { OpenAI } from 'openai';
 import { config } from '../lib/config.js';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -8,11 +7,15 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { gptCache } from '../lib/queryCache.js';
 import logger from '../lib/logger.js';
+import { TTSIntegration } from '../integrations/ttsIntegration.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
+import { speechRecognitionIntegration } from '../integrations/speechRecognitionIntegration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+// Initialize OpenAI Integration
+const openAIIntegration = new OpenAIIntegration();
 
 // Constants for audio chunking
 const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
@@ -24,8 +27,8 @@ const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours in milliseconds
 const MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
 
 export class AudioService {
-  constructor(openaiClient = openai) {
-    this.openai = openaiClient;
+  constructor(openAIIntegrationInstance = openAIIntegration) {
+    this.openAI = openAIIntegrationInstance;
     this.audioBuffer = new Map(); // Store audio chunks by callSid
     this.audioDir = path.join(process.cwd(), 'public', 'audio');
     this.cacheDir = path.join(process.cwd(), 'cache', 'audio');
@@ -145,22 +148,17 @@ export class AudioService {
       // Write the audio buffer to a file
       await fs.writeFile(filePath, audioBuffer);
 
-      // Create a file object for OpenAI
-      const file = await fs.open(filePath, 'r');
-      const fileStream = file.createReadStream();
-
       logger.info('Sending audio to Whisper for transcription...');
-      const response = await this.openai.audio.transcriptions.create({
-        file: fileStream,
+      const response = await speechRecognitionIntegration.transcribeAudio({
+        audioBuffer,
         model: "whisper-1",
         language: "en-US", // Using en-US as default
-        response_format: "text"
+        responseFormat: "text"
       });
 
       logger.info('Whisper transcription complete:', { response: response.substring(0, 100) + '...' });
 
       // Clean up
-      await file.close();
       await fs.unlink(filePath);
 
       return response;
@@ -183,19 +181,16 @@ export class AudioService {
 
       const model = this.shouldUseGPT4(transcript) ? config.GPT4_MODEL : config.GPT35_MODEL;
       
-      const response = await this.openai.chat.completions.create({
+      const response = await this.openAI.createChatCompletion({
         model,
         messages: [
-          {
-            role: "system",
-            content: "You are a warm, empathetic, and supportive assistant for people experiencing domestic violence. Provide compassionate, safe, and helpful responses that validate their feelings and experiences. Use gentle, reassuring language and show understanding of their situation. Respond in the same language as the user."
-          },
           {
             role: "user",
             content: transcript
           }
         ],
-        max_tokens: config.DEFAULT_MAX_TOKENS
+        systemPrompt: "You are a warm, empathetic, and supportive assistant for people experiencing domestic violence. Provide compassionate, safe, and helpful responses that validate their feelings and experiences. Use gentle, reassuring language and show understanding of their situation. Respond in the same language as the user.",
+        maxTokens: config.DEFAULT_MAX_TOKENS
       });
 
       const result = {
@@ -217,7 +212,7 @@ export class AudioService {
 
   // Generate TTS with caching and language support
   async generateTTS(text, languageCode = 'en-US') {
-    logger.info('Generating TTS audio with voice:', { ttsVoice: config.TTS_VOICE || 'nova', languageCode });
+    logger.info('Generating TTS audio with TTSIntegration:', { languageCode });
     try {
       // Check if TTS is enabled
       if (!config.ENABLE_TTS) {
@@ -250,147 +245,45 @@ export class AudioService {
         // Cache miss, continue to generate
       }
 
-      // Get language-specific voice
-      const { getLanguageConfig } = await import('../lib/languageConfig.js');
-      const langConfig = getLanguageConfig(languageCode);
-      const voice = langConfig?.openaiVoice || config.TTS_VOICE;
-      
-      // Generate new TTS with enhanced timeout and retry logic
-      logger.info('Generating TTS for text:', { 
-        text: text.substring(0, 100) + '...',
-        filePath: cacheFilePath,
-        voice,
-        languageCode,
-        timeout: config.TTS_TIMEOUT,
-        textLength: text.length
+      // Use TTSIntegration to generate audio
+      const ttsResult = await TTSIntegration.generateTTS(text, {
+        language: languageCode,
+        voice: config.TTS_VOICE
       });
-      
-      // Enhanced retry logic with exponential backoff
-      const maxRetries = 2; // Reduced from 3 to 2 for faster fallback
-      let lastError = null;
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          // Create AbortController for timeout handling
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => {
-            logger.warn(`TTS request timeout on attempt ${attempt}/${maxRetries}`);
-            controller.abort();
-          }, config.TTS_TIMEOUT);
 
-          try {
-            const response = await this.openai.audio.speech.create({
-              model: "tts-1",
-              voice: voice,
-              input: text
-            }, {
-              signal: controller.signal,
-              timeout: config.TTS_TIMEOUT + 2000 // Reduced buffer from 5s to 2s
-            });
-
-            clearTimeout(timeoutId);
-
-            const buffer = Buffer.from(await response.arrayBuffer());
-            
-            // Calculate total size and chunk size
-            const totalSize = buffer.length;
-            const chunkSize = 1024 * 1024; // 1MB chunks
-            const chunks = Math.ceil(totalSize / chunkSize);
-            
-            logger.info('Total audio size:', { totalSize, bytes: totalSize, chunks });
-            
-            // Write in chunks to avoid memory issues
-            logger.info(`Writing ${chunks} chunks of audio...`);
-            
-            for (let i = 0; i < chunks; i++) {
-              const start = i * chunkSize;
-              const end = Math.min(start + chunkSize, totalSize);
-              const chunk = buffer.slice(start, end);
-              
-              if (i === 0) {
-                // First chunk - create file
-                await fs.writeFile(cacheFilePath, chunk);
-              } else {
-                // Append to file
-                await fs.appendFile(cacheFilePath, chunk);
-              }
-              
-              logger.info(`Wrote chunk ${i + 1}/${chunks}`, { chunkLength: chunk.length });
-            }
-
-            // Get file stats
-            const stats = await fs.stat(cacheFilePath);
-            logger.info('TTS audio file stats:', {
-              size: stats.size,
-              created: stats.birthtime,
-              modified: stats.mtime
-            });
-
-            // Copy to audio directory for serving
-            const fileName = `${cacheKey}.mp3`;
-            const filePath = path.join(this.audioDir, fileName);
-            await fs.copyFile(cacheFilePath, filePath);
-
-            logger.info('TTS audio generated successfully:', {
-              text: text.substring(0, 50) + '...',
-              fileName,
-              filePath,
-              size: stats.size,
-              voice,
-              languageCode,
-              attempt
-            });
-
-            return {
-              text,
-              fileName,
-              filePath,
-              cached: false
-            };
-
-          } catch (fetchError) {
-            clearTimeout(timeoutId);
-            
-            if (fetchError.name === 'AbortError') {
-              logger.error(`TTS generation timed out on attempt ${attempt}/${maxRetries} after ${config.TTS_TIMEOUT}ms`);
-              lastError = new Error(`TTS generation timed out on attempt ${attempt}`);
-            } else {
-              logger.error(`TTS generation failed on attempt ${attempt}/${maxRetries}:`, {
-                error: fetchError.message,
-                name: fetchError.name,
-                code: fetchError.code
-              });
-              lastError = fetchError;
-            }
-            
-            // If this is the last attempt, throw the error immediately
-            if (attempt === maxRetries) {
-              throw lastError;
-            }
-            
-            // Reduced wait time for faster fallback
-            const waitTime = Math.min(500 * Math.pow(2, attempt - 1), 2000); // Max 2 seconds
-            logger.info(`Retrying TTS generation in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-          }
-
-        } catch (attemptError) {
-          lastError = attemptError;
-          
-          // If this is the last attempt, throw the error immediately
-          if (attempt === maxRetries) {
-            throw attemptError;
-          }
-          
-          // Reduced wait time for faster fallback
-          const waitTime = Math.min(500 * Math.pow(2, attempt - 1), 2000); // Max 2 seconds
-          logger.info(`Retrying TTS generation in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+      // Handle the TTS result
+      if (ttsResult.audioUrl) {
+        // For stub provider, create a dummy file
+        const fileName = `${cacheKey}.mp3`;
+        const filePath = path.join(this.audioDir, fileName);
+        
+        // Create a dummy audio file for stub provider
+        if (ttsResult.provider === 'stub') {
+          const dummyAudio = Buffer.from('dummy audio data');
+          await fs.writeFile(cacheFilePath, dummyAudio);
+          await fs.copyFile(cacheFilePath, filePath);
         }
+
+        logger.info('TTS audio generated successfully:', {
+          text: text.substring(0, 50) + '...',
+          fileName,
+          filePath,
+          provider: ttsResult.provider,
+          languageCode
+        });
+
+        return {
+          text,
+          fileName,
+          filePath,
+          cached: false
+        };
+      } else {
+        throw new Error('TTS integration returned no audio URL');
       }
 
     } catch (error) {
-      logger.error('Error generating TTS after all retries:', {
+      logger.error('Error generating TTS with TTSIntegration:', {
         error: error.message,
         name: error.name,
         code: error.code,
@@ -401,7 +294,7 @@ export class AudioService {
       
       // Provide more specific error information
       if (error.message.includes('timeout')) {
-        throw new Error(`TTS generation timed out after ${maxRetries} attempts. Please try again.`);
+        throw new Error(`TTS generation timed out. Please try again.`);
       } else if (error.message.includes('aborted')) {
         throw new Error('TTS request was interrupted. Please try again.');
       } else {

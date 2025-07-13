@@ -19,9 +19,11 @@ vi.mock('../lib/queryLogger.js', () => ({
   logQueryHandling: vi.fn()
 }));
 
-// Mock the standardized Tavily API function
-vi.mock('../lib/apis.js', () => ({
-  callTavilyAPI: vi.fn()
+// Mock Search Integration
+vi.mock('../integrations/searchIntegration.js', () => ({
+  SearchIntegration: {
+    search: vi.fn()
+  }
 }));
 
 describe('Query Handler', () => {
@@ -37,16 +39,19 @@ describe('Query Handler', () => {
     getIntent.mockResolvedValue('find_shelter');
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
-    // Mock Tavily response with test data that will be filtered
-    const { callTavilyAPI } = await import('../lib/apis.js');
-    callTavilyAPI.mockResolvedValue({
-      results: [
-        {
-          title: 'Local Shelter',
-          summary: 'Emergency shelter services',
-          url: 'https://example.com'
-        }
-      ]
+    // Mock Search Integration response
+    const { SearchIntegration } = await import('../integrations/searchIntegration.js');
+    SearchIntegration.search.mockResolvedValue({
+      success: true,
+      data: {
+        results: [
+          {
+            title: 'Local Shelter',
+            summary: 'Emergency shelter services',
+            url: 'https://example.com'
+          }
+        ]
+      }
     });
 
     // Mock relevance scoring
@@ -82,16 +87,19 @@ describe('Query Handler', () => {
     getIntent.mockResolvedValue('find_shelter');
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
-    // Mock Tavily response
-    const { callTavilyAPI } = await import('../lib/apis.js');
-    callTavilyAPI.mockResolvedValue({
-      results: [
-        {
-          title: 'Unrelated Result',
-          summary: 'Not relevant',
-          url: 'https://example.com'
-        }
-      ]
+    // Mock Search Integration response
+    const { SearchIntegration } = await import('../integrations/searchIntegration.js');
+    SearchIntegration.search.mockResolvedValue({
+      success: true,
+      data: {
+        results: [
+          {
+            title: 'Unrelated Result',
+            summary: 'Not relevant',
+            url: 'https://example.com'
+          }
+        ]
+      }
     });
 
     // Mock relevance scoring with low score
@@ -130,10 +138,13 @@ describe('Query Handler', () => {
     getIntent.mockResolvedValue('find_shelter');
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
-    // Mock empty Tavily response
-    const { callTavilyAPI } = await import('../lib/apis.js');
-    callTavilyAPI.mockResolvedValue({
-      results: []
+    // Mock empty Search Integration response
+    const { SearchIntegration } = await import('../integrations/searchIntegration.js');
+    SearchIntegration.search.mockResolvedValue({
+      success: true,
+      data: {
+        results: []
+      }
     });
 
     // Mock GPT fallback
@@ -161,9 +172,12 @@ describe('Query Handler', () => {
     getIntent.mockResolvedValue('find_shelter');
     rewriteQuery.mockResolvedValue('domestic violence shelter near me');
 
-    // Mock Tavily error
-    const { callTavilyAPI } = await import('../lib/apis.js');
-    callTavilyAPI.mockRejectedValue(new Error('Tavily API error: API Error'));
+    // Mock Search Integration error
+    const { SearchIntegration } = await import('../integrations/searchIntegration.js');
+    SearchIntegration.search.mockResolvedValue({
+      success: false,
+      error: 'Tavily API error: API Error'
+    });
 
     // Mock GPT fallback
     const { fallbackResponse } = await import('../lib/fallbackResponder.js');
@@ -178,36 +192,19 @@ describe('Query Handler', () => {
     const { logQueryHandling } = await import('../lib/queryLogger.js');
     expect(logQueryHandling).toHaveBeenCalledWith({
       query: 'need shelter',
-      intent: 'general_query',
+      intent: 'find_shelter',
       usedGPT: true,
-      score: 0,
-      error: 'Tavily API error: API Error'
+      score: 0
     });
   });
 
-  it('should use GPT fallback on any error', async () => {
+  it('should throw error when intent classification fails', async () => {
     // Mock intent classification error
     const { getIntent } = await import('../lib/intentClassifier.js');
     getIntent.mockRejectedValue(new Error('Intent classification failed'));
 
-    // Mock GPT fallback
-    const { fallbackResponse } = await import('../lib/fallbackResponder.js');
-    fallbackResponse.mockResolvedValue('GPT fallback response');
-
-    const result = await handleUserQuery('need shelter');
-    
-    expect(result.source).toBe('gpt');
-    expect(result.response).toBe('GPT fallback response');
-
-    // Verify logging
-    const { logQueryHandling } = await import('../lib/queryLogger.js');
-    expect(logQueryHandling).toHaveBeenCalledWith({
-      query: 'need shelter',
-      intent: 'general_query',
-      usedGPT: true,
-      score: 0,
-      error: 'Intent classification failed'
-    });
+    // Expect the function to throw an error
+    await expect(handleUserQuery('need shelter')).rejects.toThrow('Intent classification failed');
   });
 
   it('should handle off-topic queries appropriately', async () => {

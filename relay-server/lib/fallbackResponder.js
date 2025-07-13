@@ -1,8 +1,8 @@
-import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+const openAIIntegration = new OpenAIIntegration();
 
 // Few-shot examples for each intent
 const intentExamples = {
@@ -88,11 +88,11 @@ export async function fallbackResponse(query, intent, callSid = null, detectedLa
       }
     ];
 
-    const response = await openai.chat.completions.create({
+    const response = await openAIIntegration.createChatCompletion({
       model: 'gpt-3.5-turbo',
       messages,
       temperature: 0.7,
-      max_tokens: 250
+      maxTokens: 250
     });
 
     const fallbackResponse = response.choices[0].message.content;

@@ -5,7 +5,7 @@ import { fallbackResponse } from './fallbackResponder.js';
 import { logQueryHandling } from './queryLogger.js';
 import logger from './logger.js';
 import { ResponseGenerator } from './response.js';
-import { callTavilyAPI } from './apis.js';
+import { SearchIntegration } from '../integrations/searchIntegration.js';
 
 // Minimum confidence score for considering Tavily results
 const MIN_CONFIDENCE_SCORE = 0.7;
@@ -62,8 +62,25 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
     // Step 3: Extract location for enhanced search
     const location = ResponseGenerator.extractLocationFromQuery(cleanRewrittenQuery);
 
-    // Step 4: Get Tavily results using standardized API
-    const tavilyData = await callTavilyAPI(cleanRewrittenQuery, location);
+    // Step 4: Get Tavily results using SearchIntegration
+    const searchResult = await SearchIntegration.search(cleanRewrittenQuery);
+    
+    if (!searchResult.success) {
+      logger.info('Search integration failed, using GPT fallback:', searchResult.error);
+      const gptResponse = await fallbackResponse(cleanRewrittenQuery, intent, callSid, detectedLanguage);
+      
+      // Log query handling
+      await logQueryHandling({
+        query: cleanQuery,
+        intent,
+        usedGPT: true,
+        score: 0
+      });
+      
+      return { response: gptResponse, source: 'gpt' };
+    }
+    
+    const tavilyData = searchResult.data;
     
     // If no results, use GPT fallback
     if (!tavilyData.results || tavilyData.results.length === 0) {
@@ -118,19 +135,7 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
     return { response: formattedResponse.voiceResponse, source: 'tavily' };
 
   } catch (error) {
-    logger.error('Error handling user query:', error);
-    // Use GPT fallback on any error
-    const gptResponse = await fallbackResponse(query, 'general_query', callSid, detectedLanguage);
-    
-    // Log query handling with error
-    await logQueryHandling({
-      query,
-      intent: 'general_query',
-      usedGPT: true,
-      score: 0,
-      error: error.message
-    });
-    
-    return { response: gptResponse, source: 'gpt' };
+    logger.error('Error in handleUserQuery:', error);
+    throw error;
   }
 } 

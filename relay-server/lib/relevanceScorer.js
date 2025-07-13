@@ -1,8 +1,8 @@
-import { OpenAI } from 'openai';
 import { config } from './config.js';
 import logger from './logger.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+const openAIIntegration = new OpenAIIntegration();
 
 /**
  * Calculate cosine similarity between two vectors
@@ -39,13 +39,13 @@ function cosineSimilarity(vecA, vecB) {
  */
 async function getEmbedding(text) {
   try {
-    const response = await openai.embeddings.create({
+    const embedding = await openAIIntegration.createEmbedding({
+      text,
       model: 'text-embedding-3-small',
-      input: text,
-      encoding_format: 'float'
+      encodingFormat: 'float'
     });
 
-    return response.data[0].embedding;
+    return embedding;
   } catch (error) {
     logger.error('Error getting embedding:', error);
     throw error;

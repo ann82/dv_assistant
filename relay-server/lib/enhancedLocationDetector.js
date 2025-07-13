@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { geocodingIntegration } from '../integrations/geocodingIntegration.js';
 
 /**
  * Enhanced Location Detector for Domestic Violence Support Assistant
@@ -10,36 +11,42 @@ import logger from './logger.js';
  * 4. Global location detection with proper state/country specification
  */
 
-// Cache for geocoding results (in-memory, expires after 24 hours)
-const LOCATION_CACHE = new Map();
-const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-
-// Common words to filter out from location detection
-const FILTER_WORDS = [
-  'me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere',
-  'home', 'house', 'place', 'area', 'region', 'zone', 'district'
-];
-
+// Constants for current location detection
 const CURRENT_LOCATION_WORDS = [
-  'me', 'my location', 'here', 'near me', 'nearby', 'around me', 'close to me', 'current location'
+  'current location',
+  'my location',
+  'where i am',
+  'my area',
+  'my city',
+  'my town',
+  'current area',
+  'current city',
+  'current town',
+  'near me',
+  'close to me',
+  'around me',
+  'nearby',
+  'here',
+  'me'
 ];
+
+// Cache for location detection results
+const locationCache = new Map();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 /**
  * Get cached location data
- * @param {string} location - The location string
- * @returns {Object|null} Cached location data or null if not found/expired
+ * @param {string} location - Location string
+ * @returns {Object|null} Cached location data or null
  */
 function getCachedLocation(location) {
-  const normalized = location.toLowerCase().trim();
-  const cached = LOCATION_CACHE.get(normalized);
+  if (!location) return null;
   
-  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+  const normalizedLocation = location.toLowerCase().trim();
+  const cached = locationCache.get(normalizedLocation);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
     return cached.data;
-  }
-  
-  // Remove expired entry
-  if (cached) {
-    LOCATION_CACHE.delete(normalized);
   }
   
   return null;
@@ -47,53 +54,33 @@ function getCachedLocation(location) {
 
 /**
  * Cache location data
- * @param {string} location - The location string
- * @param {Object} data - The location data to cache
+ * @param {string} location - Location string
+ * @param {Object} data - Location data to cache
  */
 function cacheLocation(location, data) {
-  const normalized = location.toLowerCase().trim();
-  LOCATION_CACHE.set(normalized, {
+  if (!location) return;
+  
+  const normalizedLocation = location.toLowerCase().trim();
+  locationCache.set(normalizedLocation, {
     data,
     timestamp: Date.now()
   });
 }
 
 /**
- * Geocode location using Nominatim API
+ * Geocode location using GeocodingIntegration
  * @param {string} location - The location string to geocode
  * @returns {Promise<Object>} Geocoding result with country and coordinates
  */
 async function geocodeLocation(location) {
   try {
-    const encodedLocation = encodeURIComponent(location);
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedLocation}&limit=1&addressdetails=1`;
+    const result = await geocodingIntegration.geocode(location);
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'DomesticViolenceAssistant/1.0'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Geocoding API error: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    if (!data || data.length === 0) {
+    if (!result.success) {
       return null;
     }
     
-    const result = data[0];
-    return {
-      country: result.address?.country,
-      countryCode: result.address?.country_code,
-      state: result.address?.state,
-      city: result.address?.city || result.address?.town,
-      latitude: parseFloat(result.lat),
-      longitude: parseFloat(result.lon),
-      displayName: result.display_name
-    };
+    return result.data;
   } catch (error) {
     logger.error('Geocoding error:', error);
     return null;
@@ -110,8 +97,21 @@ export async function detectLocation(location) {
     return { location: null, scope: 'none', isComplete: false };
   }
   
-  const normalizedLocation = location.toLowerCase().trim();
+  // Normalize whitespace, lowercase, and pad with spaces
+  let paddedInput = ' ' + location.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
   
+  // Sort phrases by length (longest first)
+  const sortedPhrases = [...CURRENT_LOCATION_WORDS].sort((a, b) => b.length - a.length);
+  
+  for (const phrase of sortedPhrases) {
+    const phraseWithSpaces = ' ' + phrase + ' ';
+    if (paddedInput.includes(phraseWithSpaces)) {
+      return { location: null, scope: 'current-location', isComplete: false };
+    }
+  }
+
+  const normalizedLocation = location.trim();
+
   // Treat current-location words as incomplete (word boundary match)
   if (containsCurrentLocationWord(normalizedLocation)) {
     return { location: null, scope: 'current-location', isComplete: false };
@@ -123,11 +123,11 @@ export async function detectLocation(location) {
     logger.info('Using cached location data:', { location, cached });
     return cached;
   }
-  
+
   // Try geocoding first (most accurate)
   try {
     const geocodeResult = await geocodeLocation(location);
-    
+
     if (geocodeResult) {
       // Consider location complete if geocoding succeeded and we have city, state, or country
       const isComplete = !!(geocodeResult.city || geocodeResult.state || geocodeResult.country);
@@ -137,7 +137,7 @@ export async function detectLocation(location) {
         isComplete,
         geocodeData: geocodeResult
       };
-      
+
       cacheLocation(normalizedLocation, result);
       logger.info('Geocoded location:', { location, result });
       return result;
@@ -145,8 +145,15 @@ export async function detectLocation(location) {
   } catch (error) {
     logger.warn('Geocoding failed, falling back to pattern matching:', error);
   }
+  
   // Fallback to pattern matching
+  // Prevent fallback from extracting 'me', 'here', etc. as a location
+  if (containsCurrentLocationWord(normalizedLocation)) {
+    return { location: null, scope: 'current-location', isComplete: false };
+  }
+  
   const fallbackResult = detectLocationFallback(location);
+  
   // If fallbackResult has a US city or state, treat as complete
   if (fallbackResult.location) {
     const usCitiesOrStates = /san francisco|oakland|new york|los angeles|chicago|houston|phoenix|philadelphia|san antonio|san diego|dallas|san jose|austin|jacksonville|fort worth|columbus|charlotte|indianapolis|seattle|denver|washington|boston|el paso|nashville|detroit|oklahoma city|portland|las vegas|memphis|louisville|baltimore|milwaukee|albuquerque|tucson|fresno|sacramento|kansas city|atlanta|miami|colorado springs|raleigh|omaha|long beach|virginia beach|oakland|minneapolis|tulsa|arlington|tampa|new orleans|wichita|cleveland|bakersfield|aurora|anaheim|honolulu|santa ana|riverside|corpus christi|lexington|henderson|stockton|saint paul|cincinnati|st. louis|pittsburgh|greensboro|lincoln|anchorage|plano|orlando|irvine|newark|toledo|durham|chula vista|fort wayne|jersey city|st. petersburg|laredo|madison|chandler|lubbock|scottsdale|reno|buffalo|gilbert|glendale|north las vegas|winston–salem|chesapeake|norfolk|fremont|garland|irving|hialeah|richmond|boise|spokane|baton rouge|des moines|tacoma|san bernardino|modesto|fontana|santa clarita|birmingham|oxnard|fayetteville|moreno valley|rochester|glendale|huntington beach|salt lake city|grand rapids|amarillo|yonkers|aurora|montgomery|akron|little rock|huntsville|augusta|port st. lucie|grand prairie|columbus|tallahassee|overland park|tempe|mckinney|mobile|cape coral|shreveport|frisco|knoxville|worcester|brownsville|vancouver|fort lauderdale|sioux falls|peoria|ontario|jackson|elizabeth|warren|salem|springfield|eugene|pembroke pines|paterson|naperville|bridgeport|savannah|mesquite|killeen|palmdale|alexandria|hayward|clarksville|lakewood|hollywood|pasadena|syracuse|macon|torrance|fullerton|surprise|denton|roseville|thornton|miramar|pasadena|mesquite|olathe|dayton|carrollton|waco|clearwater|west valley city|bellevue|west jordan|richmond|gainesville|cedar rapids|visalia|coral springs|new haven|stamford|concord|kent|santa clara|el monte|topeka|simi valley|springfield|abilene|evansville|athens|vallejo|allentown|norman|beaumont|independence|murfreesboro|ann arbor|springfield|berkeley|peoria|providence|elgin|columbia|fairfield|aspen|boulder|durango|estes park|fort collins|glenwood springs|grand junction|gunnison|leadville|montrose|pueblo|steamboat springs|telluride|vail|alamosa|canon city|craig|delta|eagle|englewood|frisco|georgetown|golden|la junta|lamar|littleton|longmont|louisville|montrose|pagosa springs|parker|ridgway|salida|silverton|sterling|trinidad|walsenburg|wellington|westminster|wheat ridge|yuma|alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming/gi;
@@ -168,8 +175,12 @@ function detectLocationFallback(location) {
   if (!location || typeof location !== 'string') {
     return { location: null, scope: 'none', isComplete: false };
   }
-  
   const normalizedLocation = location.toLowerCase().trim();
+  
+  // Guard: If this is a current-location phrase, return immediately
+  if (containsCurrentLocationWord(normalizedLocation)) {
+    return { location: null, scope: 'current-location', isComplete: false };
+  }
   
   // Check if it contains state/province and country indicators
   const hasState = /,\s*[A-Z]{2}\b|\b(?:state|province|region|california|texas|florida|new york|illinois|pennsylvania|ohio|georgia|north carolina|michigan|new jersey|virginia|washington|arizona|massachusetts|tennessee|indiana|missouri|maryland|colorado|minnesota|wisconsin|south carolina|alabama|louisiana|kentucky|oregon|oklahoma|connecticut|utah|iowa|nevada|arkansas|mississippi|kansas|vermont|nebraska|idaho|west virginia|hawaii|new hampshire|maine|montana|rhode island|delaware|south dakota|north dakota|alaska|wyoming|ontario|quebec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|northwest territories|nunavut|yukon)\b/i.test(location);
@@ -177,11 +188,13 @@ function detectLocationFallback(location) {
   
   const isComplete = hasState || hasCountry;
   
-  return {
+  const result = {
     location: location.trim(),
     scope: isComplete ? 'complete' : 'incomplete',
     isComplete
   };
+  
+  return result;
 }
 
 /**
@@ -194,24 +207,34 @@ export function extractLocationFromQuery(query) {
     return { location: null, scope: 'none' };
   }
 
+  logger.info('extractLocationFromQuery DEBUG - Input query:', query);
+
   // Simple approach: Look for common location patterns in the text
   const text = query.toLowerCase();
   
   // Check for current location indicators first
+  logger.info('extractLocationFromQuery DEBUG - Checking containsCurrentLocationWord:', text);
   if (containsCurrentLocationWord(text)) {
+    logger.info('extractLocationFromQuery DEBUG - Found current location word, returning current-location scope');
     return { location: null, scope: 'current-location' };
   }
   
+  logger.info('extractLocationFromQuery DEBUG - Checking isCurrentLocationQuery:', text);
   if (isCurrentLocationQuery(text)) {
+    logger.info('extractLocationFromQuery DEBUG - Found current location query, returning current-location scope');
     return { location: null, scope: 'current-location' };
   }
   
+  logger.info('extractLocationFromQuery DEBUG - Checking isIncompleteLocationQuery:', text);
   if (isIncompleteLocationQuery(text)) {
+    logger.info('extractLocationFromQuery DEBUG - Found incomplete location query, returning incomplete scope');
     return { location: null, scope: 'incomplete' };
   }
   
   // Check for follow-up questions that shouldn't trigger location extraction
+  logger.info('extractLocationFromQuery DEBUG - Checking isFollowUpQuestion:', text);
   if (isFollowUpQuestion(text)) {
+    logger.info('extractLocationFromQuery DEBUG - Found follow-up question, returning follow-up scope');
     return { location: null, scope: 'follow-up' };
   }
 
@@ -225,14 +248,16 @@ export function extractLocationFromQuery(query) {
     /close\s+to\s+([^,.?]+(?:,\s*[^,.?]+)?)/i
   ];
 
+  logger.info('extractLocationFromQuery DEBUG - Checking simple patterns');
   for (const pattern of simplePatterns) {
     const match = query.match(pattern);
     if (match && match[1]) {
       const location = match[1].trim();
+      logger.info('extractLocationFromQuery DEBUG - Pattern match found:', { pattern: pattern.toString(), location });
       // Clean the location
       const cleanLocation = cleanExtractedLocation(location);
       if (cleanLocation) {
-        logger.info('Simple location extraction found:', { query, location: cleanLocation });
+        logger.info('extractLocationFromQuery DEBUG - Simple location extraction found:', { query, location: cleanLocation });
         return {
           location: cleanLocation,
           scope: 'unknown'
@@ -496,26 +521,22 @@ export async function detectLocationWithGeocoding(query) {
 export async function getLocationCoordinates(location) {
   if (!location) return null;
   
-  const locationInfo = await detectLocation(location);
-  
-  // Only return coordinates if we have valid geocode data and the location matches
-  if (locationInfo.geocodeData && locationInfo.geocodeData.latitude && locationInfo.geocodeData.longitude) {
-    // Validate that the geocoded location is reasonably close to the requested location
-    const geocodedName = locationInfo.geocodeData.displayName || '';
-    const requestedLower = location.toLowerCase();
+  try {
+    const result = await geocodingIntegration.getCoordinates(location);
     
-    // Check if the requested location appears in the geocoded result
-    // This helps filter out cases where geocoding returns a default location
-    if (geocodedName.toLowerCase().includes(requestedLower) || 
-        requestedLower.includes(locationInfo.geocodeData.city?.toLowerCase() || '')) {
-      return {
-        latitude: locationInfo.geocodeData.latitude,
-        longitude: locationInfo.geocodeData.longitude
-      };
+    if (!result.success) {
+      return null;
     }
+    
+    return {
+      latitude: result.latitude,
+      longitude: result.longitude,
+      location: result.location
+    };
+  } catch (error) {
+    logger.error('Error getting coordinates:', error);
+    return null;
   }
-  
-  return null;
 }
 
 
@@ -526,8 +547,8 @@ export async function getLocationCoordinates(location) {
  */
 export function getCacheStats() {
   return {
-    size: LOCATION_CACHE.size,
-    maxAge: CACHE_EXPIRY
+    size: locationCache.size,
+    maxAge: CACHE_TTL
   };
 }
 
@@ -536,9 +557,9 @@ export function getCacheStats() {
  */
 export function clearExpiredCache() {
   const now = Date.now();
-  for (const [key, value] of LOCATION_CACHE.entries()) {
-    if (now - value.timestamp > CACHE_EXPIRY) {
-      LOCATION_CACHE.delete(key);
+  for (const [key, value] of locationCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      locationCache.delete(key);
     }
   }
 }
@@ -555,12 +576,21 @@ export {
 
 function containsCurrentLocationWord(text) {
   if (!text || typeof text !== 'string') return false;
-  for (const word of CURRENT_LOCATION_WORDS) {
-    // Escape regex special characters in word
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Use word boundary regex for each word/phrase
-    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-    if (regex.test(text)) return true;
+  const normalized = text.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  for (const phrase of CURRENT_LOCATION_WORDS) {
+    // For single words like 'me', 'here', use word boundaries
+    if (phrase.length === 1 || phrase.split(' ').length === 1) {
+      const wordBoundaryRegex = new RegExp(`\\b${phrase}\\b`, 'i');
+      if (wordBoundaryRegex.test(normalized)) {
+        return true;
+      }
+    } else {
+      // For multi-word phrases, use simple includes
+      if (normalized.includes(phrase)) {
+        return true;
+      }
+    }
   }
   return false;
 } 

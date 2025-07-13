@@ -1,14 +1,33 @@
+/**
+ * Response Generator (DEPRECATED)
+ * 
+ * ⚠️  DEPRECATION WARNING ⚠️
+ * This module is deprecated and will be removed in a future version.
+ * 
+ * The new UnifiedResponseHandler system provides:
+ * - SimplifiedResponseHandler: AI-first approach
+ * - HybridResponseHandler: AI-first with fallback
+ * - UnifiedResponseHandler: Dynamic routing between handlers
+ * 
+ * Migration path:
+ * - For new code: Use UnifiedResponseHandler.getResponse()
+ * - For existing code: This will continue to work but should be migrated
+ * 
+ * @deprecated Use UnifiedResponseHandler instead
+ */
+
 import { config } from './config.js';
-import { OpenAI } from 'openai';
 import { encode } from 'gpt-tokenizer';
 import { patternCategories, shelterKeywords } from './patternConfig.js';
 import logger from './logger.js';
 import { gptCache } from './queryCache.js';
 import { voiceInstructions } from './conversationConfig.js';
 import { getEnhancedVoiceInstructions } from './conversationContextBuilder.js';
-import { callTavilyAPI } from './apis.js';
+import { SearchIntegration } from '../integrations/searchIntegration.js';
+import { getIntent } from './intentClassifier.js';
+import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+const openAIIntegration = new OpenAIIntegration();
 
 // Constants for filtering
 const DV_KEYWORDS = [
@@ -427,22 +446,22 @@ export class ResponseGenerator {
     
     try {
       const [intentResult, tavilyResponse] = await Promise.all([
-        this.classifyIntent(query),
-        callTavilyAPI(query)
+        getIntent(query),
+        SearchIntegration.search(query)
       ]);
       
       const responseTime = Date.now() - startTime;
       
       // Update routing stats
       const confidence = intentResult?.confidence || 0;
-      const success = !!tavilyResponse;
+      const success = tavilyResponse.success;
       this.updateRoutingStats(confidence, 'tavily', success, false, responseTime);
       
       // Log when making a Tavily API call
       logger.info('Calling Tavily API for query:', { query });
       
       // Format the response
-      const formattedResponse = this.formatTavilyResponse(tavilyResponse, requestType, query, maxResults, context, voice);
+      const formattedResponse = this.formatTavilyResponse(tavilyResponse.data, requestType, query, maxResults, context, voice);
       
       // Cache the response
       this.cacheResponse(cacheKey, formattedResponse);
@@ -493,13 +512,13 @@ export class ResponseGenerator {
     ];
 
     const callOpenAIWithRetry = async function callOpenAI() {
-      const response = await openai.chat.completions.create({
+      const response = await openAIIntegration.createChatCompletion({
         model,
         messages,
-        max_tokens: config.DEFAULT_MAX_TOKENS,
+        maxTokens: config.DEFAULT_MAX_TOKENS,
         temperature: 0.7,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3
+        presencePenalty: 0.6,
+        frequencyPenalty: 0.3
       });
       return response;
     };
@@ -514,8 +533,8 @@ export class ResponseGenerator {
   }
 
   static async queryTavily(query) {
-    // Use the standardized Tavily API function
-    const { callTavilyAPI } = await import('./apis.js');
+    // Use the SearchIntegration instead of direct API calls
+    const { SearchIntegration } = await import('../integrations/searchIntegration.js');
     
     // Validate query parameter
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -536,26 +555,26 @@ export class ResponseGenerator {
       timestamp: new Date().toISOString()
     });
 
-    if (!config.TAVILY_API_KEY) {
-      logger.error('Tavily API key not configured');
-      return null;
-    }
-
     try {
       // Extract location from query for better search results
       const location = this.extractLocationFromQuery(cleanQuery);
       
-      // Use the standardized API call
-      const data = await callTavilyAPI(cleanQuery, location);
+      // Use SearchIntegration to perform search
+      const result = await SearchIntegration.search(cleanQuery);
+      
+      if (!result.success) {
+        logger.error('Search integration failed:', result.error);
+        return null;
+      }
       
       logger.info('Tavily API response', {
         query: cleanQuery,
-        resultCount: data.results?.length || 0,
-        hasAnswer: !!data.answer,
+        resultCount: result.data.results?.length || 0,
+        hasAnswer: !!result.data.answer,
         timestamp: new Date().toISOString()
       });
 
-      return data;
+      return result.data;
     } catch (error) {
       logger.error('Failed to get Tavily response', {
         error: error.message,
@@ -1347,17 +1366,22 @@ export class ResponseGenerator {
     try {
       logger.info('Searching with Tavily:', { query });
       
-      // Use the standardized Tavily API function
-      const { callTavilyAPI } = await import('./apis.js');
+      // Use SearchIntegration instead of direct API calls
+      const { SearchIntegration } = await import('../integrations/searchIntegration.js');
       
       // Extract location from query for better search results
       const location = this.extractLocationFromQuery(query);
       
-      // Use the standardized API call
-      const data = await callTavilyAPI(query, location);
+      // Use SearchIntegration to perform search
+      const result = await SearchIntegration.search(query);
+      
+      if (!result.success) {
+        logger.error('Search integration failed:', result.error);
+        throw new Error(result.error || 'Search failed');
+      }
       
       // Filter and validate results
-      const validResults = data.results.filter(result => {
+      const validResults = result.data.results.filter(result => {
         const content = (result.content || '').toLowerCase();
         const title = (result.title || '').toLowerCase();
         const url = (result.url || '').toLowerCase();
