@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
   - **Root Cause**: Code was referencing undefined `tavilyResponse` variable
   - **Solution**: Replaced with correct `response` variable from UnifiedResponseHandler
   - **Impact**: Eliminates runtime errors in conversation context updates
+- **Logger Import Error**: Fixed logger import in `SpeechHandler.js`
+  - **Root Cause**: Used named import instead of default import for logger
+  - **Solution**: Changed to `import logger from '../../lib/logger.js';`
+  - **Impact**: Server now starts without import errors
 
 ### Added
 - **Enhanced Debugging Logs**: Comprehensive logging throughout speech processing flow

@@ -1,6 +1,6 @@
 import { BaseHandler } from '../base/BaseHandler.js';
 import { getLanguageConfig, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
-import { logger } from '../../lib/logger.js';
+import logger from '../../lib/logger.js';
 
 /**
  * SpeechHandler - Handles speech processing operations
