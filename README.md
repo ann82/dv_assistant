@@ -651,3 +651,267 @@ export const SUPPORTED_LANGUAGES = {
 - **Better Test Isolation**: Implemented proper module mocking to ensure tests run independently without external dependencies.
 - **Cache Testing**: Added comprehensive tests for response caching, TTL validation, and LRU cache implementation.
 - **Performance Monitoring**: Tests now validate parallel processing of intent classification and API calls, along with routing statistics tracking.
+
+## Deployment
+
+### Railway Deployment (Recommended)
+
+The Domestic Violence Support Assistant is optimized for Railway deployment with automatic scaling and SSL support.
+
+#### Prerequisites
+
+Before deploying to Railway, ensure you have the following environment variables set in your Railway project:
+
+**Required Environment Variables:**
+- `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
+- `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token  
+- `TWILIO_PHONE_NUMBER` - Your Twilio phone number (format: +1234567890)
+- `TAVILY_API_KEY` - Your Tavily API key
+- `OPENAI_API_KEY` - Your OpenAI API key
+
+**Optional Environment Variables:**
+- `NODE_ENV` - Set to "production" (default)
+- `PORT` - Railway will set this automatically
+- `LOG_LEVEL` - Set to "info", "debug", "warn", or "error" (default: "info")
+
+#### Deployment Steps
+
+1. **Connect your GitHub repository to Railway**
+2. **Set environment variables** in Railway dashboard
+3. **Deploy** - Railway will automatically build and deploy
+
+#### Health Check
+
+The application provides a health check endpoint at `/health` that returns:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-06-25T00:00:00.000Z"
+}
+```
+
+#### Troubleshooting
+
+**Service Unavailable Errors:**
+1. Check environment variables - Ensure all required variables are set
+2. Check logs - View Railway logs for specific error messages
+3. Verify build - Ensure the build process completes successfully
+
+**Common Issues:**
+- **Missing Environment Variables**: Set all required variables in Railway dashboard
+- **Module Import Errors**: Ensure all files are properly included in deployment
+- **Port Issues**: Railway handles port assignment automatically
+
+### Other Deployment Options
+
+#### Manual Deployment
+
+1. **Prepare the server**
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install Node.js 18+
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PM2 for process management
+sudo npm install -g pm2
+
+# Create application directory
+sudo mkdir -p /opt/dv-assistant
+sudo chown $USER:$USER /opt/dv-assistant
+```
+
+2. **Deploy the application**
+```bash
+# Clone the repository
+cd /opt/dv-assistant
+git clone https://github.com/your-org/dv-support-assistant.git .
+
+# Install dependencies
+npm ci --only=production
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with production values
+
+# Create log directory
+sudo mkdir -p /var/log/dv-assistant
+sudo chown $USER:$USER /var/log/dv-assistant
+```
+
+3. **Start the application**
+```bash
+# Start with PM2
+pm2 start relay-server/server.js --name "dv-assistant"
+
+# Save PM2 configuration
+pm2 save
+pm2 startup
+```
+
+#### Docker Deployment
+
+```dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "relay-server/server.js"]
+```
+
+### Monitoring
+
+- **Logs**: View real-time logs in Railway dashboard or PM2 logs
+- **Metrics**: Monitor CPU, memory, and network usage
+- **Health**: Check health endpoint for service status
+
+### Security Considerations
+
+- **SSL Certificate**: Required for HTTPS (production)
+- **Environment Variables**: Secure storage of API keys
+- **Rate Limiting**: Built-in rate limiting for API endpoints
+- **Input Validation**: Comprehensive validation for all inputs
+
+## API Documentation
+
+### Overview
+
+The Domestic Violence Support Assistant API provides voice and SMS-based support for individuals seeking domestic violence resources. The system uses AI-powered conversation management to help users find shelters, legal services, counseling, and other support resources.
+
+### Key Features
+
+- **Voice Call Support**: Real-time voice conversations with AI assistance
+- **SMS Support**: Text-based resource finding and support
+- **Location Detection**: Automatic location extraction and geocoding
+- **Resource Search**: AI-powered search for local support services
+- **Conversation Management**: Multi-turn conversation support
+- **Emergency Support**: Priority handling for emergency situations
+
+### Authentication
+
+#### Twilio Webhook Authentication
+
+Twilio webhooks are authenticated using Twilio's signature validation. The system automatically validates incoming requests using the `X-Twilio-Signature` header.
+
+**Required Headers:**
+```
+X-Twilio-Signature: [Twilio-generated signature]
+```
+
+#### API Key Authentication (for health endpoints)
+
+Some endpoints require API key authentication:
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+### Health Check Endpoints
+
+#### Basic Health Check
+
+**Endpoint:** `GET /health`
+
+**Description:** Returns basic system health status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-27T10:30:00.000Z",
+  "uptime": 3600
+}
+```
+
+#### Detailed Health Check
+
+**Endpoint:** `GET /health/detailed`
+
+**Description:** Returns comprehensive system health including all services.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "services": {
+    "openai": { "status": "healthy" },
+    "tavily": { "status": "healthy" },
+    "tts": { "status": "healthy" },
+    "twilio": { "status": "healthy" },
+    "speechRecognition": { "status": "healthy" },
+    "geocoding": { "status": "healthy" }
+  },
+  "system": {
+    "memory": {
+      "used": 512000000,
+      "total": 2048000000,
+      "percentage": 25
+    },
+    "uptime": 3600
+  }
+}
+```
+
+### Twilio Voice Endpoints
+
+#### Voice Call Webhook
+
+**Endpoint:** `POST /twilio/voice`
+
+**Description:** Handles incoming Twilio voice calls and processes speech input.
+
+**Request Body:**
+```json
+{
+  "CallSid": "CA1234567890",
+  "From": "+1234567890",
+  "To": "+0987654321",
+  "SpeechResult": "I need help finding a shelter",
+  "Confidence": 0.95
+}
+```
+
+**Response:** TwiML response for voice interaction
+
+### Error Handling
+
+The API uses standard HTTP status codes:
+
+- **200**: Success
+- **400**: Bad Request
+- **401**: Unauthorized
+- **404**: Not Found
+- **429**: Too Many Requests
+- **500**: Internal Server Error
+
+### Rate Limiting
+
+- **Default**: 100 requests per 15 minutes
+- **Voice Calls**: 50 calls per hour
+- **SMS**: 200 messages per hour
+
+### Examples
+
+#### Voice Call Example
+
+```bash
+curl -X POST https://your-domain.com/twilio/voice \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "X-Twilio-Signature: [signature]" \
+  -d "CallSid=CA1234567890&From=%2B1234567890&SpeechResult=I%20need%20help%20finding%20a%20shelter"
+```
+
+#### Health Check Example
+
+```bash
+curl -X GET https://your-domain.com/health
+```

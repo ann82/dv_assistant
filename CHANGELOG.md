@@ -939,3 +939,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAI TTS voice configuration now uses correct API voice names (nova, shimmer, echo, onyx) instead of Twilio voice names
 - Resolved 400 error when generating TTS with invalid voice names
 - Proper fallback mechanism between OpenAI TTS (primary) and Twilio Polly (fallback)
+
+## [Technical Analysis] - Code Simplification & Cost Analysis
+
+### Code Simplification Analysis
+
+**Overview:** With detailed conversation instructions (5,080 characters vs 493), the AI can handle many scenarios that were previously managed by complex code.
+
+**Simplification Opportunities:**
+- **Intent Classification**: 60-70% reduction potential (1,569 lines → ~500 lines)
+- **Query Rewriting**: 80-90% reduction potential (157 lines → ~30 lines)
+- **Response Routing**: 40-50% reduction potential (2,139 lines → ~1,200 lines)
+- **Conversation Management**: 70-80% reduction potential
+
+**Proposed Architecture:**
+- **AI-First Approach**: Let AI handle intent detection, query optimization, and response generation
+- **Hybrid Approach**: Keep Tavily for factual queries, AI for everything else
+- **Benefits**: 90% code reduction, simpler maintenance, better responses
+
+### Cost Analysis
+
+**Token Usage Comparison:**
+- **Old System Prompt**: 493 characters (~124 tokens) - $0.000186 per GPT-3.5-turbo call
+- **New Detailed Instructions**: 5,080 characters (~1,270 tokens) - $0.001905 per GPT-3.5-turbo call
+- **Cost Increase**: +$0.001719 per call (9.2x increase)
+
+**Estimated Impact Scenarios:**
+- **Conservative (20% GPT usage)**: $1.03/month for 100 calls/day
+- **Moderate (40% GPT usage)**: $2.06/month for 100 calls/day
+- **High (60% GPT usage)**: $3.09/month for 100 calls/day
+
+**Cost Mitigation Strategies:**
+- **Caching Benefits**: 30-50% reduction in GPT calls
+- **Tavily Optimization**: High-confidence queries use Tavily only (no GPT cost)
+- **Model Selection**: GPT-3.5-turbo (20x cheaper than GPT-4)
+
+**Value vs Cost Assessment:**
+- **Cost**: $1-3/month for 100 calls/day
+- **Benefit**: Significantly improved user experience and safety
+- **ROI**: High value for domestic violence support context
+- **Risk Mitigation**: Better emergency response reduces liability
+
+**Recommendation**: Proceed with implementation while monitoring costs and optimizing usage patterns.
