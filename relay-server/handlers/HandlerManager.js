@@ -566,7 +566,7 @@ export class HandlerManager {
   clearConversationContext(callSid) {
     const contextService = this.services.context;
     if (contextService) {
-      contextService.clearContext(callSid);
+      contextService.clearConversationContext(callSid);
     }
   }
 
@@ -591,7 +591,7 @@ export class HandlerManager {
    */
   async getConversationContext(callSid) {
     const contextService = this.services.context;
-    return contextService ? await contextService.getContext(callSid) : null;
+    return contextService ? await contextService.getConversationContext(callSid) : null;
   }
 
   /**
@@ -606,7 +606,7 @@ export class HandlerManager {
   async updateConversationContext(callSid, intent, query, response, tavilyResponse) {
     const contextService = this.services.context;
     if (contextService) {
-      await contextService.updateContext(callSid, {
+      await contextService.updateConversationContext(callSid, {
         intent,
         query,
         response,

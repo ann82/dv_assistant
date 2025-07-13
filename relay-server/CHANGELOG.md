@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
   - **Root Cause**: Used named import instead of default import for logger
   - **Solution**: Changed to `import logger from '../../lib/logger.js';`
   - **Impact**: Server now starts without import errors
+- **ContextService Method Name Mismatches**: Fixed incorrect method calls for context service integration
+  - **Root Cause**: Used `getContext`, `updateContext`, and `clearContext` instead of `getConversationContext`, `updateConversationContext`, and `clearConversationContext`
+  - **Solution**: Updated all references to use correct method names
+  - **Impact**: Context service integration now works as intended
 
 ### Added
 - **Enhanced Debugging Logs**: Comprehensive logging throughout speech processing flow
