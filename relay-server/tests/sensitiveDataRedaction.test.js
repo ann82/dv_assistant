@@ -99,7 +99,7 @@ describe('Sensitive Data Redaction', () => {
     });
 
     it('should redact Twilio Account SID', () => {
-      const text = 'Account SID: TEST_ACCOUNT_SID_FOR_TESTING_ONLY';
+      const text = 'Account SID: AC12345678901234567890123456789012';
       const redacted = redactString(text);
       expect(redacted).toBe('Account SID: [REDACTED]');
     });

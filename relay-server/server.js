@@ -369,5 +369,6 @@ process.on('SIGINT', () => {
   });
 });
 
-// Export the server for testing purposes
-export default server; 
+// Export the server, app, and handlerManager for testing purposes
+export default server;
+export { app, handlerManager }; 

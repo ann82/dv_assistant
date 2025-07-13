@@ -2,7 +2,7 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.21.8** (Updated: January 27, 2025)
+**Current Version: 1.21.9** (Updated: January 27, 2025)
 
 ## Features
 

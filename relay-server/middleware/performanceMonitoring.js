@@ -3,7 +3,7 @@
  * Tracks request/response times, memory usage, and performance metrics
  */
 
-import { logger } from '../lib/logger.js';
+import logger from '../lib/logger.js';
 import { loggingConfig } from '../lib/config/logging.js';
 
 // Performance metrics storage

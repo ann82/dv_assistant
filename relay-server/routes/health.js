@@ -4,14 +4,14 @@
  */
 
 import express from 'express';
-import { logger } from '../lib/logger.js';
+import logger from '../lib/logger.js';
 import { getPerformanceMetrics, getSystemHealth, getActiveRequests, resetPerformanceMetrics } from '../middleware/performanceMonitoring.js';
 import { getLoggingStatus } from '../lib/config/logging.js';
 import { config } from '../lib/config/index.js';
 import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 import { SearchIntegration } from '../integrations/searchIntegration.js';
 import { TwilioIntegration } from '../integrations/twilioIntegration.js';
-import { TtsIntegration } from '../integrations/ttsIntegration.js';
+import { TTSIntegration } from '../integrations/ttsIntegration.js';
 
 const router = express.Router();
 
@@ -223,7 +223,7 @@ async function checkIntegrationHealth() {
   // Check TTS integration
   try {
     const startTime = Date.now();
-    const ttsStatus = await TtsIntegration.getStatus();
+    const ttsStatus = await TTSIntegration.isHealthy();
     const responseTime = Date.now() - startTime;
     
     checks.tts = {

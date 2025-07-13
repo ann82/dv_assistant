@@ -36,10 +36,13 @@ export class TwilioWebSocketServer {
    * Initializes the WebSocket server and sets up connection handling.
    * 
    * @param {http.Server} server - The HTTP server to attach WebSocket handling to
+   * @param {Object} [dependencies] - Optional dependencies for easier testing
+   * @param {AudioService} [dependencies.audioService]
+   * @param {CallSummaryService} [dependencies.callSummaryService]
    */
-  constructor(server) {
+  constructor(server, dependencies = {}) {
     // Initialize audio service for processing Twilio audio streams
-    this.audioService = new AudioService();
+    this.audioService = dependencies.audioService || new AudioService();
     
     // Create WebSocket server with noServer option for manual upgrade handling
     this.wss = new WebSocketServer({ 
@@ -78,7 +81,7 @@ export class TwilioWebSocketServer {
     });
 
     // Initialize call summary service for generating call reports
-    this.callSummaryService = new CallSummaryService();
+    this.callSummaryService = dependencies.callSummaryService || new CallSummaryService();
     
     // Set up WebSocket event handlers
     this.setupWebSocket();
@@ -312,9 +315,21 @@ export class TwilioWebSocketServer {
         chunkCount: audioChunks.length
       });
 
-      // Process the accumulated audio (e.g., speech recognition)
-      // This would typically send the audio to a speech-to-text service
-      // For now, we just log the processing
+      // Transcribe the accumulated audio using Whisper
+      const transcription = await this.audioService.transcribeWithWhisper(audioChunks);
+      
+      // Get GPT response based on transcription
+      const gptReply = await this.audioService.getGptReply(transcription);
+      
+      // Send response back to the client
+      if (ws && ws.readyState === 1) { // WebSocket.OPEN
+        ws.send(JSON.stringify({
+          type: 'response',
+          transcription,
+          reply: gptReply
+        }));
+      }
+      
       logger.info('Audio processing complete for call:', callSid);
       
     } catch (error) {
@@ -328,33 +343,54 @@ export class TwilioWebSocketServer {
    * Processes call completion, generates call summary, and cleans up resources.
    * 
    * @param {string} callSid - Twilio Call SID
+   * @returns {Object|null} Generated call summary or null if no call data
    */
   async handleCallEnd(callSid) {
+    let summary = null;
     try {
       logger.info('Processing call end for:', callSid);
       
       const callData = this.activeCalls.get(callSid);
+      logger.info('Retrieved callData for', callSid, ':', callData);
+      
       if (!callData) {
+        logger.info('No call data found for call end:', callSid);
         logger.warn('No call data found for call end:', callSid);
-        return;
+        return null;
       }
 
+      // Add conversation history to the call summary service
+      if (callData.conversationHistory) {
+        logger.info('Adding conversation history:', callData.conversationHistory);
+        try {
+          callData.conversationHistory.forEach(message => {
+            this.callSummaryService.addToHistory(callSid, message);
+          });
+        } catch (err) {
+          logger.error('Error in addToHistory for conversationHistory:', err);
+        }
+      }
+      
+      // Debug: log before calling generateSummary
+      logger.info('Calling callSummaryService.generateSummary with:', callSid);
       // Generate call summary
-      const summary = await this.callSummaryService.generateSummary(callSid, callData);
+      summary = await this.callSummaryService.generateSummary(callSid);
       
       // Save call summary to file
       const summaryPath = path.join(process.cwd(), 'call-summaries', `${callSid}.json`);
       fsSync.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
       
       logger.info('Call summary generated and saved:', summaryPath);
-      
+    } catch (error) {
+      logger.error('Error handling call end:', error);
+      summary = null;
+    } finally {
       // Clean up call data
       this.activeCalls.delete(callSid);
       this.audioService.clearAccumulatedAudio(callSid);
-      
-    } catch (error) {
-      logger.error('Error handling call end:', error);
     }
+    logger.info('Returning summary from handleCallEnd:', summary);
+    return summary;
   }
 
   /**

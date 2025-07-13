@@ -22,48 +22,36 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { app } from '../server.js';
 
-// Mock all external integrations with static getStatus
+// Helper to create a mock class with static methods
+function createMockIntegration(staticMethods = {}) {
+  function MockIntegration() {}
+  Object.assign(MockIntegration, staticMethods);
+  return MockIntegration;
+}
+
 vi.mock('../integrations/openaiIntegration.js', () => ({
-  OpenAIIntegration: Object.assign(
-    vi.fn().mockImplementation(() => ({
-      createChatCompletion: vi.fn(),
-      createTTS: vi.fn(),
-      transcribeAudio: vi.fn(),
-      createEmbedding: vi.fn(),
-      isHealthy: vi.fn().mockResolvedValue(true)
-    })),
-    { getStatus: vi.fn().mockResolvedValue({ healthy: true }) }
-  )
+  OpenAIIntegration: createMockIntegration({
+    getStatus: vi.fn().mockResolvedValue({ healthy: true })
+  })
 }));
 
 vi.mock('../integrations/searchIntegration.js', () => ({
-  SearchIntegration: Object.assign(
-    vi.fn().mockImplementation(() => ({
-      search: vi.fn(),
-      isHealthy: vi.fn().mockResolvedValue(true)
-    })),
-    { getStatus: vi.fn().mockResolvedValue({ healthy: true }) }
-  )
+  SearchIntegration: createMockIntegration({
+    getStatus: vi.fn().mockResolvedValue({ healthy: true })
+  })
 }));
 
 vi.mock('../integrations/ttsIntegration.js', () => ({
-  TtsIntegration: Object.assign(
-    vi.fn().mockImplementation(() => ({
-      generateSpeech: vi.fn(),
-      isHealthy: vi.fn().mockResolvedValue(true)
-    })),
-    { getStatus: vi.fn().mockResolvedValue({ healthy: true }) }
-  )
+  TTSIntegration: createMockIntegration({
+    isHealthy: vi.fn().mockResolvedValue({ healthy: true }),
+    getStatus: vi.fn().mockResolvedValue({ healthy: true })
+  })
 }));
 
 vi.mock('../integrations/twilioIntegration.js', () => ({
-  TwilioIntegration: Object.assign(
-    vi.fn().mockImplementation(() => ({
-      sendSMS: vi.fn(),
-      isHealthy: vi.fn().mockResolvedValue(true)
-    })),
-    { getStatus: vi.fn().mockResolvedValue({ healthy: true }) }
-  )
+  TwilioIntegration: createMockIntegration({
+    getStatus: vi.fn().mockResolvedValue({ healthy: true })
+  })
 }));
 
 vi.mock('../integrations/speechRecognitionIntegration.js', () => ({
@@ -82,6 +70,16 @@ vi.mock('../integrations/geocodingIntegration.js', () => ({
     isHealthy: vi.fn().mockResolvedValue(true),
     getStatus: vi.fn().mockResolvedValue({ healthy: true })
   }
+}));
+
+// Mock ServiceManager to prevent initialization during tests
+vi.mock('../services/ServiceManager.js', () => ({
+  ServiceManager: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn().mockResolvedValue(),
+    getService: vi.fn().mockReturnValue({}),
+    getAllServices: vi.fn().mockReturnValue(new Map()),
+    getServiceStatus: vi.fn().mockResolvedValue({ healthy: true })
+  }))
 }));
 
 describe('API Integration Tests', () => {

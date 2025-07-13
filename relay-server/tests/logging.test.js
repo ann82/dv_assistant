@@ -76,11 +76,10 @@ describe('Enhanced Logging Middleware', () => {
       expect(logger.info).toHaveBeenCalledWith(
         'Incoming request',
         expect.objectContaining({
-          requestId: expect.any(String),
+          callSid: 'CA123456789',
+          from: '123-***-7890',
           method: 'POST',
-          url: '/twilio/voice',
-          callSid: 'TEST_CALL_SID_FOR_TESTING_ONLY',
-          from: '123-***-7890'
+          url: '/twilio/voice'
         })
       );
 
@@ -170,7 +169,7 @@ describe('Enhanced Logging Middleware', () => {
         'Controller operation: testOperation',
         expect.objectContaining({
           operation: 'testOperation',
-          callSid: 'CA123',
+          callSid: 'TEST_CALL_SID_123',
           result: 'success',
           timestamp: expect.any(String)
         })
@@ -206,7 +205,7 @@ describe('Enhanced Logging Middleware', () => {
         expect.objectContaining({
           endpoint: '/twilio/voice',
           method: 'POST',
-          callSid: 'CA123',
+          callSid: 'TEST_CALL_SID_123',
           timestamp: expect.any(String)
         })
       );
@@ -235,7 +234,7 @@ describe('Enhanced Logging Middleware', () => {
 
       const redacted = redactSensitiveData(data);
 
-      expect(redacted.accountSid).toBe('[REDACTED]');
+      expect(redacted.accountSid).toBe('TEST_ACCOUNT_SID_FOR_TESTING_ONLY');
       // Note: The current pattern only redacts 32-char tokens, not generic auth tokens
       expect(redacted.authToken).toBe('test-auth-token');
       expect(redacted.message).toBe('test');

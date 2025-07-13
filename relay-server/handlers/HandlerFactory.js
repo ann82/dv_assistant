@@ -5,7 +5,7 @@ import { IntentHandler } from './intent/IntentHandler.js';
 import { TwilioIntegration } from '../integrations/twilioIntegration.js';
 import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
 import { SearchIntegration } from '../integrations/searchIntegration.js';
-import { TtsIntegration } from '../integrations/ttsIntegration.js';
+import { TTSIntegration } from '../integrations/ttsIntegration.js';
 import { SpeechRecognitionIntegration } from '../integrations/speechRecognitionIntegration.js';
 import logger from '../lib/logger.js';
 
@@ -36,7 +36,7 @@ export class HandlerFactory {
     // Create integrations if not provided
     const twilioIntegration = dependencies.twilioIntegration || new TwilioIntegration();
     const openaiIntegration = dependencies.openaiIntegration || new OpenAIIntegration();
-    const ttsIntegration = dependencies.ttsIntegration || new TtsIntegration();
+    const ttsIntegration = dependencies.ttsIntegration || TTSIntegration;
 
     const handlerDependencies = {
       ...dependencies,
@@ -147,7 +147,7 @@ export class HandlerFactory {
       openaiIntegration: dependencies.openaiIntegration || new OpenAIIntegration(),
       searchIntegration: dependencies.searchIntegration || new SearchIntegration(),
       twilioIntegration: dependencies.twilioIntegration || new TwilioIntegration(),
-      ttsIntegration: dependencies.ttsIntegration || new TtsIntegration(),
+      ttsIntegration: dependencies.ttsIntegration || TTSIntegration,
       speechRecognitionIntegration: dependencies.speechRecognitionIntegration || new SpeechRecognitionIntegration(),
       ...dependencies
     };
