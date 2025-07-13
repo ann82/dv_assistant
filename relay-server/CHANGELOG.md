@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.2] - 2025-01-27
+
+### Fixed
+- **TTS TwiML Generation Error**: Resolved critical error "Cannot read properties of undefined (reading 'replace')"
+  - **Root Cause**: Missing `noSpeech` prompt in language configuration caused `getLocalizedPrompt()` to return undefined
+  - **Solution**: Added `noSpeech` prompts to all language configurations and implemented comprehensive safety checks
+  - **Impact**: TTS TwiML generation now works reliably without crashes
+  - **Languages Updated**: English, Spanish, French, and German now have proper `noSpeech` prompts
+
+### Added
+- **Missing Language Prompts**: Added `noSpeech` prompts to all supported languages
+  - **English**: "I didn't hear anything. Please try again."
+  - **Spanish**: "No escuché nada. Por favor intenta de nuevo."
+  - **French**: "Je n'ai rien entendu. Veuillez réessayer."
+  - **German**: "Ich habe nichts gehört. Bitte versuchen Sie es erneut."
+
+### Enhanced
+- **Error Handling**: Added comprehensive safety checks throughout TTS and TwiML generation
+  - **escapeXML Method**: Now handles undefined/null text parameters gracefully
+  - **generateTwiML Method**: Added fallback for undefined text parameters
+  - **generateTTSBasedTwiML Method**: Enhanced with safety checks and fallback prompts
+  - **getLocalizedPrompt Method**: Ensures it always returns a string, even if prompt lookup fails
+- **Robustness**: Multiple layers of error handling prevent similar issues in the future
+  - **Parameter Validation**: All text parameters are validated before processing
+  - **Fallback Messages**: Default messages provided when prompts are missing
+  - **Type Safety**: Ensures string types throughout the TTS pipeline
+
+### Technical Improvements
+- **Defensive Programming**: Added comprehensive null/undefined checks
+- **Graceful Degradation**: System continues to function even when individual components fail
+- **Better Logging**: Enhanced error logging for debugging TTS issues
+- **Code Maintainability**: Cleaner error handling patterns throughout the codebase
+
+### Impact
+- **Before**: TTS TwiML generation would crash with "Cannot read properties of undefined (reading 'replace')" error
+- **After**: TTS TwiML generation works reliably with proper fallbacks and error handling
+- **User Experience**: Voice calls no longer crash due to TTS errors
+- **System Stability**: More robust error handling prevents similar issues
+
 ## [v1.22.1] - 2025-01-27
 
 ### Fixed

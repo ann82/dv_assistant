@@ -2,7 +2,7 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.1** (Updated: January 27, 2025)
+**Current Version: 1.22.2** (Updated: January 27, 2025)
 
 ## 🚀 Quick Start
 
@@ -62,6 +62,7 @@ The server provides the following Twilio webhook endpoints:
   - Returns TwiML responses for call flow
   - ✅ **FIXED**: No longer returns 500 errors
   - ✅ **WORKING**: Returns proper HTTP 200 with valid TwiML XML
+  - ✅ **TTS FIXED**: TTS TwiML generation now works reliably without crashes
 
 - **Speech Processing**: `POST /twilio/voice/process`
   - Processes speech input from voice calls
@@ -89,7 +90,30 @@ curl -X POST http://localhost:3000/twilio/voice \
 
 ## Features
 
-### Vitest Internal State Error Fix (v1.22.1) - NEW
+### TTS TwiML Generation Error Fix (v1.22.2) - NEW
+- **🔧 Critical TTS Error Resolution**
+  - **Fixed "Cannot read properties of undefined (reading 'replace')" Error**: Resolved critical TTS TwiML generation error
+  - **Root Cause**: Missing `noSpeech` prompt in language configuration caused `getLocalizedPrompt()` to return undefined
+  - **Solution**: Added `noSpeech` prompts to all language configurations and implemented comprehensive safety checks
+  - **Impact**: TTS TwiML generation now works reliably without crashes
+- **🌍 Multi-Language Support Enhancement**
+  - **Added Missing Prompts**: Added `noSpeech` prompts to all supported languages
+  - **English**: "I didn't hear anything. Please try again."
+  - **Spanish**: "No escuché nada. Por favor intenta de nuevo."
+  - **French**: "Je n'ai rien entendu. Veuillez réessayer."
+  - **German**: "Ich habe nichts gehört. Bitte versuchen Sie es erneut."
+- **🛡️ Enhanced Error Handling**
+  - **Comprehensive Safety Checks**: Added null/undefined checks throughout TTS pipeline
+  - **Graceful Degradation**: System continues to function even when individual components fail
+  - **Parameter Validation**: All text parameters are validated before processing
+  - **Fallback Messages**: Default messages provided when prompts are missing
+- **🚀 Technical Improvements**
+  - **Defensive Programming**: Added comprehensive null/undefined checks
+  - **Better Logging**: Enhanced error logging for debugging TTS issues
+  - **Code Maintainability**: Cleaner error handling patterns throughout the codebase
+  - **System Stability**: More robust error handling prevents similar issues
+
+### Vitest Internal State Error Fix (v1.22.1)
 - **🚀 Vitest Error Resolution**
   - **Fixed Internal State Error**: Resolved critical Vitest error that prevented test execution
   - **Root Cause**: `vi` was imported from `vitest` at module level in `server.js`, causing context conflicts

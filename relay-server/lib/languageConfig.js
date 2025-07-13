@@ -25,6 +25,7 @@ export const SUPPORTED_LANGUAGES = {
       confirmLocation: `I found a location you mentioned earlier: {{location}}. Would you like me to search for resources in that area? Please say yes or no.`,
       usePreviousLocation: `I found a location you mentioned earlier: {{location}}. Would you like me to use that location for your search, or would you prefer to provide a different location?`,
       emergency: `This is an emergency situation. Please call 911 immediately. You can also call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance. They are available 24/7 and can help you with safety planning and emergency resources.`,
+      noSpeech: `I didn't hear anything. Please try again.`,
       fallback: `I'm sorry, I didn't understand your request. Could you please rephrase that or ask for help finding shelters, legal services, or general information about domestic violence? I'm here to listen and help you.`,
       error: `I'm sorry, I encountered an error processing your request. Please try again.`,
       processingError: `I'm sorry, I couldn't process your request. Please try rephrasing your question with a specific location.`
@@ -46,6 +47,7 @@ export const SUPPORTED_LANGUAGES = {
       confirmLocation: `Encontré una ubicación que mencionaste anteriormente: {{location}}. ¿Te gustaría que busque recursos en esa área? Por favor, di sí o no.`,
       usePreviousLocation: `Encontré una ubicación que mencionaste anteriormente: {{location}}. ¿Te gustaría usar esa ubicación para tu búsqueda, o prefieres proporcionar una ubicación diferente?`,
       emergency: `Esta es una situación de emergencia. Por favor llama al 911 inmediatamente. También puedes llamar a la Línea Nacional de Violencia Doméstica al 1-800-799-7233 para asistencia inmediata. Están disponibles las 24 horas y pueden ayudarte con la planificación de seguridad y recursos de emergencia.`,
+      noSpeech: `No escuché nada. Por favor intenta de nuevo.`,
       fallback: `Lo siento, no entendí tu solicitud. ¿Podrías reformularla o pedir ayuda para encontrar refugios, servicios legales o información general sobre violencia doméstica?`,
       error: `Lo siento, encontré un error al procesar tu solicitud. Por favor intenta de nuevo.`,
       processingError: `Lo siento, no pude procesar tu solicitud. Por favor intenta reformular tu pregunta con una ubicación específica.`
@@ -67,6 +69,7 @@ export const SUPPORTED_LANGUAGES = {
       confirmLocation: `J'ai trouvé une localisation que vous avez mentionnée précédemment : {{location}}. Voulez-vous que je cherche des ressources dans cette région ? Dites oui ou non.`,
       usePreviousLocation: `J'ai trouvé une localisation que vous avez mentionnée précédemment : {{location}}. Voulez-vous utiliser cette localisation pour votre recherche, ou préférez-vous fournir une autre localisation ?`,
       emergency: `C'est une situation d'urgence. Veuillez appeler le 911 immédiatement. Vous pouvez également appeler la Ligne Nationale de Violence Domestique au 1-800-799-7233 pour une assistance immédiate. Ils sont disponibles 24h/24 et peuvent vous aider avec la planification de sécurité et les ressources d'urgence.`,
+      noSpeech: `Je n'ai rien entendu. Veuillez réessayer.`,
       fallback: `Je suis désolé, je n'ai pas compris votre demande. Pourriez-vous la reformuler ou demander de l'aide pour trouver des refuges, des services juridiques ou des informations générales sur la violence domestique ?`,
       error: `Je suis désolé, j'ai rencontré une erreur en traitant votre demande. Veuillez réessayer.`,
       processingError: `Je suis désolé, je n'ai pas pu traiter votre demande. Veuillez essayer de reformuler votre question avec un emplacement spécifique.`
@@ -88,6 +91,7 @@ export const SUPPORTED_LANGUAGES = {
       confirmLocation: `Ich habe eine Standort, die Sie zuvor erwähnt haben: {{location}}. Möchten Sie, dass ich Ressourcen in dieser Region suche? Bitte sagen Sie ja oder nein.`,
       usePreviousLocation: `Ich habe eine Standort, die Sie zuvor erwähnt haben: {{location}}. Möchten Sie diese Standort für Ihre Suche verwenden, oder möchten Sie eine andere Standort angeben?`,
       emergency: `Dies ist eine Notfallsituation. Bitte rufen Sie sofort 911 an. Sie können auch die Nationale Hotline für häusliche Gewalt unter 1-800-799-7233 für sofortige Hilfe anrufen. Sie sind rund um die Uhr verfügbar und können Ihnen bei der Sicherheitsplanung und Notfallressourcen helfen.`,
+      noSpeech: `Ich habe nichts gehört. Bitte versuchen Sie es erneut.`,
       fallback: `Es tut mir leid, ich habe Ihre Anfrage nicht verstanden. Könnten Sie sie bitte umformulieren oder um Hilfe beim Finden von Unterkünften, Rechtsdienstleistungen oder allgemeinen Informationen über häusliche Gewalt bitten?`,
       error: `Es tut mir leid, ich habe einen Fehler bei der Verarbeitung Ihrer Anfrage festgestellt. Bitte versuchen Sie es erneut.`,
       processingError: `Es tut mir leid, ich konnte Ihre Anfrage nicht verarbeiten. Bitte versuchen Sie, Ihre Frage mit einem spezifischen Standort umzuformulieren.`

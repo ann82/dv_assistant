@@ -531,8 +531,11 @@ export class TwilioVoiceHandler extends BaseHandler {
   generateTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
     const twiml = new this.VoiceResponseClass();
     
+    // Handle undefined or null text
+    const safeText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
+    
     // Escape XML characters
-    const escapedText = this.escapeXML(text);
+    const escapedText = this.escapeXML(safeText);
     
     // Add speech with simple voice settings
     twiml.say(escapedText, {
@@ -568,8 +571,11 @@ export class TwilioVoiceHandler extends BaseHandler {
    */
   async generateTTSBasedTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
     try {
+      // Handle undefined or null text
+      const safeText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
+      
       // Use TTS service to generate audio
-      const audioResult = await this.services.tts.generateSpeech(text, languageCode);
+      const audioResult = await this.services.tts.generateSpeech(safeText, languageCode);
       
       if (audioResult.success && audioResult.data.audioUrl) {
         const twiml = new this.VoiceResponseClass();
@@ -588,7 +594,8 @@ export class TwilioVoiceHandler extends BaseHandler {
           
           // Add fallback message if no speech detected
           const langConfig = this._getLanguageConfig(languageCode);
-          gather.say(this.getLocalizedPrompt(languageCode, 'noSpeech'), {
+          const noSpeechPrompt = this.getLocalizedPrompt(languageCode, 'noSpeech') || 'I didn\'t hear anything. Please try again.';
+          gather.say(noSpeechPrompt, {
             voice: langConfig.voice,
             language: languageCode
           });
@@ -597,7 +604,7 @@ export class TwilioVoiceHandler extends BaseHandler {
         return twiml;
       } else {
         // Fallback to regular TwiML if TTS fails
-        return this.generateTwiML(text, shouldGather, languageCode);
+        return this.generateTwiML(safeText, shouldGather, languageCode);
       }
     } catch (error) {
       this.logger.error('Error generating TTS TwiML:', error);
@@ -612,6 +619,11 @@ export class TwilioVoiceHandler extends BaseHandler {
    * @returns {string} Escaped text
    */
   escapeXML(text) {
+    // Handle undefined, null, or non-string values
+    if (!text || typeof text !== 'string') {
+      return '';
+    }
+    
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -884,7 +896,8 @@ export class TwilioVoiceHandler extends BaseHandler {
         }
       }
 
-      return prompt;
+      // Ensure we always return a string
+      return typeof prompt === 'string' ? prompt : 'I\'m sorry, I didn\'t understand your request.';
     } catch (error) {
       this.logger.error('Error getting localized prompt:', { languageCode, promptKey, error: error.message });
       return 'I\'m sorry, I didn\'t understand your request.';
