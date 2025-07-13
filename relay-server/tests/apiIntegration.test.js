@@ -95,7 +95,7 @@ describe('API Integration Tests', () => {
     process.env.TWILIO_PHONE_NUMBER = '+1234567890';
     process.env.OPENAI_API_KEY = 'test-openai-key';
     process.env.TAVILY_API_KEY = 'test-tavily-key';
-    process.env.TWILIO_ACCOUNT_SID = 'AC12345678901234567890123456789012';
+    process.env.TWILIO_ACCOUNT_SID = 'TEST_ACCOUNT_SID_FOR_TESTING_ONLY';
     process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
     process.env.RATE_LIMIT_MAX_REQUESTS = '2'; // Lower for test
     

@@ -79,7 +79,7 @@ describe('Enhanced Logging Middleware', () => {
           requestId: expect.any(String),
           method: 'POST',
           url: '/twilio/voice',
-          callSid: 'CA123456789',
+          callSid: 'TEST_CALL_SID_FOR_TESTING_ONLY',
           from: '123-***-7890'
         })
       );
@@ -162,7 +162,7 @@ describe('Enhanced Logging Middleware', () => {
   describe('logControllerOperation', () => {
     it('should log controller operations with consistent format', () => {
       const operation = 'testOperation';
-      const data = { callSid: 'CA123', result: 'success' };
+      const data = { callSid: 'TEST_CALL_SID_123', result: 'success' };
 
       logControllerOperation(operation, data);
 
@@ -197,7 +197,7 @@ describe('Enhanced Logging Middleware', () => {
     it('should log API endpoints with consistent format', () => {
       const endpoint = '/twilio/voice';
       const method = 'POST';
-      const data = { callSid: 'CA123' };
+      const data = { callSid: 'TEST_CALL_SID_123' };
 
       logApiEndpoint(endpoint, method, data);
 
@@ -228,7 +228,7 @@ describe('Enhanced Logging Middleware', () => {
 
     it('should redact Twilio credentials', () => {
       const data = {
-        accountSid: 'AC1234567890abcdef1234567890abcdef',
+        accountSid: 'TEST_ACCOUNT_SID_FOR_TESTING_ONLY',
         authToken: 'test-auth-token',
         message: 'test'
       };

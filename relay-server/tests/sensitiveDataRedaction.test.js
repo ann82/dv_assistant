@@ -25,7 +25,7 @@ describe('Sensitive Data Redaction', () => {
       path: '/api/test',
       headers: {
         'authorization': 'Bearer sk-1234567890abcdef1234567890abcdef1234567890abcdef',
-        'x-api-key': 'AC1234567890abcdef1234567890abcdef',
+        'x-api-key': 'TEST_ACCOUNT_SID_FOR_TESTING_ONLY',
         'user-agent': 'test-agent'
       },
       body: {
@@ -99,7 +99,7 @@ describe('Sensitive Data Redaction', () => {
     });
 
     it('should redact Twilio Account SID', () => {
-      const text = 'Account SID: AC1234567890abcdef1234567890abcdef';
+      const text = 'Account SID: TEST_ACCOUNT_SID_FOR_TESTING_ONLY';
       const redacted = redactString(text);
       expect(redacted).toBe('Account SID: [REDACTED]');
     });
