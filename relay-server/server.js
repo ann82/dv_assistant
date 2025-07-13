@@ -41,7 +41,6 @@ import { errorHandler } from './middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, skipHealthCheckLogging } from './middleware/logging.js';
 import { performanceMonitoring, errorTracking, startMemoryMonitoring } from './middleware/performanceMonitoring.js';
 import { OpenAIIntegration } from './integrations/openaiIntegration.js';
-import { vi } from 'vitest';
 
 // ES Module compatibility: Get the directory name for __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -276,7 +275,6 @@ function mountTestRoutes(appInstance) {
   const twilioRoutes = createTwilioRouter(handlerManager);
   appInstance.use('/twilio', twilioRoutes);
   logger.info('Test environment: Mock HandlerManager and routes initialized');
-  console.log('DEBUG: Twilio routes mounted in test environment');
 }
 
 /**
@@ -347,7 +345,6 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/twilio', twilioRoutes);
   
   logger.info('Test environment: Mock HandlerManager and routes initialized');
-  console.log('DEBUG: Twilio routes mounted in test environment');
 }
 
 /**

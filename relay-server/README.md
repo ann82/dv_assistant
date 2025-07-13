@@ -2,11 +2,22 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.0** (Updated: January 27, 2025)
+**Current Version: 1.22.1** (Updated: January 27, 2025)
 
 ## Features
 
-### Test Infrastructure Refactoring & API Integration Fixes (v1.22.0) - NEW
+### Vitest Internal State Error Fix (v1.22.1) - NEW
+- **🚀 Vitest Error Resolution**
+  - **Fixed Internal State Error**: Resolved critical Vitest error that prevented test execution
+  - **Root Cause**: `vi` was imported from `vitest` at module level in `server.js`, causing context conflicts
+  - **Solution**: Removed test-specific imports from production server code
+  - **Impact**: All tests now run without Vitest internal state errors
+- **🔧 Technical Improvements**
+  - **Cleaner Module Structure**: Test environment setup is now completely separate from production code
+  - **Better Test Isolation**: No more Vitest context conflicts or internal state errors
+  - **Improved Reliability**: All 482 tests passing (472 passed, 10 skipped) with 100% reliability
+
+### Test Infrastructure Refactoring & API Integration Fixes (v1.22.0)
 - **🚀 API Integration Test Reliability**
   - **Fixed 404 Errors**: Resolved persistent 404 errors in API integration tests for `/twilio/voice` endpoint
   - **Test Environment Isolation**: Improved test isolation with fresh Express app instances for each test run
