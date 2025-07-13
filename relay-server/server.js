@@ -286,46 +286,67 @@ function mountTestRoutes(appInstance) {
 if (process.env.NODE_ENV !== 'test') {
   // Production/development initialization
   (async () => {
-    // Initialize all application services
-    await serviceManager.initialize();
-    
-    /**
-     * Dependency Injection Configuration
-     * 
-     * Creates a comprehensive dependencies object that provides all necessary
-     * services and utilities to the handler manager and other components.
-     */
-    const dependencies = {
-      // Integration dependencies for external APIs
-      openaiIntegration: new OpenAIIntegration(),
-      searchIntegration: SearchIntegration,
-      twilioIntegration: null, // Will be initialized in HandlerManager
+    try {
+      // Initialize all application services
+      await serviceManager.initialize();
       
-      // Core service dependencies
-      audioService: serviceManager.getService('audio'),
-      ttsService: serviceManager.getService('tts'),
-      searchService: serviceManager.getService('search'),
-      contextService: serviceManager.getService('context'),
+      /**
+       * Dependency Injection Configuration
+       * 
+       * Creates a comprehensive dependencies object that provides all necessary
+       * services and utilities to the handler manager and other components.
+       */
+      const dependencies = {
+        // Integration dependencies for external APIs
+        openaiIntegration: new OpenAIIntegration(),
+        searchIntegration: SearchIntegration,
+        twilioIntegration: null, // Will be initialized in HandlerManager
+        
+        // Core service dependencies
+        audioService: serviceManager.getService('audio'),
+        ttsService: serviceManager.getService('tts'),
+        searchService: serviceManager.getService('search'),
+        contextService: serviceManager.getService('context'),
+        
+        // Utility dependencies
+        logger: logger,
+        
+        // Configuration dependencies
+        config: config
+      };
       
-      // Utility dependencies
-      logger: logger,
+      // Initialize the handler manager with all dependencies
+      handlerManager = new HandlerManager(Object.fromEntries(serviceManager.getAllServices()), dependencies);
       
-      // Configuration dependencies
-      config: config
-    };
-    
-    // Initialize the handler manager with all dependencies
-    handlerManager = new HandlerManager(Object.fromEntries(serviceManager.getAllServices()), dependencies);
-    
-    // Create and mount Twilio routes with injected handlerManager
-    const twilioRoutes = createTwilioRouter(handlerManager);
-    app.use('/twilio', twilioRoutes);
-    
-    logger.info('ServiceManager and HandlerManager initialized successfully');
-  })().catch(error => {
-    logger.error('Failed to initialize services:', error);
-    process.exit(1);
-  });
+      // Create and mount Twilio routes with injected handlerManager
+      const twilioRoutes = createTwilioRouter(handlerManager);
+      app.use('/twilio', twilioRoutes);
+      
+      logger.info('ServiceManager and HandlerManager initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize services, creating fallback handlerManager:', error);
+      
+      // Create a fallback handlerManager to ensure routes are available
+      handlerManager = {
+        processVoiceCall: () => Promise.resolve({ twiml: '<Response><Say>Service temporarily unavailable. Please try again later.</Say></Response>' }),
+        generateTTSBasedTwiML: () => Promise.resolve('<Response><Say>Service temporarily unavailable. Please try again later.</Say></Response>'),
+        activeCalls: new Map(),
+        getConversationContext: () => Promise.resolve(null),
+        updateConversationContext: () => {},
+        cleanupCall: () => {},
+        sendSMSWithRetry: () => Promise.resolve(),
+        setWebSocketServer: () => {},
+        preprocessSpeech: (speech) => speech,
+        processSpeechInput: () => Promise.resolve('Service temporarily unavailable. Please try again later.')
+      };
+      
+      // Create and mount Twilio routes with fallback handlerManager
+      const twilioRoutes = createTwilioRouter(handlerManager);
+      app.use('/twilio', twilioRoutes);
+      
+      logger.info('Fallback HandlerManager and routes initialized');
+    }
+  })();
 } else {
   // Test environment - synchronous initialization
   // Create a mock handlerManager for tests

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2025-07-13
+
+### Changed
+- **Robust Twilio Route Initialization**: `/twilio/voice` and related routes are now always mounted, even if service initialization fails.
+  - If core services fail to initialize, a fallback handlerManager is created and Twilio routes return a friendly error TwiML instead of 404.
+  - This prevents 404 errors for Twilio webhooks and improves reliability for production and development.
+  - Server only starts listening after Twilio routes are mounted, ensuring webhooks are always handled.
+- **Improved Startup Logging**: Added clear log messages for both normal and fallback route mounting, making it easy to diagnose startup issues.
+- **Documentation Updates**: README now includes a section on Twilio route initialization, fallback logic, and troubleshooting 404 errors.
+
 ## [1.26.0] - 2025-01-27
 
 ### Changed

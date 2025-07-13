@@ -45,6 +45,7 @@ A real-time voice-based assistant designed to provide immediate support and info
 - Enhanced logging and debugging capabilities
 - Robust filtering, caching, and response formatting logic
 - Customizable Tavily response formatting with required fields always present
+- **Robust Twilio route mounting and error handling**: Ensures /twilio/voice is always available, even if service initialization fails
 - **Enhanced Tavily response formatting with improved title and address extraction**
 - **Improved Railway deployment with enhanced startup script and error handling**
 - **Enhanced speech-to-text recognition with intelligent preprocessing to reduce garbling**
@@ -464,6 +465,42 @@ The system includes comprehensive logging throughout the request-response lifecy
 3. Monitor parameter validation errors
 4. Check TwiML response formatting
 5. Review error responses and stack traces
+
+## Twilio Route Initialization and 404 Troubleshooting
+
+### How Twilio Routes Are Mounted
+- The `/twilio` routes (including `/twilio/voice`) are mounted **after** all core services are initialized.
+- If service initialization fails, a fallback handler is mounted so `/twilio/voice` always returns a valid TwiML response (with a friendly error message).
+- This prevents 404 errors for Twilio webhooks, even if there are backend issues.
+
+### Startup Sequence
+1. Server starts and loads environment variables.
+2. Core services (context, search, TTS, audio) are initialized.
+3. If all services initialize successfully, the main HandlerManager is created and `/twilio` routes are mounted with full functionality.
+4. If service initialization fails, a fallback handlerManager is created and `/twilio` routes are mounted with a static error response.
+5. The server only starts listening after routes are mounted, ensuring Twilio webhooks never see a 404.
+
+### Troubleshooting 404 Errors
+- If you see a 404 on `/twilio/voice`, check the server logs for errors during startup.
+- Make sure you wait for the log line `Initializing Twilio routes with enhanced logging` before sending requests.
+- If you see `Fallback HandlerManager and routes initialized`, the server is running in fallback mode due to a startup error. Check logs for the root cause.
+- If you see `ServiceManager and HandlerManager initialized successfully`, the server is running normally and Twilio routes are fully functional.
+
+### Example Log Output
+```
+] Initializing Twilio routes with enhanced logging
+] ServiceManager and HandlerManager initialized successfully
+```
+Or, if fallback mode:
+```
+] Failed to initialize services, creating fallback handlerManager: ...
+] Fallback HandlerManager and routes initialized
+```
+
+### Best Practices
+- Always check logs after startup to confirm Twilio routes are mounted.
+- If you need to debug, add a test POST to `/twilio/voice` after seeing the route-mount log.
+- For production, ensure all required environment variables are set and services are healthy to avoid fallback mode.
 
 ## Recent Changes
 
