@@ -281,7 +281,7 @@ if (process.env.NODE_ENV !== 'test') {
     const dependencies = {
       // Integration dependencies for external APIs
       openaiIntegration: new OpenAIIntegration(),
-      searchIntegration: new SearchIntegration(),
+      searchIntegration: SearchIntegration,
       twilioIntegration: null, // Will be initialized in HandlerManager
       
       // Core service dependencies
