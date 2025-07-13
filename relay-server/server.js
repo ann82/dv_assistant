@@ -194,6 +194,16 @@ app.use('/audio', express.static(audioDir));
 // Health check and monitoring routes
 app.use('/health', healthRoutes);
 
+// Simple test route to verify basic routing works
+app.get('/test', (req, res) => {
+  res.json({ message: 'Basic routing works', timestamp: new Date().toISOString() });
+});
+
+// Simple test Twilio route to verify router mounting works
+app.get('/twilio-simple', (req, res) => {
+  res.json({ message: 'Simple Twilio route works', timestamp: new Date().toISOString() });
+});
+
 // Start memory monitoring for performance tracking
 startMemoryMonitoring();
 
@@ -227,13 +237,7 @@ app.use(errorTracking);
 // General error handler for uncaught exceptions
 app.use(errorHandler);
 
-// 404 handler for unmatched routes
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: 'The requested resource was not found'
-  });
-});
+// 404 handler will be mounted after routes are initialized
 
 /**
  * HTTP Server Creation
@@ -283,6 +287,34 @@ function mountTestRoutes(appInstance) {
  * Initializes services and handlers. In test environment, creates a mock handlerManager
  * to ensure routes are available for testing.
  */
+function startServer() {
+  server.listen(port, () => {
+    logger.info(`🚀 Domestic Violence Support Assistant server started successfully`);
+    logger.info(`📡 Server listening on port ${port}`);
+    logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🔗 Health check: http://localhost:${port}/health`);
+    logger.info(`📞 Twilio webhook: http://localhost:${port}/twilio/voice`);
+    logger.info(`🔊 Audio files: http://localhost:${port}/audio/`);
+    
+    // Log service status (only if ServiceManager is initialized)
+    if (serviceManager && serviceManager.initialized) {
+      try {
+        const services = Array.from(serviceManager.getAllServices().keys());
+        logger.info(`⚙️  Services initialized: ${services.join(', ')}`);
+      } catch (error) {
+        logger.warn('ServiceManager not yet initialized, skipping service status log');
+      }
+    } else {
+      logger.info('⚙️  Services initializing...');
+    }
+    
+    logger.info('✅ Server startup complete');
+  }).on('error', (err) => {
+    logger.error('❌ Failed to start server:', err);
+    process.exit(1);
+  });
+}
+
 if (process.env.NODE_ENV !== 'test') {
   // Production/development initialization
   (async () => {
@@ -319,10 +351,35 @@ if (process.env.NODE_ENV !== 'test') {
       handlerManager = new HandlerManager(Object.fromEntries(serviceManager.getAllServices()), dependencies);
       
       // Create and mount Twilio routes with injected handlerManager
-      const twilioRoutes = createTwilioRouter(handlerManager);
-      app.use('/twilio', twilioRoutes);
+      try {
+        const twilioRoutes = createTwilioRouter(handlerManager);
+        logger.info('Twilio router created successfully');
+        app.use('/twilio', twilioRoutes);
+        logger.info('Twilio router mounted at /twilio');
+        
+        // Debug: Log all mounted routes
+        logger.info('Debug: All mounted routes:', app._router.stack
+          .filter(layer => layer.route)
+          .map(layer => `${Object.keys(layer.route.methods).join(',').toUpperCase()} ${layer.route.path}`)
+        );
+        
+        logger.info('ServiceManager and HandlerManager initialized successfully');
+        logger.info('✅ Twilio routes mounted successfully at /twilio');
+      } catch (error) {
+        logger.error('Failed to create or mount Twilio routes:', error);
+        throw error;
+      }
       
-      logger.info('ServiceManager and HandlerManager initialized successfully');
+      // Mount 404 handler after all routes are mounted
+      app.use((req, res) => {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'The requested resource was not found'
+        });
+      });
+      
+      // Start the server after routes are mounted
+      startServer();
     } catch (error) {
       logger.error('Failed to initialize services, creating fallback handlerManager:', error);
       
@@ -341,10 +398,29 @@ if (process.env.NODE_ENV !== 'test') {
       };
       
       // Create and mount Twilio routes with fallback handlerManager
-      const twilioRoutes = createTwilioRouter(handlerManager);
-      app.use('/twilio', twilioRoutes);
+      try {
+        const twilioRoutes = createTwilioRouter(handlerManager);
+        logger.info('Fallback Twilio router created successfully');
+        app.use('/twilio', twilioRoutes);
+        logger.info('Fallback Twilio router mounted at /twilio');
+        
+        logger.info('Fallback HandlerManager and routes initialized');
+        logger.info('✅ Fallback Twilio routes mounted successfully at /twilio');
+      } catch (error) {
+        logger.error('Failed to create or mount fallback Twilio routes:', error);
+        throw error;
+      }
       
-      logger.info('Fallback HandlerManager and routes initialized');
+      // Mount 404 handler after all routes are mounted
+      app.use((req, res) => {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'The requested resource was not found'
+        });
+      });
+      
+      // Start the server after fallback routes are mounted
+      startServer();
     }
   })();
 } else {
@@ -362,10 +438,29 @@ if (process.env.NODE_ENV !== 'test') {
   };
   
   // Create and mount Twilio routes with injected handlerManager
-  const twilioRoutes = createTwilioRouter(handlerManager);
-  app.use('/twilio', twilioRoutes);
+  try {
+    const twilioRoutes = createTwilioRouter(handlerManager);
+    logger.info('Test Twilio router created successfully');
+    app.use('/twilio', twilioRoutes);
+    logger.info('Test Twilio router mounted at /twilio');
+    
+    logger.info('Test environment: Mock HandlerManager and routes initialized');
+    logger.info('✅ Test Twilio routes mounted successfully at /twilio');
+  } catch (error) {
+    logger.error('Failed to create or mount test Twilio routes:', error);
+    throw error;
+  }
   
-  logger.info('Test environment: Mock HandlerManager and routes initialized');
+  // Mount 404 handler after all routes are mounted
+  app.use((req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'The requested resource was not found'
+    });
+  });
+  
+  // Start the server after test routes are mounted
+  startServer();
 }
 
 /**
@@ -393,34 +488,9 @@ if (process.env.NODE_ENV !== 'test') {
 /**
  * Server Startup
  * 
- * Starts the HTTP server and begins listening for incoming requests.
- * Includes comprehensive error handling and logging.
+ * Server startup is now handled by the startServer() function
+ * which is called after routes are mounted to prevent race conditions.
  */
-server.listen(port, () => {
-  logger.info(`🚀 Domestic Violence Support Assistant server started successfully`);
-  logger.info(`📡 Server listening on port ${port}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🔗 Health check: http://localhost:${port}/health`);
-  logger.info(`📞 Twilio webhook: http://localhost:${port}/twilio/voice`);
-  logger.info(`🔊 Audio files: http://localhost:${port}/audio/`);
-  
-  // Log service status (only if ServiceManager is initialized)
-  if (serviceManager && serviceManager.initialized) {
-    try {
-      const services = Array.from(serviceManager.getAllServices().keys());
-      logger.info(`⚙️  Services initialized: ${services.join(', ')}`);
-    } catch (error) {
-      logger.warn('ServiceManager not yet initialized, skipping service status log');
-    }
-  } else {
-    logger.info('⚙️  Services initializing...');
-  }
-  
-  logger.info('✅ Server startup complete');
-}).on('error', (err) => {
-  logger.error('❌ Failed to start server:', err);
-  process.exit(1);
-});
 
 /**
  * Graceful Shutdown Handling

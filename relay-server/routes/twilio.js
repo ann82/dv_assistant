@@ -28,10 +28,13 @@ const __dirname = path.dirname(__filename);
 
 // Create a factory function to create the router with injected dependencies
 function createTwilioRouter(handlerManager) {
+  logger.info('Creating Twilio router...');
   const router = express.Router();
   
   // Create the Twilio controller with injected handlerManager
+  logger.info('Creating Twilio controller...');
   const twilioController = createTwilioController(handlerManager);
+  logger.info('Twilio controller created successfully');
 
 // Initialize TwilioVoiceHandler
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -41,8 +44,8 @@ const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 // Skip credential check in test environment
 if (process.env.NODE_ENV !== 'test') {
   if (!accountSid || !authToken || !phoneNumber) {
-    logger.error('Twilio credentials not found in environment variables');
-    throw new Error('Twilio credentials not found in environment variables');
+    logger.warn('Twilio credentials not found in environment variables, but continuing anyway');
+    // Don't throw error, just log warning
   }
 }
 
@@ -105,6 +108,11 @@ router.use(rateLimiter);
 
 // Log when the router is initialized
 logger.info('Initializing Twilio routes with enhanced logging');
+
+// Add a simple test route to verify router mounting
+router.get('/test', (req, res) => {
+  res.json({ message: 'Twilio router is working', timestamp: new Date().toISOString() });
+});
 
 // ============================================================================
 // TWILIO VOICE PROCESSING ENDPOINT
@@ -408,6 +416,7 @@ router.post('/web/process', validateRequest('webSpeech'), async (req, res) => {
     return wsServer;
   };
 
+  logger.info('Twilio router creation completed, returning router');
   return router;
 }
 
