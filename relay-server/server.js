@@ -316,9 +316,17 @@ if (process.env.NODE_ENV !== 'test') {
 let wsServer;
 if (process.env.NODE_ENV !== 'test') {
   wsServer = new TwilioWebSocketServer(server);
-  if (handlerManager) {
-    handlerManager.setWebSocketServer(wsServer);
-  }
+  // Set WebSocket server on handlerManager when it becomes available
+  const setWebSocketServer = () => {
+    if (handlerManager) {
+      handlerManager.setWebSocketServer(wsServer);
+      logger.info('WebSocket server connected to HandlerManager');
+    } else {
+      // Retry after a short delay if handlerManager is not yet available
+      setTimeout(setWebSocketServer, 100);
+    }
+  };
+  setWebSocketServer();
 }
 
 /**
@@ -335,10 +343,16 @@ server.listen(port, () => {
   logger.info(`📞 Twilio webhook: http://localhost:${port}/twilio/voice`);
   logger.info(`🔊 Audio files: http://localhost:${port}/audio/`);
   
-  // Log service status
-  if (serviceManager) {
-    const services = Array.from(serviceManager.getAllServices().keys());
-    logger.info(`⚙️  Services initialized: ${services.join(', ')}`);
+  // Log service status (only if ServiceManager is initialized)
+  if (serviceManager && serviceManager.initialized) {
+    try {
+      const services = Array.from(serviceManager.getAllServices().keys());
+      logger.info(`⚙️  Services initialized: ${services.join(', ')}`);
+    } catch (error) {
+      logger.warn('ServiceManager not yet initialized, skipping service status log');
+    }
+  } else {
+    logger.info('⚙️  Services initializing...');
   }
   
   logger.info('✅ Server startup complete');
