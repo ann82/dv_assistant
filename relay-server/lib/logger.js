@@ -1,48 +1,38 @@
 import winston from 'winston';
 
-// Create a custom format for better readability
-const customFormat = winston.format.printf(({ level, message, timestamp, ...metadata }) => {
-  let msg = `${timestamp} [${level.toUpperCase()}] ${message}`;
-  if (Object.keys(metadata).length > 0) {
-    msg += ` ${JSON.stringify(metadata, null, 2)}`;
-  }
-  return msg;
-});
+// Helper to safely stringify objects with circular references
+function safeStringify(obj) {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, function(key, value) {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+    }
+    return value;
+  });
+}
 
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'debug',
+  level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.colorize(),
-    customFormat
+    winston.format.timestamp(),
+    winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      let metaString = '';
+      if (Object.keys(meta).length > 0) {
+        try {
+          metaString = '\n' + safeStringify(meta, null, 2);
+        } catch (e) {
+          metaString = '\n[Could not stringify meta: ' + e.message + ']';
+        }
+      }
+      return `[${timestamp}] ${level}: ${message}${metaString}`;
+    })
   ),
   transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        customFormat
-      )
-    })
+    new winston.transports.Console()
   ]
-});
-
-// Add a test log to verify logging is working
-logger.info('Logger initialized');
-
-// Add a stream for Morgan
-logger.stream = {
-  write: (message) => {
-    logger.info(message.trim());
-  }
-};
-
-// Log unhandled errors
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (error) => {
-  logger.error('Unhandled Rejection:', error);
 });
 
 export default logger; 

@@ -357,11 +357,23 @@ if (process.env.NODE_ENV !== 'test') {
         app.use('/twilio', twilioRoutes);
         logger.info('Twilio router mounted at /twilio');
         
-        // Debug: Log all mounted routes
-        logger.info('Debug: All mounted routes:', app._router.stack
-          .filter(layer => layer.route)
-          .map(layer => `${Object.keys(layer.route.methods).join(',').toUpperCase()} ${layer.route.path}`)
-        );
+        // Debug: Log all mounted routes including routers
+        const allRoutes = [];
+        app._router.stack.forEach(layer => {
+          if (layer.route) {
+            // Direct routes
+            allRoutes.push(`${Object.keys(layer.route.methods).join(',').toUpperCase()} ${layer.route.path}`);
+          } else if (layer.name === 'router') {
+            // Mounted routers
+            const routerPath = layer.regexp.source.replace('^\\/','').replace('\\/?(?=\\/|$)','');
+            layer.handle.stack.forEach(routeLayer => {
+              if (routeLayer.route) {
+                allRoutes.push(`${Object.keys(routeLayer.route.methods).join(',').toUpperCase()} /${routerPath}${routeLayer.route.path}`);
+              }
+            });
+          }
+        });
+        logger.info('Debug: All mounted routes:', allRoutes);
         
         logger.info('ServiceManager and HandlerManager initialized successfully');
         logger.info('✅ Twilio routes mounted successfully at /twilio');

@@ -89,18 +89,15 @@ export class BaseHandler {
    */
   sanitizeRequest(request) {
     if (!request) return null;
-    
-    const sanitized = { ...request };
-    
-    // Remove sensitive fields
-    const sensitiveFields = ['password', 'token', 'apiKey', 'authToken', 'accountSid'];
-    for (const field of sensitiveFields) {
-      if (sanitized[field]) {
-        sanitized[field] = '[REDACTED]';
-      }
-    }
-    
-    return sanitized;
+    // Only log safe fields
+    return {
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body,
+      params: request.params,
+      query: request.query,
+    };
   }
   
   /**

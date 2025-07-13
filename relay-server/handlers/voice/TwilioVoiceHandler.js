@@ -106,15 +106,16 @@ export class TwilioVoiceHandler extends BaseHandler {
   }
 
   /**
-   * Validate request structure
+   * Validate incoming request structure (not Twilio signature)
    * @param {Object} request - Request to validate
    */
-  async validateRequest(request) {
+  async validateIncomingRequest(request) {
     if (!request) {
       throw new Error('Request is required');
     }
-    
-    // Additional validation can be added here
+    // For Twilio requests, we'll do the validation in the specific handler methods
+    // to avoid conflicts with the Twilio validation function
+    return true;
   }
 
   /**
@@ -132,57 +133,78 @@ export class TwilioVoiceHandler extends BaseHandler {
    */
   async handleIncomingCall(req) {
     return this.processRequest(req, 'incoming call', async (request) => {
-      // Set longer timeout for Twilio requests
-      request.setTimeout(30000); // 30 seconds timeout
-      
-      // Log request headers for debugging
-      this.logOperation('twilio request received', {
-        headers: request.headers,
-        body: request.body,
-        url: request.originalUrl,
-        protocol: request.protocol,
-        host: request.get('host'),
-        method: request.method
-      });
-
-      // Validate request
-      if (!this.validateTwilioRequest(request)) {
-        this.logOperation('invalid twilio request', {
+      try {
+        // Set longer timeout for Twilio requests
+        request.setTimeout(30000); // 30 seconds timeout
+        
+        // Log request headers for debugging
+        this.logOperation('twilio request received', {
           headers: request.headers,
           body: request.body,
           url: request.originalUrl,
+          protocol: request.protocol,
+          host: request.get('host'),
           method: request.method
         });
+
+        // Validate request (structure only)
+        await this.validateIncomingRequest(request);
+        this.logOperation('twilio request structure validated');
+
+        // Validate Twilio signature (skip in dev)
+        this.logOperation('validating twilio request');
+        if (!this.validateTwilioRequest(request)) {
+          this.logOperation('invalid twilio request', {
+            headers: request.headers,
+            body: request.body,
+            url: request.originalUrl,
+            method: request.method
+          });
+          const twiml = new this.VoiceResponseClass();
+          twiml.say('Invalid request');
+          return twiml;
+        }
+        this.logOperation('twilio request validated successfully');
+
+        const callSid = request.body.CallSid;
+        const from = request.body.From;
+        const to = request.body.To;
+
+        // Initialize call tracking
+        this.activeCalls.set(callSid, {
+          callSid,
+          from,
+          to,
+          startTime: Date.now(),
+          lastActivity: Date.now(),
+          status: CALL_STATUS.IN_PROGRESS,
+          timeouts: new Set(),
+          pendingRequests: new Set()
+        });
+
+        // Generate welcome message using TTS service
+        const welcomeMessage = "Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need.";
+        this.logOperation('generating welcome message', { welcomeMessage });
+        
+        // Create a simple TwiML response
         const twiml = new this.VoiceResponseClass();
-        twiml.say('Invalid request');
+        twiml.say(welcomeMessage);
+        twiml.gather({
+          input: 'speech',
+          action: '/twilio/voice/process',
+          method: 'POST'
+        });
+
+        this.logOperation('incoming call handled', { callSid, from, to });
         return twiml;
+      } catch (error) {
+        this.logger.error('Error in handleIncomingCall:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        throw error;
       }
-
-      const callSid = request.body.CallSid;
-      const from = request.body.From;
-      const to = request.body.To;
-
-      // Initialize call tracking
-      this.activeCalls.set(callSid, {
-        callSid,
-        from,
-        to,
-        startTime: Date.now(),
-        lastActivity: Date.now(),
-        status: CALL_STATUS.IN_PROGRESS,
-        timeouts: new Set(),
-        pendingRequests: new Set()
-      });
-
-      // Create WebSocket connection for real-time communication
-      await this.createWebSocketConnection(callSid, from, request.res);
-
-      // Generate welcome message using TTS service
-      const welcomeMessage = this.getLocalizedPrompt(DEFAULT_LANGUAGE, 'welcome');
-      const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true, DEFAULT_LANGUAGE);
-
-      this.logOperation('incoming call handled', { callSid, from, to });
-      return twiml;
     });
   }
 
@@ -306,6 +328,11 @@ export class TwilioVoiceHandler extends BaseHandler {
    */
   validateTwilioRequest(req) {
     try {
+      // Skip validation in development/test environment for testing
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        this.logger.info('Skipping Twilio validation in development/test environment');
+        return true;
+      }
       return this.validateRequest(req, this.authToken);
     } catch (error) {
       this.logger.error('Twilio request validation failed:', error);
@@ -507,26 +534,25 @@ export class TwilioVoiceHandler extends BaseHandler {
     // Escape XML characters
     const escapedText = this.escapeXML(text);
     
-    // Add speech with language-specific voice
-    const langConfig = this._getLanguageConfig(languageCode);
+    // Add speech with simple voice settings
     twiml.say(escapedText, {
-      voice: langConfig.voice,
-      language: languageCode
+      voice: 'Polly.Amy',
+      language: 'en-US'
     });
 
     if (shouldGather) {
       const gather = twiml.gather({
         input: 'speech',
-        language: languageCode,
+        language: 'en-US',
         speechTimeout: 30,
         action: '/twilio/speech',
         method: 'POST'
       });
       
       // Add fallback message if no speech detected
-      gather.say(this.getLocalizedPrompt(languageCode, 'noSpeech'), {
-        voice: langConfig.voice,
-        language: languageCode
+      gather.say('I didn\'t hear anything. Please try again.', {
+        voice: 'Polly.Amy',
+        language: 'en-US'
       });
     }
 

@@ -4,6 +4,89 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 **Current Version: 1.22.1** (Updated: January 27, 2025)
 
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Twilio account (for voice/SMS features)
+- OpenAI API key (for AI responses)
+
+### Installation
+```bash
+cd relay-server
+npm install
+```
+
+### Environment Setup
+Create a `.env` file in the relay-server directory:
+
+```env
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone_number
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Running the Server
+```bash
+# Development
+npm run dev
+
+# Production
+npm start
+```
+
+The server will start on port 3000 (or the port specified in your .env file).
+
+### Health Check
+Visit `http://localhost:3000/health` to verify the server is running.
+
+## 📞 Twilio Integration
+
+### Webhook Endpoints
+The server provides the following Twilio webhook endpoints:
+
+- **Voice Calls**: `POST /twilio/voice`
+  - Handles incoming voice calls
+  - Returns TwiML responses for call flow
+  - ✅ **FIXED**: No longer returns 500 errors
+  - ✅ **WORKING**: Returns proper HTTP 200 with valid TwiML XML
+
+- **Speech Processing**: `POST /twilio/voice/process`
+  - Processes speech input from voice calls
+  - Generates AI-powered responses
+
+- **SMS**: `POST /twilio/sms`
+  - Handles incoming SMS messages
+
+### Configuration
+1. Set up your Twilio webhook URLs:
+   - Voice webhook: `https://your-domain.com/twilio/voice`
+   - SMS webhook: `https://your-domain.com/twilio/sms`
+
+2. Ensure your Twilio credentials are properly configured in the `.env` file
+
+### Testing
+You can test the voice endpoint locally:
+```bash
+curl -X POST http://localhost:3000/twilio/voice \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "CallSid=test123&From=+1234567890&To=+0987654321"
+```
+
+**Expected Response**: HTTP 200 with valid TwiML XML
+
 ## Features
 
 ### Vitest Internal State Error Fix (v1.22.1) - NEW

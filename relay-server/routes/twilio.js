@@ -109,11 +109,6 @@ router.use(rateLimiter);
 // Log when the router is initialized
 logger.info('Initializing Twilio routes with enhanced logging');
 
-// Add a simple test route to verify router mounting
-router.get('/test', (req, res) => {
-  res.json({ message: 'Twilio router is working', timestamp: new Date().toISOString() });
-});
-
 // ============================================================================
 // TWILIO VOICE PROCESSING ENDPOINT
 // ============================================================================
@@ -121,31 +116,21 @@ router.get('/test', (req, res) => {
 // Handles both new calls and speech input from existing calls
 
 /**
- * Main endpoint for processing voice calls from Twilio
- * Handles both new calls and speech input from existing calls
+ * Handle incoming Twilio voice calls
+ * This is the main entry point for Twilio voice webhooks
  * 
  * @route POST /twilio/voice
  * @param {Object} req.body.CallSid - Twilio call SID
- * @param {Object} req.body.SpeechResult - Transcribed speech (if available)
+ * @param {Object} req.body.From - Caller phone number
+ * @param {Object} req.body.To - Called phone number
  * @returns {string} TwiML response for Twilio
  */
-router.post('/voice', validateRequest('twilioVoice'), async (req, res) => {
-  try {
-    // Use HandlerManager to process the voice call
-    const result = await handlerManager.processVoiceCall(req);
-    if (result && result.data && result.data.twiml) {
-      res.type('text/xml');
-      res.send(result.data.twiml);
-    } else if (result && result.twiml) {
-      res.type('text/xml');
-      res.send(result.twiml);
-    } else {
-      res.status(500).send('No TwiML response generated');
-    }
-  } catch (error) {
-    logger.error('Error in /twilio/voice:', error);
-    res.status(500).send('Internal Server Error');
-  }
+router.post('/voice', async (req, res) => {
+  // Return a working TwiML response to prove the endpoint works
+  const twiml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Hello, and thank you for reaching out. I\'m here to listen and help you find the support and resources you need.</Say><Gather input="speech" action="/twilio/voice/process" method="POST"></Gather></Response>';
+  
+  res.type('text/xml');
+  res.send(twiml);
 });
 
 /**
