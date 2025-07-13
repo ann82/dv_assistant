@@ -306,6 +306,11 @@ export function createTwilioController(handlerManager) {
 
   // Main process function that routes to appropriate handler based on request type
   async function processSpeechResult(callSid, speechResult, requestId, requestType = 'web') {
+    logger.info('processSpeechResult called', {
+      requestId,
+      callSid,
+      text: speechResult
+    });
   logControllerOperation('processSpeechResult', { callSid, speechResult, requestId, requestType });
   logger.info('Processing speech result:', {
     requestId,
@@ -318,6 +323,11 @@ export function createTwilioController(handlerManager) {
   try {
     // Get conversation context FIRST (for follow-up questions)
     const context = callSid ? handlerManager.getConversationContext(callSid) : null;
+    logger.info('Retrieved conversation context', {
+      requestId,
+      callSid,
+      context: context
+    });
     logger.info('Retrieved conversation context:', {
       requestId,
       callSid,
@@ -330,6 +340,11 @@ export function createTwilioController(handlerManager) {
     // Check for follow-up questions BEFORE intent classification
     const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
     
+    logger.info('Follow-up question check', {
+      requestId,
+      callSid,
+      isFollowUp: !!followUpResponse
+    });
     logger.info('Follow-up question check:', {
       requestId,
       callSid,
@@ -366,6 +381,11 @@ export function createTwilioController(handlerManager) {
 
     // Get intent classification (only if not a follow-up)
     const intent = await getIntent(speechResult);
+    logger.info('Classified intent', {
+      requestId,
+      callSid,
+      intent
+    });
     logger.info('Classified intent:', {
       requestId,
       callSid,
@@ -375,6 +395,11 @@ export function createTwilioController(handlerManager) {
 
     // Extract location from speech input
     const location = await extractLocation(speechResult);
+    logger.info('Extracted location', {
+      requestId,
+      callSid,
+      location
+    });
     logger.info('Extracted location:', {
       requestId,
       callSid,
@@ -393,6 +418,11 @@ export function createTwilioController(handlerManager) {
 
     // Rewrite query with context for better search results
     let rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
+    logger.info('Rewritten query', {
+      requestId,
+      callSid,
+      rewrittenQuery
+    });
     logger.info('Rewritten query:', {
       requestId,
       callSid,
@@ -424,6 +454,11 @@ export function createTwilioController(handlerManager) {
     });
     const response = await UnifiedResponseHandler.getResponse(rewrittenQuery, context, requestType, { maxResults: 3 });
 
+    logger.info('UnifiedResponseHandler.getResponse result', {
+      requestId,
+      callSid,
+      response
+    });
     logger.info('Received UnifiedResponseHandler response:', {
       requestId,
       callSid,
@@ -435,6 +470,11 @@ export function createTwilioController(handlerManager) {
 
     // Format response based on request type (web vs Twilio have different formats)
     const formattedResponse = requestType === 'web' ? response.webResponse : response.voiceResponse;
+    logger.info('Formatted response', {
+      requestId,
+      callSid,
+      formattedResponse
+    });
     logger.info('Formatted response:', {
       requestId,
       callSid,
@@ -448,14 +488,19 @@ export function createTwilioController(handlerManager) {
     // Update conversation context for follow-up questions
     if (callSid) {
       handlerManager.updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, response);
+      logger.info('Updated conversation context', {
+        requestId,
+        callSid,
+        intent
+      });
       logger.info('Updated conversation context:', {
         requestId,
         callSid,
         intent,
         queryLength: rewrittenQuery.length,
         responseLength: formattedResponse.length,
-        hasTavilyResults: !!tavilyResponse?.results,
-        resultCount: tavilyResponse?.results?.length || 0
+        hasTavilyResults: !!response?.results,
+        resultCount: response?.results?.length || 0
       });
     }
 

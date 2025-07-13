@@ -1,5 +1,6 @@
 import { BaseHandler } from '../base/BaseHandler.js';
 import { getLanguageConfig, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
+import { logger } from '../../lib/logger.js';
 
 /**
  * SpeechHandler - Handles speech processing operations
@@ -25,10 +26,12 @@ export class SpeechHandler extends BaseHandler {
    */
   async validateRequest(request) {
     if (!request) {
+      logger.info('SpeechHandler.validateRequest: missing request', { request });
       throw new Error('Request is required');
     }
     
     if (!request.text && !request.audio) {
+      logger.info('SpeechHandler.validateRequest: missing text/audio', { request });
       throw new Error('Request must contain either text or audio');
     }
   }
@@ -39,7 +42,8 @@ export class SpeechHandler extends BaseHandler {
    * @returns {Promise<Object>} Processing result
    */
   async processSpeech(request) {
-    return this.processRequest(request, 'speech processing', async (req) => {
+    logger.info('SpeechHandler.processSpeech: start', { request });
+    const result = await this.processRequest(request, 'speech processing', async (req) => {
       const { text, audio, languageCode = DEFAULT_LANGUAGE, contextId } = req;
 
       // Preprocess speech text
@@ -81,6 +85,8 @@ export class SpeechHandler extends BaseHandler {
         confidence: this.calculateConfidence(processedText, extractedInfo)
       };
     });
+    logger.info('SpeechHandler.processSpeech: end', { request, result });
+    return result;
   }
 
   /**

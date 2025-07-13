@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.3] - 2025-01-27
+
+### Fixed
+- **SpeechHandler Error**: Resolved critical error "Request must contain either text or audio"
+  - **Root Cause**: Route was calling `handlerManager.processSpeechInput()` with incorrect parameters
+  - **Solution**: Updated route to use `twilioController.processSpeechResult()` with proper parameters
+  - **Impact**: Speech processing now works correctly without validation errors
+- **Undefined Variable Error**: Fixed `tavilyResponse` undefined variable in controller
+  - **Root Cause**: Code was referencing undefined `tavilyResponse` variable
+  - **Solution**: Replaced with correct `response` variable from UnifiedResponseHandler
+  - **Impact**: Eliminates runtime errors in conversation context updates
+
+### Added
+- **Enhanced Debugging Logs**: Comprehensive logging throughout speech processing flow
+  - **Route Level**: Added detailed logging for incoming requests, cleaned speech, and TwiML responses
+  - **Controller Level**: Added step-by-step logging for intent classification, location extraction, and response generation
+  - **Handler Level**: Added logging for request validation and processing lifecycle
+  - **Log Fields**: requestId, CallSid, text, voice, and relevant objects for complete traceability
+  - **Impact**: Significantly improved debugging capabilities and request flow visibility
+
+### Changed
+- **Request Processing Flow**: Streamlined speech processing pipeline
+  - **Before**: Route called handler directly with incorrect parameters
+  - **After**: Route uses controller method with proper parameter structure
+  - **Impact**: More reliable and maintainable speech processing
+
 ## [v1.22.2] - 2025-01-27
 
 ### Fixed

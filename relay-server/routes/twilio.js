@@ -143,6 +143,19 @@ router.post('/voice', async (req, res) => {
  * @returns {string} TwiML response for Twilio
  */
 router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) => {
+  const requestId = Math.random().toString(36).substring(7);
+  const { CallSid, SpeechResult } = req.body;
+  const voice = req.body.voice || 'unknown';
+
+  logger.info('Incoming /twilio/voice/process request', {
+    requestId,
+    CallSid,
+    text: SpeechResult,
+    voice,
+    headers: req.headers,
+    body: req.body
+  });
+
   // Send immediate acknowledgment to prevent 499 errors
   res.set('Connection', 'keep-alive');
   res.set('Keep-Alive', 'timeout=15');
@@ -167,7 +180,6 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   }, 12000); // Reduced to 12 seconds for Twilio compatibility
   
   try {
-    const { CallSid, SpeechResult } = req.body;
     
     if (!CallSid || !SpeechResult) {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
@@ -192,21 +204,42 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       logger.info('Initialized call in voice handler during speech processing:', { CallSid, from: req.body.From });
     }
     
-    // Preprocess speech input to improve recognition accuracy
-    const cleanedSpeechResult = handlerManager.preprocessSpeech(SpeechResult);
-    logger.info('Cleaned speech result:', { CallSid, original: SpeechResult, cleaned: cleanedSpeechResult });
+    // Clean and process speech result
+    const cleanedSpeechResult = SpeechResult ? SpeechResult.trim() : '';
+    logger.info('Cleaned speech result', {
+      requestId,
+      CallSid,
+      text: cleanedSpeechResult,
+      voice
+    });
     
     // Check if this is a consent response (yes/no to SMS question)
     const lowerSpeech = cleanedSpeechResult.toLowerCase();
     const consentKeywords = ['yes', 'no', 'agree', 'disagree', 'ok', 'okay', 'sure', 'nope'];
     
+    // Before calling processSpeechResult
+    logger.info('Calling processSpeechResult', {
+      requestId,
+      CallSid,
+      text: cleanedSpeechResult,
+      voice
+    });
+
     // Process the speech input with timeout handling - reduced for Twilio compatibility
     const processedResponse = await Promise.race([
-      handlerManager.processSpeechInput(cleanedSpeechResult, CallSid),
+      twilioController.processSpeechResult(CallSid, cleanedSpeechResult, requestId, 'twilio'),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Processing timeout')), 10000)
       )
     ]);
+
+    logger.info('processSpeechResult response', {
+      requestId,
+      CallSid,
+      text: cleanedSpeechResult,
+      voice,
+      processedResponse
+    });
     
     // Clear the request timeout since we got a response
     clearTimeout(requestTimeout);
@@ -261,10 +294,19 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       twiml = fallbackTwiml.toString();
     }
     
+    // Before sending TwiML
+    logger.info('Sending TwiML response', {
+      requestId,
+      CallSid,
+      text: cleanedSpeechResult,
+      voice,
+      twiml: twiml
+    });
+
     res.type('text/xml');
     res.send(twiml);
     
-    logger.info('Successfully processed speech:', { CallSid, responseLength: response.length });
+    logger.info('Successfully processed speech:', { requestId, CallSid, responseLength: response.length });
     
   } catch (error) {
     clearTimeout(requestTimeout);
