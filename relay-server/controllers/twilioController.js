@@ -311,216 +311,245 @@ export function createTwilioController(handlerManager) {
       callSid,
       text: speechResult
     });
-  logControllerOperation('processSpeechResult', { callSid, speechResult, requestId, requestType });
-  logger.info('Processing speech result:', {
-    requestId,
-    callSid,
-    speechResult,
-    requestType,
-    timestamp: new Date().toISOString()
-  });
-
-  try {
-    // Get conversation context FIRST (for follow-up questions)
-    const context = callSid ? handlerManager.getConversationContext(callSid) : null;
-    logger.info('Retrieved conversation context', {
+    logControllerOperation('processSpeechResult', { callSid, speechResult, requestId, requestType });
+    logger.info('Processing speech result:', {
       requestId,
       callSid,
-      context: context
-    });
-    logger.info('Retrieved conversation context:', {
-      requestId,
-      callSid,
-      hasContext: !!context,
-      lastIntent: context?.lastIntent,
-      hasLastQueryContext: !!context?.lastQueryContext,
-      needsLocation: context?.lastQueryContext?.needsLocation || false
-    });
-
-    // Check for follow-up questions BEFORE intent classification
-    const followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
-    
-    logger.info('Follow-up question check', {
-      requestId,
-      callSid,
-      isFollowUp: !!followUpResponse
-    });
-    logger.info('Follow-up question check:', {
-      requestId,
-      callSid,
-      isFollowUp: !!followUpResponse,
-      followUpType: followUpResponse?.type,
       speechResult,
-      lastIntent: context?.lastIntent
+      requestType,
+      timestamp: new Date().toISOString()
     });
 
-    // If this is a follow-up question, handle it directly
-    if (followUpResponse) {
-      logger.info('Processing follow-up response:', {
+    try {
+      // Get conversation context FIRST (for follow-up questions)
+      let context = null;
+      try {
+        context = callSid ? await handlerManager.getConversationContext(callSid) : null;
+        logger.info('Retrieved conversation context', {
+          requestId,
+          callSid,
+          context: context
+        });
+      } catch (contextError) {
+        logger.error('Error getting conversation context:', {
+          requestId,
+          callSid,
+          error: contextError.message,
+          stack: contextError.stack
+        });
+        // Continue without context
+      }
+
+      // Check for follow-up questions BEFORE intent classification
+      let followUpResponse = null;
+      try {
+        followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
+        logger.info('Follow-up question check', {
+          requestId,
+          callSid,
+          isFollowUp: !!followUpResponse
+        });
+      } catch (followUpError) {
+        logger.error('Error checking follow-up:', {
+          requestId,
+          callSid,
+          error: followUpError.message,
+          stack: followUpError.stack
+        });
+        // Continue without follow-up handling
+      }
+
+      // If this is a follow-up question, handle it directly
+      if (followUpResponse) {
+        logger.info('Processing follow-up response:', {
+          requestId,
+          callSid,
+          followUpType: followUpResponse.type,
+          hasResults: !!followUpResponse.results,
+          resultCount: followUpResponse.results?.length || 0
+        });
+
+        // Update conversation context with follow-up response
+        if (callSid) {
+          try {
+            await handlerManager.updateConversationContext(callSid, followUpResponse.intent || context?.lastIntent || 'general_information', speechResult, {
+              voiceResponse: followUpResponse.voiceResponse,
+              smsResponse: followUpResponse.smsResponse
+            }, followUpResponse.results && followUpResponse.results.length > 0 ? { results: followUpResponse.results } : null);
+          } catch (updateError) {
+            logger.error('Error updating conversation context for follow-up:', {
+              requestId,
+              callSid,
+              error: updateError.message
+            });
+          }
+        }
+
+        // Return appropriate format based on request type
+        if (requestType === 'web') {
+          return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
+        }
+        return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
+      }
+
+      // Get intent classification (only if not a follow-up)
+      let intent = null;
+      try {
+        intent = await getIntent(speechResult);
+        logger.info('Classified intent', {
+          requestId,
+          callSid,
+          intent
+        });
+      } catch (intentError) {
+        logger.error('Error classifying intent:', {
+          requestId,
+          callSid,
+          error: intentError.message,
+          stack: intentError.stack
+        });
+        intent = 'general_information'; // Fallback intent
+      }
+
+      // Extract location from speech input
+      let location = null;
+      try {
+        location = await extractLocation(speechResult);
+        logger.info('Extracted location', {
+          requestId,
+          callSid,
+          location
+        });
+      } catch (locationError) {
+        logger.error('Error extracting location:', {
+          requestId,
+          callSid,
+          error: locationError.message,
+          stack: locationError.stack
+        });
+      }
+
+      if (!location) {
+        logger.info('No location found in speech, generating prompt:', {
+          requestId,
+          callSid,
+          speechResult
+        });
+        try {
+          return await generateLocationPrompt();
+        } catch (promptError) {
+          logger.error('Error generating location prompt:', {
+            requestId,
+            callSid,
+            error: promptError.message
+          });
+          return "I'd be happy to help you find shelter. Could you please tell me which city, state, and country you're looking for?";
+        }
+      }
+
+      // Rewrite query with context for better search results
+      let rewrittenQuery = null;
+      try {
+        rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
+        logger.info('Rewritten query', {
+          requestId,
+          callSid,
+          rewrittenQuery
+        });
+      } catch (rewriteError) {
+        logger.error('Error rewriting query:', {
+          requestId,
+          callSid,
+          error: rewriteError.message,
+          stack: rewriteError.stack
+        });
+        rewrittenQuery = speechResult; // Use original query as fallback
+      }
+
+      // Defensive check and logging before Tavily API call
+      logger.info('Type and value of rewrittenQuery before Tavily:', {
+        type: typeof rewrittenQuery,
+        value: rewrittenQuery
+      });
+      if (typeof rewrittenQuery !== 'string') {
+        logger.error('rewrittenQuery is not a string, attempting to convert or throw error', {
+          rewrittenQuery
+        });
+        if (rewrittenQuery && typeof rewrittenQuery.toString === 'function') {
+          rewrittenQuery = rewrittenQuery.toString();
+        } else {
+          throw new Error('rewrittenQuery must be a string');
+        }
+      }
+
+      // Call Tavily API with rewritten query
+      logger.info('Calling Tavily API:', {
         requestId,
         callSid,
-        followUpType: followUpResponse.type,
-        hasResults: !!followUpResponse.results,
-        resultCount: followUpResponse.results?.length || 0
+        query: rewrittenQuery
+      });
+      
+      let response = null;
+      try {
+        response = await UnifiedResponseHandler.getResponse(rewrittenQuery, context, requestType, { maxResults: 3 });
+        logger.info('UnifiedResponseHandler.getResponse result', {
+          requestId,
+          callSid,
+          response
+        });
+      } catch (responseError) {
+        logger.error('Error getting response from UnifiedResponseHandler:', {
+          requestId,
+          callSid,
+          error: responseError.message,
+          stack: responseError.stack
+        });
+        throw responseError; // Re-throw this error as it's critical
+      }
+
+      // Format response based on request type (web vs Twilio have different formats)
+      const formattedResponse = requestType === 'web' ? response.webResponse : response.voiceResponse;
+      logger.info('Formatted response', {
+        requestId,
+        callSid,
+        formattedResponse
       });
 
-      // Update conversation context with follow-up response
+      // Update conversation context for follow-up questions
       if (callSid) {
-        handlerManager.updateConversationContext(callSid, followUpResponse.intent || context?.lastIntent || 'general_information', speechResult, {
-          voiceResponse: followUpResponse.voiceResponse,
-          smsResponse: followUpResponse.smsResponse
-        }, followUpResponse.results && followUpResponse.results.length > 0 ? { results: followUpResponse.results } : null);
+        try {
+          await handlerManager.updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, response);
+          logger.info('Updated conversation context', {
+            requestId,
+            callSid,
+            intent
+          });
+        } catch (updateError) {
+          logger.error('Error updating conversation context:', {
+            requestId,
+            callSid,
+            error: updateError.message
+          });
+        }
       }
 
       // Return appropriate format based on request type
       if (requestType === 'web') {
-        return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
+        return formattedResponse;
       }
-      return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
-    }
-
-    // Get intent classification (only if not a follow-up)
-    const intent = await getIntent(speechResult);
-    logger.info('Classified intent', {
-      requestId,
-      callSid,
-      intent
-    });
-    logger.info('Classified intent:', {
-      requestId,
-      callSid,
-      intent,
-      speechResult
-    });
-
-    // Extract location from speech input
-    const location = await extractLocation(speechResult);
-    logger.info('Extracted location', {
-      requestId,
-      callSid,
-      location
-    });
-    logger.info('Extracted location:', {
-      requestId,
-      callSid,
-      location,
-      originalSpeech: speechResult
-    });
-
-    if (!location) {
-      logger.info('No location found in speech, generating prompt:', {
+      return formattedResponse;
+    } catch (error) {
+      logControllerOperation('processSpeechResult.error', { callSid, speechResult, requestId, error: error.message }, 'error');
+      logger.error('Error processing speech result:', {
         requestId,
         callSid,
+        error: error.message,
+        stack: error.stack,
         speechResult
       });
-      return generateLocationPrompt();
+      throw error;
     }
-
-    // Rewrite query with context for better search results
-    let rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
-    logger.info('Rewritten query', {
-      requestId,
-      callSid,
-      rewrittenQuery
-    });
-    logger.info('Rewritten query:', {
-      requestId,
-      callSid,
-      originalQuery: speechResult,
-      rewrittenQuery,
-      intent
-    });
-
-    // Defensive check and logging before Tavily API call
-    logger.info('Type and value of rewrittenQuery before Tavily:', {
-      type: typeof rewrittenQuery,
-      value: rewrittenQuery
-    });
-    if (typeof rewrittenQuery !== 'string') {
-      logger.error('rewrittenQuery is not a string, attempting to convert or throw error', {
-        rewrittenQuery
-      });
-      if (rewrittenQuery && typeof rewrittenQuery.toString === 'function') {
-        rewrittenQuery = rewrittenQuery.toString();
-      } else {
-        throw new Error('rewrittenQuery must be a string');
-      }
-    }
-    // Call Tavily API with rewritten query
-    logger.info('Calling Tavily API:', {
-      requestId,
-      callSid,
-      query: rewrittenQuery
-    });
-    const response = await UnifiedResponseHandler.getResponse(rewrittenQuery, context, requestType, { maxResults: 3 });
-
-    logger.info('UnifiedResponseHandler.getResponse result', {
-      requestId,
-      callSid,
-      response
-    });
-    logger.info('Received UnifiedResponseHandler response:', {
-      requestId,
-      callSid,
-      success: response.success,
-      source: response.source,
-      hasVoiceResponse: !!response.voiceResponse,
-      hasWebResponse: !!response.webResponse
-    });
-
-    // Format response based on request type (web vs Twilio have different formats)
-    const formattedResponse = requestType === 'web' ? response.webResponse : response.voiceResponse;
-    logger.info('Formatted response', {
-      requestId,
-      callSid,
-      formattedResponse
-    });
-    logger.info('Formatted response:', {
-      requestId,
-      callSid,
-      responseType: typeof formattedResponse,
-      responseLength: typeof formattedResponse === 'string' ? formattedResponse.length : JSON.stringify(formattedResponse).length,
-      responsePreview: typeof formattedResponse === 'string' ? 
-        (formattedResponse.substring(0, 100) + '...') : 
-        JSON.stringify(formattedResponse).substring(0, 100) + '...'
-    });
-
-    // Update conversation context for follow-up questions
-    if (callSid) {
-      handlerManager.updateConversationContext(callSid, intent, rewrittenQuery, formattedResponse, response);
-      logger.info('Updated conversation context', {
-        requestId,
-        callSid,
-        intent
-      });
-      logger.info('Updated conversation context:', {
-        requestId,
-        callSid,
-        intent,
-        queryLength: rewrittenQuery.length,
-        responseLength: formattedResponse.length,
-        hasTavilyResults: !!response?.results,
-        resultCount: response?.results?.length || 0
-      });
-    }
-
-    // Return appropriate format based on request type
-    if (requestType === 'web') {
-      return formattedResponse;
-    }
-    return formattedResponse;
-  } catch (error) {
-    logControllerOperation('processSpeechResult.error', { callSid, speechResult, requestId, error: error.message }, 'error');
-    logger.error('Error processing speech result:', {
-      requestId,
-      callSid,
-      error: error.message,
-      stack: error.stack,
-      speechResult
-    });
-    throw error;
   }
-}
 
   // Helper function to handle follow-up questions
   async function handleFollowUp(speechResult, lastQueryContext) {

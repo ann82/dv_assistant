@@ -13,21 +13,23 @@ const provider = process.env.TTS_PROVIDER || 'openai';
  * @param {Object} data - Data to log
  * @param {string} level - Log level (info, warn, error, debug)
  * @param {string} requestId - Optional request ID for tracking
+ * @param {Object} metadata - Additional metadata for context
  */
-function logTTSOperation(operation, data = {}, level = 'info', requestId = null) {
+function logTTSOperation(operation, data = {}, level = 'info', requestId = null, metadata = {}) {
   const logData = {
     integration: 'TTS',
     operation,
     requestId: requestId || uuidv4(),
     timestamp: new Date().toISOString(),
-    ...data
+    ...data,
+    ...metadata
   };
   
   logger[level](`TTS Integration - ${operation}:`, logData);
 }
 
 export const TTSIntegration = {
-  async generateTTS(text, options = {}, requestId = null) {
+  async generateTTS(text, options = {}, requestId = null, metadata = {}) {
     const operationId = requestId || uuidv4();
     
     logTTSOperation('generateTTS.start', { 
@@ -35,7 +37,7 @@ export const TTSIntegration = {
       textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
       provider,
       options 
-    }, 'info', operationId);
+    }, 'info', operationId, metadata);
     
     if (provider === 'openai') {
       try {
@@ -53,7 +55,7 @@ export const TTSIntegration = {
           provider: 'openai',
           voice: options.voice || 'nova',
           speed: options.speed || 1.0
-        }, 'info', operationId);
+        }, 'info', operationId, metadata);
 
         return {
           audioBuffer,
@@ -68,12 +70,13 @@ export const TTSIntegration = {
           error: error.message,
           errorCode: error.code,
           voice: options.voice || 'nova'
-        }, 'error', operationId);
+        }, 'error', operationId, metadata);
         
         logger.error('OpenAI TTS generation failed:', {
           error: error.message,
           code: error.code,
-          requestId: operationId
+          requestId: operationId,
+          ...metadata
         });
         throw error;
       }
@@ -83,7 +86,7 @@ export const TTSIntegration = {
       logTTSOperation('generateTTS.stub', {
         textLength: text.length,
         provider: 'stub'
-      }, 'info', operationId);
+      }, 'info', operationId, metadata);
       
       // Stub: return a dummy audio URL or buffer
       return {
@@ -96,7 +99,7 @@ export const TTSIntegration = {
     logTTSOperation('generateTTS.unsupported', {
       provider,
       error: `Unsupported TTS provider: ${provider}`
-    }, 'error', operationId);
+    }, 'error', operationId, metadata);
     
     throw new Error(`Unsupported TTS provider: ${provider}`);
   },
@@ -116,37 +119,39 @@ export const TTSIntegration = {
   /**
    * Check if the TTS integration is healthy
    * @param {string} requestId - Optional request ID for tracking
+   * @param {Object} metadata - Additional metadata for context
    * @returns {Promise<boolean>} Health status
    */
-  async isHealthy(requestId = null) {
+  async isHealthy(requestId = null, metadata = {}) {
     const operationId = requestId || uuidv4();
     
     try {
-      logTTSOperation('isHealthy.start', {}, 'info', operationId);
+      logTTSOperation('isHealthy.start', {}, 'info', operationId, metadata);
       
       if (provider === 'openai') {
         const result = await openAIIntegration.testConnection(operationId);
-        logTTSOperation('isHealthy.result', { healthy: result }, 'info', operationId);
+        logTTSOperation('isHealthy.result', { healthy: result }, 'info', operationId, metadata);
         return result;
       }
       
       if (provider === 'stub') {
-        logTTSOperation('isHealthy.result', { healthy: true }, 'info', operationId);
+        logTTSOperation('isHealthy.result', { healthy: true }, 'info', operationId, metadata);
         return true;
       }
       
-      logTTSOperation('isHealthy.unsupported', { provider }, 'warn', operationId);
+      logTTSOperation('isHealthy.unsupported', { provider }, 'warn', operationId, metadata);
       return false;
     } catch (error) {
       logTTSOperation('isHealthy.error', { 
         error: error.message,
         provider 
-      }, 'error', operationId);
+      }, 'error', operationId, metadata);
       
       logger.error('TTS integration health check failed:', {
         error: error.message,
         provider,
-        requestId: operationId
+        requestId: operationId,
+        ...metadata
       });
       return false;
     }

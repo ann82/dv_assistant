@@ -60,11 +60,11 @@ export class TtsService extends BaseService {
    * @param {Object} options - TTS options
    * @returns {Promise<Object>} TTS result with audio data
    */
-  async generateSpeech(text, options = {}) {
+  async generateSpeech(text, options = {}, metadata = {}) {
     return this.processRequest(
-      { text, options },
+      { text, options, metadata },
       'generate speech',
-      async ({ text, options }) => {
+      async ({ text, options, metadata }) => {
         // Validate input
         if (!isNotEmpty(text)) {
           throw new Error('Text is required for TTS generation');
@@ -81,18 +81,24 @@ export class TtsService extends BaseService {
         const cachedResult = await this.getFromCache(cacheKey);
         
         if (cachedResult) {
-          this.logOperation('cache hit', { cacheKey: cacheKey.substring(0, 8) });
+          this.logOperation('cache hit', { 
+            cacheKey: cacheKey.substring(0, 8),
+            ...metadata
+          });
           return cachedResult;
         }
         
-        this.logOperation('cache miss', { cacheKey: cacheKey.substring(0, 8) });
+        this.logOperation('cache miss', { 
+          cacheKey: cacheKey.substring(0, 8),
+          ...metadata
+        });
         
-        // Generate speech using TTSIntegration
-        const result = await TTSIntegration.generateTTS(text, ttsOptions);
+        // Generate speech using TTSIntegration with metadata
+        const result = await TTSIntegration.generateTTS(text, ttsOptions, metadata.requestId);
         
-        // Cache result
+        // Cache result with metadata
         if (this.config.cache.enabled) {
-          await this.addToCache(cacheKey, result);
+          await this.addToCache(cacheKey, result, metadata);
         }
         
         return result;
@@ -161,30 +167,41 @@ export class TtsService extends BaseService {
    * Add TTS result to cache
    * @param {string} cacheKey - Cache key
    * @param {Object} result - TTS result
+   * @param {Object} metadata - Additional metadata for logging
    */
-  async addToCache(cacheKey, result) {
+  async addToCache(cacheKey, result, metadata = {}) {
     if (!this.config.cache.enabled) {
       return;
     }
     
     try {
       // Save metadata
-      const metadata = {
+      const cacheMetadata = {
         ...result,
         audio: undefined, // Don't save audio in metadata
         timestamp: new Date().toISOString()
       };
       
       const cacheFile = path.join(this.config.cache.directory, `${cacheKey}.json`);
-      await fs.writeFile(cacheFile, JSON.stringify(metadata, null, 2));
+      await fs.writeFile(cacheFile, JSON.stringify(cacheMetadata, null, 2));
       
       // Save audio file
       const audioFile = path.join(this.config.cache.directory, `${cacheKey}.mp3`);
       await fs.writeFile(audioFile, result.audio);
       
-      this.logOperation('cached', { cacheKey: cacheKey.substring(0, 8) });
+      this.logOperation('cached', { 
+        cacheKey: cacheKey.substring(0, 8),
+        ...metadata
+      });
     } catch (error) {
-      this.logger.warn('Failed to cache TTS result:', error.message);
+      this.logger.warn('Failed to cache TTS result:', {
+        error: error.message,
+        cacheKey: cacheKey.substring(0, 8),
+        textLength: result.text?.length || 0,
+        audioSize: result.audio?.length || 0,
+        provider: result.provider || 'unknown',
+        ...metadata
+      });
     }
   }
   

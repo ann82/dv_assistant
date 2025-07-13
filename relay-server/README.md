@@ -2,7 +2,7 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.3** (Updated: January 27, 2025)
+**Current Version: 1.22.4** (Updated: January 27, 2025)
 
 ## 🚀 Quick Start
 
@@ -69,11 +69,44 @@ npm test
 - **WebSocket Support**: Real-time communication for web clients
 - **SMS Integration**: Send follow-up messages and resource summaries via SMS
 
+### Recent Improvements (v1.22.4)
+- **Enhanced Error Handling**: Comprehensive error handling throughout the speech processing pipeline
+- **Configurable Welcome Messages**: Welcome messages now use language-specific configuration
+- **Improved Debugging**: Enhanced route-level logging with request tracking
+- **Graceful Degradation**: System continues to function even when individual components fail
+
 ### Recent Improvements (v1.22.3)
 - **Fixed SpeechHandler Errors**: Resolved critical speech processing validation errors
 - **Enhanced Debugging**: Added comprehensive logging throughout the speech processing flow
 - **Improved Error Handling**: Better error recovery and fallback mechanisms
 - **Streamlined Processing**: Optimized request processing pipeline for better reliability
+
+## 🛡️ Error Handling & Logging
+
+### Enhanced Error Handling
+The system implements comprehensive error handling with graceful degradation:
+
+**Speech Processing Pipeline:**
+- **Context Service Failures**: System continues without context if context service is unavailable
+- **Intent Classification Failures**: Falls back to 'general_information' intent
+- **Location Extraction Failures**: Continues processing with location prompts
+- **Query Rewriting Failures**: Uses original query as fallback
+- **Response Generation Failures**: Provides fallback responses with detailed error logging
+- **Context Update Failures**: Non-blocking updates with error logging
+
+**Error Logging:**
+All errors are logged with complete context:
+- `requestId`: Unique request identifier for tracking
+- `callSid`: Twilio Call SID for call-specific debugging
+- `component`: Specific component that encountered the error
+- `stack`: Full stack trace for debugging
+- `timestamp`: ISO timestamp for chronological analysis
+
+### Configurable Welcome Messages
+Welcome messages are now configurable per language using the language configuration system:
+- **Language-Specific**: Welcome messages adapt to the selected language
+- **Consistent Experience**: Messages are consistent with the overall language configuration
+- **Easy Customization**: Messages can be easily updated in the language configuration files
 
 ## 📡 API Endpoints
 

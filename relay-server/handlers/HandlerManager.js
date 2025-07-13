@@ -503,11 +503,12 @@ export class HandlerManager {
    * 
    * @param {string} text - Text to convert to speech
    * @param {boolean} shouldGather - Whether to include gather element
+   * @param {Object} metadata - Additional metadata for logging
    * @returns {Promise<string>} TwiML response
    */
-  async generateTTSBasedTwiML(text, shouldGather = true) {
+  async generateTTSBasedTwiML(text, shouldGather = true, metadata = {}) {
     const twilioHandler = this.handlers.get('twilioVoice');
-    return twilioHandler ? twilioHandler.generateTTSBasedTwiML(text, shouldGather) : null;
+    return twilioHandler ? twilioHandler.generateTTSBasedTwiML(text, shouldGather, metadata) : null;
   }
 
   /**

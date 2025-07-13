@@ -6,6 +6,8 @@ import { AudioService } from '../../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { getLanguageConfig, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
+import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
+import logger from '../../lib/logger.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -183,7 +185,9 @@ export class TwilioVoiceHandler extends BaseHandler {
         });
 
         // Generate welcome message using TTS service
-        const welcomeMessage = "Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need.";
+        const language = DEFAULT_LANGUAGE; // or detect dynamically
+        const welcomeMessage = SUPPORTED_LANGUAGES[language].prompts.welcome;
+        this.logger.info('Selected welcome message', { callSid, language, welcomeMessage });
         this.logOperation('generating welcome message', { welcomeMessage });
         
         // Create a simple TwiML response
@@ -194,6 +198,7 @@ export class TwilioVoiceHandler extends BaseHandler {
           action: '/twilio/voice/process',
           method: 'POST'
         });
+        this.logger.info('Sending welcome message TwiML', { callSid, language, twiml: twiml.toString() });
 
         this.logOperation('incoming call handled', { callSid, from, to });
         return twiml;
@@ -567,15 +572,24 @@ export class TwilioVoiceHandler extends BaseHandler {
    * @param {string} text - Text to speak
    * @param {boolean} shouldGather - Whether to gather input after speaking
    * @param {string} languageCode - Language code
+   * @param {Object} metadata - Additional metadata for logging
    * @returns {Promise<Object>} TwiML response
    */
-  async generateTTSBasedTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
+  async generateTTSBasedTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE, metadata = {}) {
     try {
       // Handle undefined or null text
       const safeText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
       
-      // Use TTS service to generate audio
-      const audioResult = await this.services.tts.generateSpeech(safeText, languageCode);
+      this.logger.info('Generating TTS-based TwiML:', {
+        textLength: safeText.length,
+        textPreview: safeText.substring(0, 100) + (safeText.length > 100 ? '...' : ''),
+        shouldGather,
+        languageCode,
+        ...metadata
+      });
+      
+      // Use TTS service to generate audio with metadata
+      const audioResult = await this.services.tts.generateSpeech(safeText, languageCode, metadata);
       
       if (audioResult.success && audioResult.data.audioUrl) {
         const twiml = new this.VoiceResponseClass();
@@ -601,13 +615,32 @@ export class TwilioVoiceHandler extends BaseHandler {
           });
         }
 
+        this.logger.info('TTS-based TwiML generated successfully:', {
+          audioUrl: audioResult.data.audioUrl,
+          shouldGather,
+          languageCode,
+          ...metadata
+        });
+
         return twiml;
       } else {
         // Fallback to regular TwiML if TTS fails
+        this.logger.warn('TTS failed, falling back to regular TwiML:', {
+          ttsSuccess: audioResult.success,
+          ttsError: audioResult.error,
+          ...metadata
+        });
         return this.generateTwiML(safeText, shouldGather, languageCode);
       }
     } catch (error) {
-      this.logger.error('Error generating TTS TwiML:', error);
+      this.logger.error('Error generating TTS TwiML:', {
+        error: error.message,
+        stack: error.stack,
+        textLength: text?.length || 0,
+        shouldGather,
+        languageCode,
+        ...metadata
+      });
       // Fallback to regular TwiML
       return this.generateTwiML(text, shouldGather, languageCode);
     }

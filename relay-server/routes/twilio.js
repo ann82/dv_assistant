@@ -143,6 +143,12 @@ router.post('/voice', async (req, res) => {
  * @returns {string} TwiML response for Twilio
  */
 router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) => {
+  console.log('=== ROUTE HANDLER CALLED ===', { 
+    CallSid: req.body.CallSid, 
+    SpeechResult: req.body.SpeechResult,
+    timestamp: new Date().toISOString()
+  });
+  
   const requestId = Math.random().toString(36).substring(7);
   const { CallSid, SpeechResult } = req.body;
   const voice = req.body.voice || 'unknown';
@@ -262,8 +268,18 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     // Generate TwiML response with timeout handling
     let twiml;
     try {
+      const metadata = {
+        requestId,
+        callSid: CallSid,
+        text: cleanedSpeechResult,
+        voice,
+        responseLength: response.length,
+        shouldEndCall,
+        timestamp: new Date().toISOString()
+      };
+      
       twiml = await Promise.race([
-        handlerManager.generateTTSBasedTwiML(response, !shouldEndCall),
+        handlerManager.generateTTSBasedTwiML(response, !shouldEndCall, metadata),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('TwiML generation timeout')), 12000)
         )
@@ -271,8 +287,10 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     } catch (ttsError) {
       logger.error('TTS generation failed, using fallback:', {
         error: ttsError.message,
+        requestId,
         CallSid,
-        responseLength: response.length
+        responseLength: response.length,
+        voice
       });
       
       // Quick fallback to Polly TTS to prevent 499 errors
@@ -306,14 +324,27 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     res.type('text/xml');
     res.send(twiml);
     
-    logger.info('Successfully processed speech:', { requestId, CallSid, responseLength: response.length });
+    logger.info('Successfully processed speech:', { 
+      requestId, 
+      CallSid, 
+      text: cleanedSpeechResult,
+      voice,
+      responseLength: response.length,
+      shouldEndCall,
+      twimlLength: twiml?.length || 0,
+      timestamp: new Date().toISOString()
+    });
     
   } catch (error) {
     clearTimeout(requestTimeout);
     logger.error('Error processing speech:', {
       error: error.message,
       stack: error.stack,
-      CallSid: req.body.CallSid
+      requestId,
+      CallSid: req.body.CallSid,
+      text: cleanedSpeechResult,
+      voice,
+      timestamp: new Date().toISOString()
     });
     
     // Send error response
