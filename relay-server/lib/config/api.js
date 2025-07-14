@@ -22,7 +22,7 @@ export const apiConfig = {
     searchDepth: process.env.TAVILY_SEARCH_DEPTH || 'basic',
     searchType: process.env.TAVILY_SEARCH_TYPE || 'basic',
     maxResults: parseInt(process.env.TAVILY_MAX_RESULTS) || 5, // Reduced for faster response
-    timeout: parseInt(process.env.TAVILY_TIMEOUT) || 8000, // Reduced for faster response
+    timeout: parseInt(process.env.TAVILY_TIMEOUT) || 6000, // Reduced from 8000 to 6000ms for faster response
     cacheEnabled: process.env.TAVILY_CACHE_ENABLED !== 'false',
     includeRawContent: false // Always false for performance
   },

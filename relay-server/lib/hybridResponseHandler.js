@@ -110,7 +110,7 @@ export class HybridResponseHandler {
       
       logger.info('HybridResponseHandler: Tavily search completed', {
         query: searchQuery,
-        resultsCount: searchResult?.results?.length || 0,
+        resultsCount: searchResult?.data?.results?.length || 0,
         responseTime: `${responseTime}ms`
       });
 
@@ -277,14 +277,35 @@ export class HybridResponseHandler {
    * @returns {Object} Formatted response
    */
   static formatShelterResponse(searchResult, input, context, requestType) {
-    const results = searchResult?.results || [];
+    // Handle the nested data structure from SearchIntegration
+    const results = searchResult?.data?.results || searchResult?.results || [];
     const location = this.extractLocation(input, context);
+    
+    logger.info('HybridResponseHandler: Processing search results', {
+      totalResults: results.length,
+      results: results.map(r => ({
+        title: r.title,
+        score: r.score,
+        url: r.url,
+        hasShelterKeyword: this.isRelevantShelter(r)
+      }))
+    });
     
     // Filter relevant results
     const relevantResults = results.filter(result => 
       result.score >= 0.2 && 
       this.isRelevantShelter(result)
     ).slice(0, 3);
+    
+    logger.info('HybridResponseHandler: Filtered results', {
+      originalCount: results.length,
+      filteredCount: relevantResults.length,
+      relevantResults: relevantResults.map(r => ({
+        title: r.title,
+        score: r.score,
+        url: r.url
+      }))
+    });
     
     // Create response
     const baseResponse = {
@@ -355,13 +376,30 @@ export class HybridResponseHandler {
     }
     const title = result.title.toLowerCase();
     const content = result.content.toLowerCase();
-    const shelterKeywords = ['shelter', 'safe house', 'crisis center', 'domestic violence'];
+    const url = (result.url || '').toLowerCase();
+    
+    // Shelter-specific keywords
+    const shelterKeywords = [
+      'shelter', 'safe house', 'crisis center', 'domestic violence', 
+      'family violence', 'victim services', 'abuse shelter', 'emergency housing'
+    ];
+    
+    // Check if result contains shelter-related keywords
     const hasShelterKeyword = shelterKeywords.some(keyword => 
       title.includes(keyword) || content.includes(keyword)
     );
+    
+    // Check for contact information (phone numbers, .org/.gov domains, or hotline mentions)
     const hasContactInfo = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/.test(content) || 
-                          /\bwww\.|\.org|\.gov\b/.test(result.url);
-    return hasShelterKeyword && hasContactInfo;
+                          /\bhotline\b/.test(content) ||
+                          /\bwww\.|\.org|\.gov\b/.test(url) ||
+                          /\bhelp\b|\bsupport\b|\bassistance\b/.test(content);
+    
+    // For government or organization domains, be more lenient
+    const isGovernmentOrOrg = /\.gov$|\.org$/.test(url);
+    
+    // Return true if it has shelter keywords AND either contact info or is gov/org
+    return hasShelterKeyword && (hasContactInfo || isGovernmentOrOrg);
   }
 
   /**

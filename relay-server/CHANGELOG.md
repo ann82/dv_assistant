@@ -15,6 +15,12 @@ All notable changes to this project will be documented in this file.
   - **Intent-Aware Processing**: Treats location mentions in "off_topic" intents as resource requests when previous context was resource-seeking
   - **Smart Query Rewriting**: Automatically rewrites queries to include location context for resource searches
   - **Seamless Transitions**: Users can naturally mention locations in follow-up conversations without repeating their request
+- **Critical Timeout Optimization**: Implemented comprehensive timeout management to prevent processing delays and race conditions
+  - **Search Integration Timeout**: Reduced Tavily search timeout from 15s to 6s for faster response
+  - **Processing Timeout**: Reduced speech processing timeout from 10s to 7s to prevent race conditions
+  - **TTS Generation Timeout**: Reduced TTS generation timeout from 12s to 5s for faster response
+  - **Request Timeout**: Maintained 8s request timeout as the overall limit
+  - **Headers Already Sent Protection**: Added comprehensive checks throughout voice processing route to prevent "headers already sent" errors
 
 ### Improved
 - **Location Detection Reliability**: More robust detection of current location phrases prevents incorrect location extraction
@@ -36,6 +42,19 @@ All notable changes to this project will be documented in this file.
   - **Solution**: Removed the entire early location validation block (lines 381-610) that was violating intent-first processing
   - **Impact**: System now strictly follows intent-first processing: Intent → Context → Follow-up → Location (only if needed)
   - **Example**: "Yeah, I'm not an angel. Can you help me find shelter?" no longer triggers geocoding of "Yeah" as a location
+- **CRITICAL: Voice Processing Timeout Issues**: Fixed critical timeout and race condition issues causing "headers already sent" errors
+  - **Root Cause**: Search integration timeout (15s) was longer than voice processing timeout (8s), causing race conditions
+  - **Solution**: Reduced search timeout to 6s, processing timeout to 7s, and TTS timeout to 5s to ensure proper timeout hierarchy
+  - **Headers Already Sent Protection**: Added comprehensive `!res.headersSent` checks throughout voice processing route
+  - **Impact**: Eliminated "headers already sent" errors and improved response reliability
+  - **Example**: "Yeah, I'm looking for domestic shelter. Homes in Austin, Texas." now processes without timeout errors
+- **CRITICAL: Hybrid Response Handler Data Structure Issue**: Fixed critical issue where Tavily search results were being filtered out incorrectly
+  - **Root Cause**: HybridResponseHandler was accessing `searchResult.results` instead of `searchResult.data.results` from SearchIntegration
+  - **Solution**: Updated data structure access to handle nested SearchIntegration response format
+  - **Enhanced Filtering**: Improved `isRelevantShelter` method to be less restrictive and better handle government/organization domains
+  - **Debug Logging**: Added comprehensive logging to track result filtering and processing
+  - **Impact**: Tavily search results now properly display instead of showing "No shelters found"
+  - **Example**: "domestic violence shelter Austin, Texas" now returns actual shelter results instead of empty response
 
 ### Changed
 - **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times

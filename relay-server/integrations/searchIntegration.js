@@ -5,7 +5,7 @@ const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const TAVILY_SEARCH_DEPTH = process.env.TAVILY_SEARCH_DEPTH || 'basic';
 const TAVILY_SEARCH_TYPE = process.env.TAVILY_SEARCH_TYPE || 'basic';
 const TAVILY_MAX_RESULTS = parseInt(process.env.TAVILY_MAX_RESULTS) || 8;
-const TAVILY_TIMEOUT = parseInt(process.env.TAVILY_TIMEOUT) || 15000;
+const TAVILY_TIMEOUT = parseInt(process.env.TAVILY_TIMEOUT) || 6000; // Reduced from 15000 to 6000ms for faster response
 
 if (!TAVILY_API_KEY) {
   logger.error('Tavily API key not found in environment variables');

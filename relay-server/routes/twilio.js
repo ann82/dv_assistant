@@ -292,7 +292,18 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     if (!CallSid || !SpeechResult) {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
       clearTimeout(requestTimeout);
-      return res.status(400).json({ error: 'Missing required fields: CallSid and SpeechResult are required.' });
+      
+      // Only send response if headers haven't been sent yet
+      if (!res.headersSent) {
+        return res.status(400).json({ error: 'Missing required fields: CallSid and SpeechResult are required.' });
+      } else {
+        logger.warn('Headers already sent, cannot send missing parameters error:', {
+          requestId,
+          CallSid,
+          SpeechResult
+        });
+        return;
+      }
     }
     
     logger.info('Processing speech:', { CallSid, SpeechResult });
@@ -374,8 +385,19 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       });
 
       clearTimeout(requestTimeout);
-      res.type('text/xml');
-      return res.send(repromptTwiml.toString());
+      
+      // Only send response if headers haven't been sent yet
+      if (!res.headersSent) {
+        res.type('text/xml');
+        return res.send(repromptTwiml.toString());
+      } else {
+        logger.warn('Headers already sent, cannot send reprompt:', {
+          requestId,
+          CallSid,
+          originalSpeech
+        });
+        return;
+      }
     }
 
     // Check if this is a consent response (yes/no to SMS question)
@@ -394,7 +416,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     const processedResponse = await Promise.race([
       twilioController.processSpeechResult(CallSid, cleanedSpeechResult, requestId, 'twilio'),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Processing timeout')), 10000)
+        setTimeout(() => reject(new Error('Processing timeout')), 7000) // Reduced from 10000 to 7000ms
       )
     ]);
 
@@ -424,8 +446,19 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       const twiml = new twilio.twiml.VoiceResponse();
       twiml.say(response);
       twiml.redirect('/twilio/consent');
-      res.type('text/xml');
-      return res.send(twiml.toString());
+      
+      // Only send response if headers haven't been sent yet
+      if (!res.headersSent) {
+        res.type('text/xml');
+        return res.send(twiml.toString());
+      } else {
+        logger.warn('Headers already sent, cannot send consent redirect:', {
+          requestId,
+          CallSid,
+          SpeechResult: cleanedSpeechResult
+        });
+        return;
+      }
     }
     
     // Generate TwiML response with timeout handling
@@ -444,7 +477,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       twiml = await Promise.race([
         handlerManager.generateTTSBasedTwiML(response, !shouldEndCall, null, metadata),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TwiML generation timeout')), 12000)
+          setTimeout(() => reject(new Error('TwiML generation timeout')), 5000) // Reduced from 12000 to 5000ms
         )
       ]);
     } catch (ttsError) {
@@ -484,10 +517,19 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       twiml: twiml
     });
 
-    res.type('text/xml');
-    // Convert TwiML object to string if it's an object
-    const twimlString = typeof twiml === 'object' && twiml.toString ? twiml.toString() : twiml;
-    res.send(twimlString);
+    // Only send response if headers haven't been sent yet
+    if (!res.headersSent) {
+      res.type('text/xml');
+      // Convert TwiML object to string if it's an object
+      const twimlString = typeof twiml === 'object' && twiml.toString ? twiml.toString() : twiml;
+      res.send(twimlString);
+    } else {
+      logger.warn('Headers already sent, cannot send TwiML response:', {
+        requestId,
+        CallSid,
+        text: cleanedSpeechResult
+      });
+    }
     
     logger.info('Successfully processed speech:', { 
       requestId, 
@@ -512,8 +554,10 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       timestamp: new Date().toISOString()
     });
     
-    // Send error response
-    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Only send error response if headers haven't been sent yet
+    if (!res.headersSent) {
+      // Send error response
+      const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Amy">I'm sorry, I encountered an error processing your request. Please try again.</Say>
   <Gather input="speech" action="/twilio/voice/process" method="POST" 
@@ -522,11 +566,18 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
           enhanced="true"
           language="en-US"/>
 </Response>`;
-    
-    res.type('text/xml');
-    // Convert TwiML object to string if it's an object
-    const errorTwimlString = typeof errorTwiml === 'object' && errorTwiml.toString ? errorTwiml.toString() : errorTwiml;
-    res.send(errorTwimlString);
+      
+      res.type('text/xml');
+      // Convert TwiML object to string if it's an object
+      const errorTwimlString = typeof errorTwiml === 'object' && errorTwiml.toString ? errorTwiml.toString() : errorTwiml;
+      res.send(errorTwimlString);
+    } else {
+      logger.warn('Headers already sent, cannot send error response:', {
+        requestId,
+        CallSid: req.body.CallSid,
+        error: error.message
+      });
+    }
   }
 });
 
