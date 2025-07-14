@@ -184,7 +184,7 @@ export class TwilioVoiceHandler extends BaseHandler {
         });
 
         // Generate welcome message using TTS service
-        const language = DEFAULT_LANGUAGE; // or detect dynamically
+        const language = this._DEFAULT_LANGUAGE; // or detect dynamically
         const welcomeMessage = SUPPORTED_LANGUAGES[language].prompts.welcome;
         this.logger.info('Selected welcome message', { callSid, language, welcomeMessage });
         this.logOperation('generating welcome message', { welcomeMessage });
@@ -242,7 +242,8 @@ export class TwilioVoiceHandler extends BaseHandler {
    * @param {string} languageCode - Language code
    * @returns {Promise<Object>} TwiML response
    */
-  async processSpeechInput(speechResult, callSid = null, languageCode = DEFAULT_LANGUAGE) {
+  async processSpeechInput(speechResult, callSid = null, languageCode = null) {
+    const finalLanguageCode = languageCode || this._DEFAULT_LANGUAGE;
     const requestId = this.generateRequestId();
 
     try {
@@ -260,8 +261,8 @@ export class TwilioVoiceHandler extends BaseHandler {
       
       // Check if speech is garbled
       if (this.isGarbled(processedSpeech)) {
-        const garbledMessage = this.getLocalizedPrompt(languageCode, 'garbledSpeech');
-        return this.generateTwiML(garbledMessage, true, languageCode);
+        const garbledMessage = this.getLocalizedPrompt(finalLanguageCode, 'garbledSpeech');
+        return this.generateTwiML(garbledMessage, true, finalLanguageCode);
       }
 
       // Use services to process the request
@@ -282,7 +283,7 @@ export class TwilioVoiceHandler extends BaseHandler {
       
       // Generate TTS response
       const responseText = searchResult.data.response || 'I apologize, but I could not process your request.';
-      const twiml = await this.generateTTSBasedTwiML(responseText, true, languageCode, { callSid, requestId });
+      const twiml = await this.generateTTSBasedTwiML(responseText, true, finalLanguageCode, { callSid, requestId });
 
       this.logOperation('speech processing completed', { 
         requestId, 
@@ -295,8 +296,8 @@ export class TwilioVoiceHandler extends BaseHandler {
     } catch (error) {
       await this.handleError(error, 'processSpeechInput', { requestId, callSid });
       
-      const errorMessage = this.getLocalizedPrompt(languageCode, 'error');
-      return this.generateTwiML(errorMessage, true, languageCode);
+      const errorMessage = this.getLocalizedPrompt(finalLanguageCode, 'error');
+      return this.generateTwiML(errorMessage, true, finalLanguageCode);
     }
   }
 
@@ -526,7 +527,8 @@ export class TwilioVoiceHandler extends BaseHandler {
    * @param {string} languageCode - Language code
    * @returns {Object} TwiML response
    */
-  generateTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE) {
+  generateTwiML(text, shouldGather = true, languageCode = null) {
+    const finalLanguageCode = languageCode || this._DEFAULT_LANGUAGE;
     const twiml = new this.VoiceResponseClass();
     
     // Handle undefined or null text
@@ -568,26 +570,27 @@ export class TwilioVoiceHandler extends BaseHandler {
    * @param {Object} metadata - Additional metadata for logging
    * @returns {Promise<Object>} TwiML response
    */
-  async generateTTSBasedTwiML(text, shouldGather = true, languageCode = DEFAULT_LANGUAGE, metadata = {}) {
+  async generateTTSBasedTwiML(text, shouldGather = true, languageCode = null, metadata = {}) {
+    const finalLanguageCode = languageCode || this._DEFAULT_LANGUAGE;
     const startTime = Date.now();
     try {
       // Handle undefined or null text
       const safeText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
 
-      this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML input', {
-        requestId: metadata.requestId,
-        callSid: metadata.callSid,
-        textLength: safeText.length,
-        textPreview: safeText.slice(0, 100),
-        shouldGather,
-        languageCode,
-        ...metadata,
-        timestamp: new Date().toISOString()
-      });
+              this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML input', {
+          requestId: metadata.requestId,
+          callSid: metadata.callSid,
+          textLength: safeText.length,
+          textPreview: safeText.slice(0, 100),
+          shouldGather,
+          languageCode: finalLanguageCode,
+          ...metadata,
+          timestamp: new Date().toISOString()
+        });
 
       // Use TTS service to generate audio with metadata
       const ttsStart = Date.now();
-      const ttsResponse = await this.services.tts.generateSpeech(safeText, languageCode, metadata);
+      const ttsResponse = await this.services.tts.generateSpeech(safeText, finalLanguageCode, metadata);
       const ttsDuration = Date.now() - ttsStart;
 
       // Handle BaseService response format (wrapped in success/data structure)
@@ -629,18 +632,18 @@ export class TwilioVoiceHandler extends BaseHandler {
         if (shouldGather) {
           const gather = twiml.gather({
             input: 'speech',
-            language: languageCode,
+            language: finalLanguageCode,
             speechTimeout: 30,
             action: '/twilio/voice/process',
             method: 'POST'
           });
 
           // Add fallback message if no speech detected
-          const langConfig = this._getLanguageConfig(languageCode);
-          const noSpeechPrompt = this.getLocalizedPrompt(languageCode, 'noSpeech') || 'I didn\'t hear anything. Please try again.';
+          const langConfig = this._getLanguageConfig(finalLanguageCode);
+          const noSpeechPrompt = this.getLocalizedPrompt(finalLanguageCode, 'noSpeech') || 'I didn\'t hear anything. Please try again.';
           gather.say(noSpeechPrompt, {
             voice: langConfig.voice,
-            language: languageCode
+            language: finalLanguageCode
           });
         }
 
@@ -652,7 +655,7 @@ export class TwilioVoiceHandler extends BaseHandler {
           hasAudioUrl: !!audioResult.audioUrl,
           provider: audioResult.provider,
           shouldGather,
-          languageCode,
+          languageCode: finalLanguageCode,
           ttsSuccess: ttsResponse.success,
           audioPath,
           ttsDurationMs: ttsDuration,
@@ -682,7 +685,7 @@ export class TwilioVoiceHandler extends BaseHandler {
           ...metadata,
           timestamp: new Date().toISOString()
         });
-        const fallbackTwiml = this.generateTwiML(safeText, shouldGather, languageCode);
+        const fallbackTwiml = this.generateTwiML(safeText, shouldGather, finalLanguageCode);
         this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML Fallback TwiML XML', {
           requestId: metadata.requestId,
           callSid: metadata.callSid,
@@ -702,7 +705,7 @@ export class TwilioVoiceHandler extends BaseHandler {
         timestamp: new Date().toISOString()
       });
       // Fallback to regular TwiML
-      const fallbackTwiml = this.generateTwiML(text, shouldGather, languageCode);
+      const fallbackTwiml = this.generateTwiML(text, shouldGather, finalLanguageCode);
       this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML Error Fallback TwiML XML', {
         requestId: metadata.requestId,
         callSid: metadata.callSid,

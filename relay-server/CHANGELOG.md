@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.6] - 2025-07-14
+
+### Fixed
+- **TTS Language Configuration Issue**: Resolved critical issue where welcome messages were failing due to incorrect language configuration handling
+  - **Root Cause**: TwilioVoiceHandler was using `DEFAULT_LANGUAGE` constant directly instead of injected dependency `this._DEFAULT_LANGUAGE`
+  - **Solution**: Updated all method signatures and calls to use the injected language configuration consistently
+  - **Impact**: Welcome messages now work correctly with proper language configuration and TTS generation
+  - **Methods Updated**: `processSpeechInput`, `generateTwiML`, `generateTTSBasedTwiML` now use injected language configuration
+- **Enhanced Debug Logging**: Improved debug logging throughout the TTS pipeline for better troubleshooting
+  - **TTS Service Logging**: Added detailed input/output logging for TTS service operations
+  - **OpenAI Integration Logging**: Enhanced logging for TTS generation with request/response details
+  - **TwilioVoiceHandler Logging**: Added comprehensive logging for TTS-based TwiML generation
+  - **Cache Event Logging**: Added logging for TTS cache hits, misses, and audio file operations
+  - **Error Logging**: Enhanced error logging with full context and stack traces
+  - **Performance Logging**: Added timing information for TTS operations and audio file creation
+
+### Technical Improvements
+- **Language Configuration Consistency**: All language-related operations now use the injected configuration consistently
+- **Debug Logging Enhancement**: Comprehensive debug logging enables better troubleshooting of TTS issues
+- **Error Handling**: Improved error handling with detailed logging for debugging
+- **Code Maintainability**: Cleaner code structure with consistent dependency injection patterns
+
+### Impact
+- **Before**: Welcome messages failed due to language configuration issues, making debugging difficult
+- **After**: Welcome messages work correctly with comprehensive debug logging for easy troubleshooting
+- **User Experience**: Reliable welcome message delivery with high-quality TTS audio
+- **Developer Experience**: Much easier debugging with detailed logs throughout the TTS pipeline
+
 ## [v1.22.5] - 2025-07-14
 
 ### Added

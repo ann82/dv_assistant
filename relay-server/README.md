@@ -2,7 +2,7 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.5** (Updated: July 14, 2025)
+**Current Version: 1.22.6** (Updated: July 14, 2025)
 
 ## 🚀 Quick Start
 
@@ -74,6 +74,12 @@ npm test
 - **Caching System**: Intelligent caching for API responses and TTS audio
 - **WebSocket Support**: Real-time communication for web clients
 - **SMS Integration**: Send follow-up messages and resource summaries via SMS
+
+### Recent Improvements (v1.22.6)
+- **TTS Language Configuration Fix**: Resolved critical issue where welcome messages were failing due to incorrect language configuration handling
+- **Enhanced Debug Logging**: Comprehensive debug logging throughout the TTS pipeline for better troubleshooting
+- **Language Configuration Consistency**: All language-related operations now use injected configuration consistently
+- **Improved Error Handling**: Enhanced error handling with detailed logging for debugging TTS issues
 
 ### Recent Improvements (v1.22.5)
 - **TTS-Based Welcome Messages**: The welcome message for incoming calls is now generated using the TTS pipeline, ensuring the full, configurable prompt is played to callers with natural, high-quality audio
