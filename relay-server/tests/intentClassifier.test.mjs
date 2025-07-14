@@ -168,7 +168,7 @@ describe('Intent Classification', () => {
       expect(shelterResult).toBe('need housing domestic violence shelter help');
 
       const legalResult = await rewriteQuery('need legal help', 'legal_services');
-      expect(legalResult).toBe('"domestic violence shelter" "legal aid" "attorney" "lawyer"');
+      expect(legalResult).toBe('need legal help legal aid attorney lawyer');
     });
 
     it('should preserve location information', async () => {

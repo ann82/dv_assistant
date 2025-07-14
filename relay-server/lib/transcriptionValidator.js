@@ -13,7 +13,8 @@ const TRANSCRIPTION_ERRORS = {
     { pattern: /\bI\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g, fix: 'I\'m at $1' },
     { pattern: /\bI\s+(?!am\s+at\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Station|Street|Avenue|Road|Drive|Lane|Place|Boulevard|Highway|Freeway|Interstate|Center|Plaza|Mall|Building|Complex|District|Neighborhood|Park|Area|Region|County|City|Town|State|Province|Country))\b/gi, fix: 'I\'m at $1' },
     { pattern: /\bI\s+([A-Z][a-z]*\s+\d+)\b/g, fix: 'I\'m at $1' },
-    { pattern: /\bI\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:near|around|close\s+to|in|at))\b/gi, fix: 'I\'m $1' },
+    // FIXED: More specific pattern to avoid matching "I live in [location]"
+    { pattern: /\bI\s+(?!live\s+in\s+)(?!am\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:near|around|close\s+to|in|at))\b/gi, fix: 'I\'m $1' },
   ],
   
   // Common speech recognition errors

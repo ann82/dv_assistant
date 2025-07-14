@@ -57,6 +57,23 @@ export class SpeechHandler extends BaseHandler {
       // Extract key information
       const extractedInfo = this.extractSpeechInfo(processedText, languageCode);
       
+      // Check if this is a find_shelter intent and handle location requirements
+      if (extractedInfo.intent === 'find_shelter') {
+        const locationCheckResult = await this.processFindShelterWithLocationCheck(processedText, contextId, languageCode);
+        if (locationCheckResult.needsLocationPrompt) {
+          return {
+            processedText,
+            extractedInfo,
+            needsLocationPrompt: true,
+            locationPrompt: locationCheckResult.locationPrompt,
+            languageCode,
+            confidence: this.calculateConfidence(processedText, extractedInfo)
+          };
+        }
+        // Update extractedInfo with validated location
+        extractedInfo.location = locationCheckResult.validLocation;
+      }
+      
       // Update context if provided
       if (contextId) {
         await this.services.context.updateConversationContext(contextId, {
@@ -91,6 +108,79 @@ export class SpeechHandler extends BaseHandler {
     });
     logger.info('SpeechHandler.processSpeech: end', { request, result });
     return result;
+  }
+
+  /**
+   * Process find_shelter intent with strict location validation
+   * @param {string} speechText - Processed speech text
+   * @param {string} contextId - Context ID for conversation history
+   * @param {string} languageCode - Language code
+   * @returns {Object} Result with location validation and prompt if needed
+   */
+  async processFindShelterWithLocationCheck(speechText, contextId, languageCode) {
+    logger.info('Processing find_shelter intent with location check:', { speechText, contextId, languageCode });
+    
+    // Step 1: Check previous context for valid location
+    let validLocation = null;
+    if (contextId) {
+      try {
+        const context = await this.services.context.getConversationContext(contextId);
+        if (context && context.location) {
+          logger.info('Found location in previous context:', { contextLocation: context.location });
+          
+          // Validate the context location strictly
+          const { detectLocationWithGeocoding } = await import('../../lib/enhancedLocationDetector.js');
+          const locationData = await detectLocationWithGeocoding(context.location);
+          
+          if (locationData && locationData.isComplete) {
+            validLocation = locationData.location;
+            logger.info('Context location is valid:', { validLocation });
+          } else {
+            logger.info('Context location is not complete:', { contextLocation: context.location, locationData });
+          }
+        }
+      } catch (error) {
+        logger.error('Error checking context for location:', error);
+      }
+    }
+    
+    // Step 2: If no valid location in context, check current speech
+    if (!validLocation) {
+      try {
+        const { detectLocationWithGeocoding } = await import('../../lib/enhancedLocationDetector.js');
+        const locationData = await detectLocationWithGeocoding(speechText);
+        
+        if (locationData && locationData.isComplete) {
+          validLocation = locationData.location;
+          logger.info('Found valid location in current speech:', { validLocation });
+        } else {
+          logger.info('No valid location found in current speech:', { speechText, locationData });
+        }
+      } catch (error) {
+        logger.error('Error extracting location from current speech:', error);
+      }
+    }
+    
+    // Step 3: If no valid location found, return location prompt
+    if (!validLocation) {
+      const languageConfig = getLanguageConfig(languageCode);
+      const locationPrompt = languageConfig.prompts.location || 'Can you tell me your location so I can find nearby shelters?';
+      
+      logger.info('No valid location found, returning location prompt:', { locationPrompt });
+      return {
+        needsLocationPrompt: true,
+        locationPrompt,
+        validLocation: null
+      };
+    }
+    
+    // Step 4: Valid location found, proceed normally
+    logger.info('Valid location found, proceeding with shelter search:', { validLocation });
+    return {
+      needsLocationPrompt: false,
+      locationPrompt: null,
+      validLocation
+    };
   }
 
   /**

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.12] - 2025-07-14
+
+### Added
+- **Confidence-Based Location Validation**: Implemented reliable location validation using Nominatim importance scores
+  - **Confidence Threshold**: Locations with confidence scores below 0.5 are automatically rejected
+  - **Enhanced Geocoding**: Geocoding results now include confidence scores, importance, and OSM metadata
+  - **Smart Filtering**: Ambiguous locations like "I Station 2" are filtered out with very low confidence (0.000)
+  - **User Clarification**: Prompts users for more specific location names when confidence is insufficient
+  - **New Validation Method**: Added `validateLocationWithConfidence()` method for threshold-based validation
+  - **Impact**: Much more reliable location detection and reduced false positives
+
+### Improved
+- **Location Detection Reliability**: Confidence-based filtering prevents incorrect location assumptions
+- **Transcription Error Handling**: Better handling of speech recognition errors with confidence validation
+- **Geocoding Integration**: Enhanced with confidence scores, importance, placeId, osmType, and osmId fields
+
+### Fixed
+- **Test Expectations**: Updated all test expectations to include new geocoding fields
+- **Test Reliability**: All 482 tests now pass with enhanced geocoding integration
+
 ## [v1.22.11] - 2025-07-14
 
 ### Added

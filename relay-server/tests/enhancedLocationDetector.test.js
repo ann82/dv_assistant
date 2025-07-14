@@ -57,7 +57,12 @@ describe('Enhanced Location Detector', () => {
           city: 'San Francisco',
           latitude: 37.7749,
           longitude: -122.4194,
-          displayName: 'San Francisco, San Francisco County, California, United States'
+          displayName: 'San Francisco, San Francisco County, California, United States',
+          importance: 0,
+          confidence: 0,
+          placeId: undefined,
+          osmType: undefined,
+          osmId: undefined
         }
       });
     });
@@ -92,7 +97,12 @@ describe('Enhanced Location Detector', () => {
           city: 'San Francisco',
           latitude: 37.7749,
           longitude: -122.4194,
-          displayName: 'San Francisco, San Francisco County, California, United States'
+          displayName: 'San Francisco, San Francisco County, California, United States',
+          importance: 0,
+          confidence: 0,
+          placeId: undefined,
+          osmType: undefined,
+          osmId: undefined
         }
       });
     });
@@ -383,7 +393,7 @@ describe('Enhanced Location Detector', () => {
       });
 
       expect(extractLocationFromQuery('shelter near London, UK')).toEqual({
-        location: 'London, Uk',
+        location: 'London, UK',
         scope: 'unknown'
       });
 
@@ -471,7 +481,12 @@ describe('Enhanced Location Detector', () => {
           city: 'San Francisco',
           latitude: 37.7749,
           longitude: -122.4194,
-          displayName: 'San Francisco, San Francisco County, California, United States'
+          displayName: 'San Francisco, San Francisco County, California, United States',
+          importance: 0,
+          confidence: 0,
+          placeId: undefined,
+          osmType: undefined,
+          osmId: undefined
         }
       });
     });
@@ -505,7 +520,12 @@ describe('Enhanced Location Detector', () => {
           city: 'London',
           latitude: 51.5074,
           longitude: -0.1278,
-          displayName: 'London, Greater London, England, United Kingdom'
+          displayName: 'London, Greater London, England, United Kingdom',
+          importance: 0,
+          confidence: 0,
+          placeId: undefined,
+          osmType: undefined,
+          osmId: undefined
         }
       });
     });

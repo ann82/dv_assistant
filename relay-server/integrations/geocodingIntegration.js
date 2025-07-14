@@ -205,7 +205,9 @@ export class GeocodingIntegration {
           displayName: result.display_name,
           placeId: result.place_id,
           osmType: result.osm_type,
-          osmId: result.osm_id
+          osmId: result.osm_id,
+          importance: parseFloat(result.importance) || 0,
+          confidence: parseFloat(result.importance) || 0 // Use importance as confidence score
         };
 
         this.logOperation('geocodeWithNominatim.success', { 
@@ -214,7 +216,8 @@ export class GeocodingIntegration {
           hasState: !!geocodeData.state,
           hasCity: !!geocodeData.city,
           latitude: geocodeData.latitude,
-          longitude: geocodeData.longitude
+          longitude: geocodeData.longitude,
+          confidence: geocodeData.confidence
         }, 'info', operationId);
 
         return {
@@ -334,6 +337,60 @@ export class GeocodingIntegration {
       success: true,
       isValid: true,
       isComplete,
+      scope: isComplete ? 'complete' : 'incomplete',
+      data: result.data
+    };
+  }
+
+  /**
+   * Validate location with confidence threshold
+   * @param {string} location - Location string
+   * @param {number} confidenceThreshold - Minimum confidence score (0-1)
+   * @param {string} requestId - Optional request ID for tracking
+   * @returns {Promise<Object>} Validation result with confidence check
+   */
+  async validateLocationWithConfidence(location, confidenceThreshold = 0.5, requestId = null) {
+    const operationId = requestId || uuidv4();
+    
+    this.logOperation('validateLocationWithConfidence.start', { 
+      location, 
+      confidenceThreshold 
+    }, 'info', operationId);
+    
+    const result = await this.geocode(location, {}, operationId);
+    
+    if (!result.success) {
+      this.logOperation('validateLocationWithConfidence.error', { 
+        location,
+        error: result.error 
+      }, 'error', operationId);
+      
+      return {
+        success: false,
+        isValid: false,
+        error: result.error
+      };
+    }
+
+    const confidenceScore = result.data.confidence || 0;
+    const hasSufficientConfidence = confidenceScore >= confidenceThreshold;
+    const isComplete = !!(result.data.city || result.data.state || result.data.country);
+    
+    this.logOperation('validateLocationWithConfidence.result', { 
+      location,
+      confidenceScore,
+      confidenceThreshold,
+      hasSufficientConfidence,
+      isComplete
+    }, 'info', operationId);
+
+    return {
+      success: true,
+      isValid: hasSufficientConfidence && isComplete,
+      hasSufficientConfidence,
+      isComplete,
+      confidenceScore,
+      confidenceThreshold,
       scope: isComplete ? 'complete' : 'incomplete',
       data: result.data
     };

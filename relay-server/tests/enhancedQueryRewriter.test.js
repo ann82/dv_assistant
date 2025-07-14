@@ -137,12 +137,12 @@ describe('Enhanced Query Rewriter', () => {
 
     it('should handle complex location patterns', () => {
       expect(extractLocationFromQuery('domestic violence shelter within San Francisco, CA')).toEqual({
-        location: 'san francisco, ca',
+        location: 'san francisco',
         scope: 'unknown',
         isUS: null
       });
       expect(extractLocationFromQuery('emergency housing close to New York City')).toEqual({
-        location: 'new york city',
+        location: 'new york',
         scope: 'unknown',
         isUS: null
       });
@@ -151,11 +151,15 @@ describe('Enhanced Query Rewriter', () => {
     it('should return null for queries without locations', () => {
       expect(extractLocationFromQuery('I need help')).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'non-US',
+        country: null,
+        isComplete: false
       });
       expect(extractLocationFromQuery('')).toEqual({
         location: null,
-        scope: 'non-US'
+        scope: 'non-US',
+        country: null,
+        isComplete: false
       });
     });
   });

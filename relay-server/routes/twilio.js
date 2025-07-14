@@ -425,6 +425,60 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
         const geoData = geoResult.data;
         const hasValidLocation = geoData.city || geoData.state || geoData.country;
         
+        // Check confidence score - reject if below 0.5
+        const confidenceScore = geoData.confidence || 0;
+        const hasSufficientConfidence = confidenceScore >= 0.5;
+        
+        logger.info('🔍 LOCATION VALIDATION - Confidence check', {
+          requestId,
+          CallSid,
+          extractedLocation,
+          confidenceScore,
+          hasSufficientConfidence,
+          geoData: {
+            displayName: geoData.displayName,
+            city: geoData.city,
+            state: geoData.state,
+            country: geoData.country
+          },
+          timestamp: new Date().toISOString()
+        });
+        
+        if (!hasSufficientConfidence) {
+          logger.warn('🔍 LOCATION VALIDATION - Insufficient confidence score', {
+            requestId,
+            CallSid,
+            extractedLocation,
+            confidenceScore,
+            threshold: 0.5,
+            geoData: {
+              displayName: geoData.displayName,
+              city: geoData.city,
+              state: geoData.state,
+              country: geoData.country
+            },
+            timestamp: new Date().toISOString()
+          });
+
+          const confidencePrompt = `I found "${extractedLocation}" but I'm not very confident about the location. Could you please provide a more specific location name, like a city or area?`;
+          
+          const confidenceTwiml = new twilio.twiml.VoiceResponse();
+          confidenceTwiml.say(confidencePrompt);
+          confidenceTwiml.gather({
+            input: 'speech',
+            action: '/twilio/voice/process',
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
+            language: languageCode
+          });
+
+          clearTimeout(requestTimeout);
+          res.type('text/xml');
+          return res.send(confidenceTwiml.toString());
+        }
+        
         // Additional validation: Check if the location is in the US (or your target region)
         const isInTargetRegion = geoData.country === 'United States' || 
                                 geoData.country === 'Canada' || 

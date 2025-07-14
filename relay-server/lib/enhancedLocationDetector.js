@@ -250,8 +250,8 @@ export function extractLocationFromQuery(query) {
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Station|Street|Avenue|Road|Drive|Lane|Place|Boulevard|Highway|Freeway|Interstate|Center|Plaza|Mall|Building|Complex|District|Neighborhood|Park|Area|Region|County|City|Town|State|Province|Country))\b/i,
     // New: Look for numbered locations (like "Station 2", "Building 5")
     /\b([A-Z][a-z]*\s+\d+)\b/i,
-    // New: Look for any capitalized word sequence that might be a location
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g
+    // FIXED: More specific pattern for location names - avoid matching single words like "Yeah"
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g
   ];
 
   logger.info('extractLocationFromQuery DEBUG - Checking simple patterns');
@@ -280,16 +280,17 @@ export function extractLocationFromQuery(query) {
   for (let i = 0; i < words.length; i++) {
     const word = words[i].replace(/[^\w]/g, '');
     
-    // More conservative check: must be capitalized, longer than 3 chars
-    if (word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) {
+    // FIXED: More conservative check: must be capitalized, longer than 3 chars OR contain numbers
+    if ((word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) || /\d/.test(word)) {
       
-      // Look for consecutive capitalized words
+      // Look for consecutive capitalized words or words with numbers
       let location = word;
       let j = i + 1;
       
       while (j < words.length) {
         const nextWord = words[j].replace(/[^\w]/g, '');
-        if (nextWord.length > 3 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) {
+        // FIXED: Include words with numbers or capitalized words
+        if ((nextWord.length > 3 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) || /\d/.test(nextWord)) {
           location += ' ' + nextWord;
           j++;
         } else {
@@ -297,7 +298,7 @@ export function extractLocationFromQuery(query) {
         }
       }
       
-      // More lenient location detection - consider any capitalized word sequence as potential location
+      // FIXED: More lenient location detection - prefer multi-word locations
       const locationLower = location.toLowerCase();
       
       // Check for strong location indicators
@@ -317,8 +318,9 @@ export function extractLocationFromQuery(query) {
       const hasNumberPattern = /\d+/.test(location); // Contains numbers (like "Station 2")
       const hasMultipleWords = location.split(' ').length > 1; // Multiple words
       
-      // More lenient: accept if it has any of these characteristics
-      if (hasStrongIndicator || hasCommaPattern || hasNumberPattern || hasMultipleWords) {
+      // FIXED: Prefer multi-word locations and avoid single words like "Yeah"
+      if ((hasStrongIndicator || hasCommaPattern || hasNumberPattern || hasMultipleWords) && 
+          !['yeah', 'yes', 'no', 'okay', 'sure', 'right', 'left', 'here', 'there'].includes(locationLower)) {
         potentialLocations.push(location);
       }
       
@@ -326,9 +328,19 @@ export function extractLocationFromQuery(query) {
     }
   }
   
-  // Return the longest potential location only if we found something that looks like a real location
+  // FIXED: Return the longest potential location only if we found something that looks like a real location
   if (potentialLocations.length > 0) {
-    const bestLocation = potentialLocations.sort((a, b) => b.length - a.length)[0];
+    // Sort by length (longest first) and prefer multi-word locations
+    const sortedLocations = potentialLocations.sort((a, b) => {
+      const aWords = a.split(' ').length;
+      const bWords = b.split(' ').length;
+      if (aWords !== bWords) {
+        return bWords - aWords; // Prefer multi-word locations
+      }
+      return b.length - a.length; // Then by total length
+    });
+    
+    const bestLocation = sortedLocations[0];
     logger.info('Fallback location extraction found:', { query, location: bestLocation });
     return {
       location: bestLocation,
@@ -354,25 +366,23 @@ function cleanExtractedLocation(location) {
 
   let cleaned = location.trim();
   
-  // Only remove very basic non-location words
+  // FIXED: Preserve the original location structure, only remove very basic non-location words
   const basicNonLocationWords = ['me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere'];
-  const words = cleaned.toLowerCase().split(/\s+/);
+  
+  // FIXED: Don't split and filter words that might break location names like "Station 2"
+  // Instead, only remove complete matches of basic non-location words
+  const words = cleaned.split(/\s+/);
   const filteredWords = words.filter(word => {
-    const cleanWord = word.replace(/[^\w]/g, '');
-    return !basicNonLocationWords.includes(cleanWord) && cleanWord.length > 1;
+    const cleanWord = word.replace(/[^\w]/g, '').toLowerCase();
+    return !basicNonLocationWords.includes(cleanWord) || word.length > 1;
   });
   
   if (filteredWords.length === 0) {
     return null;
   }
   
-  // Reconstruct the location with proper capitalization
-  cleaned = filteredWords.map(word => {
-    // Preserve original capitalization for proper nouns
-    const originalWord = location.toLowerCase().includes(word) ? 
-      location.match(new RegExp(word, 'i'))[0] : word;
-    return originalWord.charAt(0).toUpperCase() + originalWord.slice(1).toLowerCase();
-  }).join(' ');
+  // FIXED: Preserve original structure and capitalization
+  cleaned = filteredWords.join(' ');
   
   return cleaned || null;
 }
