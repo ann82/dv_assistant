@@ -71,7 +71,11 @@ export class SpeechHandler extends BaseHandler {
       // Generate TTS if requested
       let audioUrl = null;
       if (req.generateAudio) {
-        const ttsResult = await this.services.tts.generateSpeech(processedText, languageCode);
+        const ttsOptions = {
+          language: languageCode,
+          voice: 'nova' // Default voice for speech processing
+        };
+        const ttsResult = await this.services.tts.generateSpeech(processedText, ttsOptions);
         if (ttsResult.success) {
           audioUrl = ttsResult.data.audioUrl;
         }
@@ -346,7 +350,11 @@ export class SpeechHandler extends BaseHandler {
       }
 
       // Generate TTS
-      const ttsResult = await this.services.tts.generateSpeech(text, languageCode, voice);
+      const ttsOptions = {
+        language: languageCode,
+        voice: voice || 'nova'
+      };
+      const ttsResult = await this.services.tts.generateSpeech(text, ttsOptions);
       
       if (!ttsResult.success) {
         throw new Error(`TTS generation failed: ${ttsResult.error}`);

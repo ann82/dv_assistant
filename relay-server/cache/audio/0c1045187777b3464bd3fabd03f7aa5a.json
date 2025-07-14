@@ -1,0 +1,6 @@
+{
+  "provider": "openai",
+  "text": "This is a test with the alloy voice.",
+  "voice": "alloy",
+  "timestamp": "2025-07-14T01:59:34.481Z"
+}

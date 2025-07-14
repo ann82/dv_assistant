@@ -1,3 +1,6 @@
 {
-  "timestamp": "2025-07-13T23:01:07.579Z"
+  "audioUrl": "/audio/integration-test.mp3",
+  "provider": "stub",
+  "text": "Hello, I can help you find shelters.",
+  "timestamp": "2025-07-14T02:10:10.274Z"
 }

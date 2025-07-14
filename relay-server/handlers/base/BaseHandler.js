@@ -89,15 +89,27 @@ export class BaseHandler {
    */
   sanitizeRequest(request) {
     if (!request) return null;
-    // Only log safe fields
-    return {
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
-      body: request.body,
-      params: request.params,
-      query: request.query,
+    
+    // Define sensitive fields that should be redacted
+    const sensitiveFields = ['password', 'token', 'apiKey', 'secret', 'auth', 'authorization'];
+    
+    // Create a deep copy and redact sensitive fields
+    const sanitized = JSON.parse(JSON.stringify(request));
+    
+    const redactSensitiveData = (obj) => {
+      if (typeof obj !== 'object' || obj === null) return;
+      
+      for (const key in obj) {
+        if (sensitiveFields.includes(key.toLowerCase())) {
+          obj[key] = '[REDACTED]';
+        } else if (typeof obj[key] === 'object') {
+          redactSensitiveData(obj[key]);
+        }
+      }
     };
+    
+    redactSensitiveData(sanitized);
+    return sanitized;
   }
   
   /**

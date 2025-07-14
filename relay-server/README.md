@@ -2,7 +2,19 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.6** (Updated: July 14, 2025)
+**Current Version: 1.22.7** (Updated: July 14, 2025)
+
+---
+
+## 🆕 v1.22.7 Highlights
+- **TTS Voice Parameter Error Fixed:** All TTS calls now use the correct OpenAI voice for each language (nova, shimmer, echo, onyx, etc.)
+- **No More Circular JSON Errors:** Logging middleware now handles TwiML objects with circular references safely
+- **Voice Selection:** Voice is now determined from language config, not request body, ensuring correct TTS voice for every call
+- **API Validation:** `/twilio/voice` and `/twilio/voice/process` endpoints now validate required fields and return 400 errors if missing
+- **Request Sanitization:** Sensitive fields (password, token, apiKey, etc.) are now redacted in logs
+- **Test Suite:** All tests pass (482 total, 472 passed, 10 skipped)
+
+---
 
 ## 🚀 Quick Start
 

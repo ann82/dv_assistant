@@ -55,7 +55,7 @@ describe('Phase 2: Service Layer Refactoring', () => {
       expect(result.success).toBe(true);
       expect(result.data.audioUrl).toBeDefined();
       expect(result.data.provider).toBe('stub');
-      expect(TTSIntegration.generateTTS).toHaveBeenCalledWith('Hello, world!', expect.any(Object));
+      expect(TTSIntegration.generateTTS).toHaveBeenCalledWith('Hello, world!', expect.any(Object), undefined);
     });
     
     it('should handle empty text', async () => {
@@ -491,6 +491,13 @@ describe('Phase 2: Service Layer Refactoring', () => {
       // Test search service
       const searchResult = await searchService.search('domestic violence shelters San Francisco');
       expect(searchResult.success).toBe(true);
+      
+      // Mock TTSIntegration response for TTS service test
+      TTSIntegration.generateTTS.mockResolvedValueOnce({
+        audioUrl: '/audio/integration-test.mp3',
+        provider: 'stub',
+        text: 'Hello, I can help you find shelters.'
+      });
       
       // Test TTS service
       const ttsResult = await ttsService.generateSpeech('Hello, I can help you find shelters.');

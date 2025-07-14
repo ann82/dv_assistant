@@ -138,7 +138,11 @@ export class ResponseHandler extends BaseHandler {
     const textResponse = this.formatTextResponse(searchData, languageCode);
     
     // Generate TTS
-    const ttsResult = await this.services.tts.generateSpeech(textResponse, languageCode);
+    const ttsOptions = {
+      language: languageCode,
+      voice: 'nova'
+    };
+    const ttsResult = await this.services.tts.generateSpeech(textResponse, ttsOptions);
     
     return {
       text: textResponse,
@@ -246,7 +250,11 @@ export class ResponseHandler extends BaseHandler {
     const textResponse = this.formatEmergencyText(content, location, languageCode);
     
     // Generate TTS with urgent voice settings
-    const ttsResult = await this.services.tts.generateSpeech(textResponse, languageCode, 'nova');
+    const ttsOptions = {
+      language: languageCode,
+      voice: 'nova'
+    };
+    const ttsResult = await this.services.tts.generateSpeech(textResponse, ttsOptions);
     
     return {
       text: textResponse,

@@ -22,6 +22,7 @@ import { welcomeMessage } from '../lib/conversationConfig.js';
 import { createTwilioController } from '../controllers/twilioController.js';
 import { validateRequest, rateLimiter } from '../middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, performanceLogger } from '../middleware/logging.js';
+import { getLanguageConfig } from '../lib/languageConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,9 +127,12 @@ logger.info('Initializing Twilio routes with enhanced logging');
  * @returns {string} TwiML response for Twilio
  */
 router.post('/voice', async (req, res) => {
+  const { CallSid, From, To } = req.body;
+  if (!CallSid || !From || !To) {
+    return res.status(400).json({ error: 'Missing required fields: CallSid, From, and To are required.' });
+  }
   // Return a working TwiML response to prove the endpoint works
   const twiml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Hello, and thank you for reaching out. I\'m here to listen and help you find the support and resources you need.</Say><Gather input="speech" action="/twilio/voice/process" method="POST"></Gather></Response>';
-  
   res.type('text/xml');
   res.send(twiml);
 });
@@ -151,7 +155,10 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   
   const requestId = Math.random().toString(36).substring(7);
   const { CallSid, SpeechResult } = req.body;
-  const voice = req.body.voice || 'unknown';
+  
+  // Get voice from language configuration instead of request body
+  const languageCode = req.body.Language || 'en-US';
+  const voice = getLanguageConfig(languageCode)?.voice || 'nova';
   let cleanedSpeechResult = ''; // Initialize outside try block
 
   logger.info('Incoming /twilio/voice/process request', {
@@ -187,13 +194,11 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   }, 12000); // Reduced to 12 seconds for Twilio compatibility
   
   try {
-    
+    // NEW: Return 400 if required fields are missing
     if (!CallSid || !SpeechResult) {
       logger.error('Missing required parameters:', { CallSid, SpeechResult });
       clearTimeout(requestTimeout);
-      const twiml = await handlerManager.generateTTSBasedTwiML("I didn't catch that. Could you please repeat?", true);
-      res.type('text/xml');
-      return res.send(twiml);
+      return res.status(400).json({ error: 'Missing required fields: CallSid and SpeechResult are required.' });
     }
     
     logger.info('Processing speech:', { CallSid, SpeechResult });

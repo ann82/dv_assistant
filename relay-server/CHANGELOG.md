@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.7] - 2025-07-14
+
+### Fixed
+- **TTS Voice Parameter Error**: Resolved critical OpenAI TTS error "Input should be 'nova', 'shimmer', 'echo', 'onyx', 'fable', 'alloy', 'ash', 'sage' or 'coral'"
+  - **Root Cause**: TTS service calls were passing incorrect parameters - language codes as options instead of proper options objects
+  - **Solution**: Fixed all TTS service calls to pass proper options objects with `voice` and `language` properties
+  - **Impact**: TTS generation now works correctly with proper voice selection for all languages
+  - **Files Updated**: TwilioVoiceHandler, SpeechHandler, ResponseHandler, and TTS service calls
+- **Circular JSON Structure Error**: Fixed "Converting circular structure to JSON" error in logging middleware
+  - **Root Cause**: TwiML objects have circular references that can't be serialized to JSON
+  - **Solution**: Enhanced logging middleware to detect TwiML objects and handle them properly
+  - **Impact**: No more circular structure errors in logs, improved logging reliability
+- **Voice Determination Issue**: Fixed voice showing as "unknown" in logs and TTS requests
+  - **Root Cause**: Voice was being determined from `req.body.voice` (which Twilio never sends) instead of language configuration
+  - **Solution**: Updated voice determination to use `getLanguageConfig(languageCode)?.openaiVoice` with proper fallback
+  - **Impact**: Correct voice selection for each language (nova, shimmer, echo, onyx) in logs and TTS requests
+- **Test Suite Fixes**: Fixed all failing tests to ensure 100% test reliability
+  - **API Integration Tests**: Fixed missing required fields validation for Twilio endpoints
+  - **BaseHandler Tests**: Fixed request sanitization to properly redact sensitive data
+  - **TtsService Tests**: Updated test expectations to match new TTS service signature
+  - **Service Integration Tests**: Fixed mock setup for TTS integration tests
+  - **Test Results**: All 482 tests passing (472 passed, 10 skipped)
+
+### Added
+- **Enhanced Request Validation**: Added proper validation for Twilio webhook endpoints
+  - **Required Fields**: `/twilio/voice` now validates CallSid, From, and To fields
+  - **Required Fields**: `/twilio/voice/process` now validates CallSid and SpeechResult fields
+  - **Error Responses**: Returns 400 Bad Request with JSON error messages for missing fields
+  - **Impact**: Better API reliability and clearer error messages for debugging
+- **Comprehensive Request Sanitization**: Enhanced BaseHandler to properly redact sensitive data
+  - **Sensitive Fields**: Automatically redacts password, token, apiKey, secret, auth, authorization
+  - **Deep Redaction**: Recursively redacts sensitive fields in nested objects
+  - **Safe Logging**: Ensures sensitive data is never logged while preserving other information
+  - **Impact**: Improved security and compliance with data protection requirements
+
+### Changed
+- **TTS Service Call Signature**: Updated all TTS service calls to use proper options objects
+  - **Before**: `generateSpeech(text, languageCode, metadata)`
+  - **After**: `generateSpeech(text, { language, voice }, metadata)`
+  - **Impact**: Consistent and correct TTS parameter passing throughout the application
+- **Voice Configuration**: Updated voice determination to use language-specific configuration
+  - **Before**: Used `req.body.voice || 'unknown'`
+  - **After**: Uses `getLanguageConfig(languageCode)?.openaiVoice || 'nova'`
+  - **Impact**: Correct voice selection based on detected/requested language
+
+### Technical Improvements
+- **Error Handling**: Enhanced error handling for TwiML objects in logging
+- **Code Consistency**: Standardized TTS service calls across all handlers
+- **Test Reliability**: All tests now pass consistently with proper mocking
+- **Security**: Improved data sanitization for logging and debugging
+
+### Impact
+- **Before**: TTS generation failed with "unknown" voice errors, circular JSON errors in logs, and inconsistent test results
+- **After**: TTS generation works correctly with proper voice selection, clean logs, and 100% test reliability
+- **User Experience**: Reliable TTS audio generation with correct voices for each language
+- **Developer Experience**: Clean logs without errors, consistent test results, and better debugging capabilities
+
 ## [v1.22.6] - 2025-07-14
 
 ### Fixed

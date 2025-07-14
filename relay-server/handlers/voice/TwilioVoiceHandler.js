@@ -590,7 +590,11 @@ export class TwilioVoiceHandler extends BaseHandler {
 
       // Use TTS service to generate audio with metadata
       const ttsStart = Date.now();
-      const ttsResponse = await this.services.tts.generateSpeech(safeText, finalLanguageCode, metadata);
+      const ttsOptions = {
+        language: finalLanguageCode,
+        voice: this._getLanguageConfig(finalLanguageCode)?.voice || 'nova'
+      };
+      const ttsResponse = await this.services.tts.generateSpeech(safeText, ttsOptions, metadata);
       const ttsDuration = Date.now() - ttsStart;
 
       // Handle BaseService response format (wrapped in success/data structure)

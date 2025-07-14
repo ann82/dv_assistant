@@ -1,0 +1,6 @@
+{
+  "provider": "openai",
+  "text": "Hello, this is a test of the TTS service.",
+  "voice": "nova",
+  "timestamp": "2025-07-14T01:59:32.006Z"
+}
