@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2025-01-27
+
+### Added
+- **Enhanced Welcome Message Pacing**: Welcome messages now use `x-slow` rate with longer strategic pauses for more measured, empathetic delivery
+- **Improved SSML Templates**: Updated SSML templates to include `x-slow` rate option for more natural conversation flow
+- **Multi-Language Welcome Speed**: All supported languages (English, Spanish, French, German) now use consistent slower pacing
+
+### Changed
+- **Welcome Message SSML**: Updated welcome messages to use `<prosody rate="x-slow">` instead of `rate="slow"` for more measured delivery
+- **Strategic Pause Timing**: Increased pause durations (800ms, 600ms, 500ms) for better emotional impact and comprehension
+- **SSML Configuration**: Added `x-slow` rate option to empathetic voice profile for more supportive interactions
+
+### Technical Details
+- **Rate Change**: From `rate="slow"` to `rate="x-slow"` for more measured speech
+- **Pause Enhancement**: Increased pauses from 300-500ms to 500-800ms for better pacing
+- **Emotional Impact**: Slower delivery helps create a more calming, supportive atmosphere
+- **Accessibility**: Better pacing supports users who may be in distress or need more time to process information
+
 ## [1.27.0] - 2025-07-13
 
 ### Changed

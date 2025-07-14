@@ -152,6 +152,46 @@ import { welcomeMessage } from '../lib/conversationConfig.js';
 | 10,000 | $1-2 | $0 | $1-2 |
 | 100,000 | $10-20 | $0 | $10-20 |
 
+## Enhanced Welcome Message Pacing
+
+The system now features optimized welcome message pacing for more empathetic and supportive interactions:
+
+### Key Improvements
+
+- **Slower Speech Rate**: Welcome messages use `x-slow` rate instead of `slow` for more measured delivery
+- **Strategic Pauses**: Longer pause durations (800ms, 600ms, 500ms) for better emotional impact and comprehension
+- **Multi-Language Consistency**: All supported languages (English, Spanish, French, German) use the same slower pacing
+- **Emotional Impact**: More calming, supportive atmosphere for users in distress
+
+### Technical Features
+
+- **SSML Rate Enhancement**: `<prosody rate="x-slow">` for more measured speech delivery
+- **Pause Optimization**: Strategic pauses of 800ms, 600ms, and 500ms for better pacing
+- **Voice Profile Updates**: Empathetic voice profile now uses `x-slow` rate for supportive interactions
+- **Cross-Platform Consistency**: Same pacing across voice calls and web interface
+
+### Benefits
+
+- **Better User Experience**: More measured pace helps users in distress feel heard and supported
+- **Improved Comprehension**: Longer pauses give users time to process information
+- **Enhanced Empathy**: Slower delivery conveys more care and attention
+- **Accessibility**: Better pacing supports users who may need more time to process information
+
+### Example Welcome Message
+```
+<speak>
+  <prosody rate="x-slow" pitch="+2st">Hello, and thank you for reaching out.</prosody> 
+  <break time="800ms"/> 
+  <prosody rate="x-slow">I'm here to help you find support and resources.</prosody> 
+  <break time="600ms"/> 
+  <prosody rate="x-slow" pitch="+1st">Are you in immediate danger right now?</prosody> 
+  <break time="500ms"/> 
+  <prosody rate="x-slow">If so, please call 911.</prosody> 
+  <break time="600ms"/> 
+  <prosody rate="x-slow">Otherwise, what brings you to call today?</prosody>
+</speak>
+```
+
 ## Enhanced AI Conversation Guidelines
 
 The system now includes comprehensive conversation guidelines that significantly improve response quality and user experience:
