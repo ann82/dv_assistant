@@ -1842,3 +1842,59 @@ All notable changes to this project will be documented in this file.
 - **HandlerManager Integration**: Fixed conversation context integration between HandlerManager and intentClassifier module
 - **Context Persistence**: Ensured conversation context persists across multiple user interactions
 - **Location Context Usage**: Fixed follow-up queries to properly use saved location context
+
+## [v1.22.17] - 2025-07-14
+
+### Enhanced
+- **Pet-Related Follow-up Detection**: Enhanced follow-up detection patterns to catch more variations of pet policy questions
+  - **Root Cause**: User's specific query "I just want to know if I can take my dog there" wasn't being detected as a follow-up
+  - **Solution**: Added comprehensive pet-related patterns including "take my dog", "can take my dog", "i can take my dog", "want to know if i can take my dog", etc.
+  - **Impact**: Pet policy questions are now correctly detected as follow-ups and receive appropriate responses
+  - **Example**: "Yeah, I you just gave me a list of housing places. I can go. I just want to know if I can take my dog there." now correctly triggers pet policy response
+  - **Response**: System now provides specific guidance about calling shelters directly for pet accommodation policies
+
+### Technical Improvements
+- **Enhanced Pattern Matching**: Added 20+ new pet-related follow-up detection patterns
+- **Flexible Query Recognition**: System now recognizes various ways users ask about pet policies
+- **Improved User Experience**: Pet questions now receive contextually appropriate responses instead of generic AI responses
+
+## [v1.22.18] - 2025-07-14
+
+### Enhanced
+- **Tavily API Parameters**: Implemented comprehensive Tavily API parameters for improved domestic violence shelter searches
+  - **Search Depth**: Default changed from 'basic' to 'advanced' for better results
+  - **Include Domains**: Added default include domains for domestic violence resources (domesticshelters.org, womenshelters.org, ncadv.org, thehotline.org, etc.)
+  - **Exclude Domains**: Added default exclude domains to filter out social media and non-relevant sites (wikipedia.org, reddit.com, facebook.com, etc.)
+  - **Max Results**: Reduced default from 8 to 5 for more focused results
+  - **Include Answer**: Default to true for better AI-generated summaries
+  - **Include Results**: Default to true for structured search results
+  - **Include Raw Content**: Default to false for cleaner responses
+
+### Added
+- **Specialized DV Shelter Search**: New `searchDvShelters()` method with optimized parameters for domestic violence searches
+  - **Optimized Query Building**: Automatically builds queries with location and filters
+  - **Pet-Friendly Filtering**: Supports pet-friendly shelter searches
+  - **Family Accommodation**: Supports searches for shelters that accommodate children
+  - **Emergency Services**: Supports emergency and crisis shelter searches
+  - **Legal Assistance**: Supports searches for legal advocacy services
+  - **Counseling Services**: Supports searches for therapy and support groups
+
+### Technical Improvements
+- **Enhanced Logging**: Added comprehensive logging for domain filtering and search parameters
+- **Better Error Handling**: Improved error handling for Tavily API responses
+- **Configuration Management**: Enhanced configuration object with domain lists
+- **Performance Optimization**: Maintained 6-second timeout for fast responses
+
+## [v1.22.19] - 2025-07-14
+
+### Enhanced
+- **Tavily Result Extraction & Ranking**: Results are now post-processed to extract:
+  - **Name**: Taken from the result title
+  - **Address**: Extracted using address patterns from content/raw_content
+  - **Phone Number**: Extracted using phone number patterns from content/raw_content
+- **Ranking**: Results are ranked by Tavily's score (descending), then filtered by shelter keywords and presence of contact info
+- **Contact Info**: Results now include `extracted_phone_numbers`, `extracted_addresses`, and `has_contact_info` fields
+- **Improved Filtering**: Only results with score > 0.6 and relevant keywords are included by default
+
+### Cleanup
+- **Removed Unnecessary Files**: Deleted test and unused files for a cleaner repo

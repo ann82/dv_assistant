@@ -584,6 +584,12 @@ export async function handleFollowUp(query, lastQueryContext) {
     // Pet-related follow-up patterns (enhanced) - more specific to questions
     'do they allow pets', 'can i bring my pet', 'are pets allowed', 'pet policy', 'pet-friendly', 'pet accommodation', 'pet shelter', 'pet program', 'pet support', 'pet services', 'pet safe', 'pet safety', 'pet-friendly shelter', 'pet-friendly program', 'pet-friendly services',
     'do they allow dogs', 'can i bring my dog', 'are dogs allowed', 'do they allow cats', 'can i bring my cat', 'are cats allowed',
+    // Enhanced pet patterns to catch more variations
+    'take my dog', 'take my pet', 'take my cat', 'bring my dog', 'bring my pet', 'bring my cat',
+    'can take my dog', 'can take my pet', 'can take my cat', 'can bring my dog', 'can bring my pet', 'can bring my cat',
+    'i can take my dog', 'i can take my pet', 'i can take my cat', 'i can bring my dog', 'i can bring my pet', 'i can bring my cat',
+    'want to know if i can take my dog', 'want to know if i can take my pet', 'want to know if i can take my cat',
+    'just want to know if i can take my dog', 'just want to know if i can take my pet', 'just want to know if i can take my cat',
     'if they', 'do they', 'can they', 'will they', 'allow', 'accept', 'take', 'bring',
     // Enhanced pet policy patterns
     'let me know if', 'tell me if', 'do you know if', 'can you tell me if', 'i want to know if', 'i need to know if',

@@ -209,7 +209,12 @@ describe('Integration Logging', () => {
   describe('Search Integration Logging', () => {
     it('should log search operations with request ID', async () => {
       const mockResponse = {
-        results: [{ title: 'Test Result' }],
+        results: [{ 
+          title: 'Domestic Violence Shelter - Test Result',
+          url: 'https://domesticshelters.org/test',
+          content: 'Emergency shelter for domestic violence survivors. Call us at (555) 123-4567.',
+          score: 0.8
+        }],
         answer: 'Test answer'
       };
       global.fetch.mockResolvedValue({
@@ -236,7 +241,7 @@ describe('Integration Logging', () => {
           integration: 'Search',
           operation: 'search.success',
           requestId: 'test-request-id',
-          resultCount: 1,
+          filteredResultCount: 1,
           hasAnswer: true
         })
       );

@@ -58,6 +58,18 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - **Query Rewriting**: Improved to preserve user's original query context and reduce overly generic terms
 - **No More Annoying Prompts**: Removed "I didn't hear anything" message that was playing after every response
 
+## 🆕 v1.22.19 Highlights
+- **Tavily Result Extraction & Ranking**: Search results are now post-processed to extract:
+  - **Name**: Taken from the result title
+  - **Address**: Extracted using address patterns from content/raw_content
+  - **Phone Number**: Extracted using phone number patterns from content/raw_content
+- **Ranking & Filtering**:
+  - Results are ranked by Tavily's score (descending)
+  - Only results with score > 0.6 and relevant shelter keywords are included
+  - Results must have contact info (phone/address) to be considered high-confidence
+  - Each result includes `extracted_phone_numbers`, `extracted_addresses`, and `has_contact_info` fields
+- **Repo Cleanup**: Removed unnecessary test and unused files for a cleaner codebase
+
 ---
 
 ## 🚀 Quick Start
