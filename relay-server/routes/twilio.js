@@ -328,7 +328,9 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     });
 
     res.type('text/xml');
-    res.send(twiml);
+    // Convert TwiML object to string if it's an object
+    const twimlString = typeof twiml === 'object' && twiml.toString ? twiml.toString() : twiml;
+    res.send(twimlString);
     
     logger.info('Successfully processed speech:', { 
       requestId, 
@@ -365,7 +367,9 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
 </Response>`;
     
     res.type('text/xml');
-    res.send(errorTwiml);
+    // Convert TwiML object to string if it's an object
+    const errorTwimlString = typeof errorTwiml === 'object' && errorTwiml.toString ? errorTwiml.toString() : errorTwiml;
+    res.send(errorTwimlString);
   }
 });
 

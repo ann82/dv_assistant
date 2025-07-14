@@ -126,6 +126,16 @@ export function enhancedRequestLogger(req, res, next) {
       logOperationSuccess('Request processing', responseData, context.requestId);
     }
     
+    // If it's a TwiML object, convert it to string before calling originalJson
+    if (data && typeof data === 'object' && data.toString && typeof data.toString === 'function' && data._propertyName) {
+      try {
+        const twimlString = data.toString();
+        return originalJson.call(this, { twiml: twimlString, _twimlObject: true });
+      } catch (error) {
+        return originalJson.call(this, { error: 'Failed to convert TwiML object to string', _twimlObject: true });
+      }
+    }
+    
     return originalJson.call(this, data);
   };
   
