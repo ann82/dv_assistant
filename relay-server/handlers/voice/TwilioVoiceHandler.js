@@ -5,8 +5,7 @@ import { TwilioWebSocketServer } from '../../websocketServer.js';
 import { AudioService } from '../../services/audioService.js';
 import path from 'path';
 import fs from 'fs/promises';
-import { getLanguageConfig, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
-import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
+import { getLanguageConfig, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
 import logger from '../../lib/logger.js';
 
 // Get validateRequest from twilio package
