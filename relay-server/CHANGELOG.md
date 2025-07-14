@@ -4,11 +4,46 @@ All notable changes to this project will be documented in this file.
 
 ## [v1.22.5] - 2025-07-14
 
+### Added
+- **TTS-Based Welcome Messages**: The welcome message for incoming calls is now generated using the TTS pipeline, ensuring the full, configurable prompt is played to callers with natural, high-quality audio
+  - **OpenAI TTS Integration**: Welcome messages use OpenAI TTS service for superior audio quality
+  - **Audio File Generation**: TTS audio is saved as MP3 files in `/public/audio/` directory
+  - **TwiML Enhancement**: Audio is delivered via `<Play>` verb inside `<Gather>` for immediate interaction
+  - **Language Support**: TTS welcome messages work with all supported languages (English, Spanish, French, German)
+  - **Voice Customization**: TTS voice can be customized via `TTS_VOICE` environment variable
+- **Comprehensive TTS Logging**: Enhanced logging for all TTS operations with detailed metadata
+  - **Request Tracking**: All TTS operations include requestId and callSid for complete traceability
+  - **Text Preview**: Logs include text length and preview for debugging
+  - **Voice Information**: TTS voice and provider information is logged
+  - **Audio File Details**: Audio file creation and serving details are logged
+  - **Performance Metrics**: TTS generation time and audio file size are tracked
+
 ### Changed
-- **Welcome Message Now Uses TTS**: The welcome message for incoming calls is now generated using the TTS pipeline, ensuring the full, configurable prompt is played to callers. Falls back to a simple TwiML <Say> if TTS fails.
-- **Robust TTS Fallback**: If TTS generation fails (e.g., OpenAI API error), the system gracefully falls back to a simple TwiML <Say> so callers always hear a message.
-- **Improved Metadata Logging**: All TTS and TwiML generation logs now include requestId, callSid, text preview, and other metadata for easier debugging and traceability.
-- **TTS Pipeline Compatibility**: The TTS pipeline now works with the actual TTS service response format, handling both audioBuffer and audioUrl, and saving audio files as needed.
+- **Robust TTS Fallback**: If TTS generation fails (e.g., OpenAI API error), the system gracefully falls back to a simple TwiML `<Say>` so callers always hear a message
+  - **Graceful Degradation**: System continues to function even when TTS service is unavailable
+  - **Error Isolation**: TTS failures don't affect other system components
+  - **User Experience**: Callers always receive a welcome message, regardless of TTS status
+- **TTS Pipeline Compatibility**: The TTS pipeline now works with the actual TTS service response format, handling both audioBuffer and audioUrl, and saving audio files as needed
+  - **Response Format Handling**: Supports both audioBuffer (binary data) and audioUrl (file URLs)
+  - **File System Integration**: Automatically creates audio files when needed
+  - **Error Handling**: Comprehensive error handling for file creation and serving
+- **Enhanced Error Handling**: Comprehensive error handling throughout the speech processing pipeline with graceful degradation
+  - **TTS Error Recovery**: Detailed error logging and fallback mechanisms for TTS operations
+  - **File System Error Handling**: Graceful handling of audio file creation and serving errors
+  - **API Error Management**: Better error handling for OpenAI TTS API calls
+
+### Technical Improvements
+- **Audio File Management**: Automatic creation and cleanup of TTS audio files
+- **TTS Service Health**: Better monitoring and health checking of TTS services
+- **Performance Optimization**: Improved TTS generation and audio file serving performance
+- **Code Maintainability**: Cleaner TTS integration with better separation of concerns
+
+### Impact
+- **Before**: Welcome messages used simple TwiML `<Say>` with limited customization
+- **After**: Welcome messages use high-quality TTS audio with full customization and robust fallback
+- **User Experience**: More natural, professional-sounding welcome messages
+- **Developer Experience**: Better debugging capabilities with comprehensive TTS logging
+- **System Reliability**: Robust fallback ensures system continues to function even when TTS fails
 
 ## [v1.22.4] - 2025-01-27
 
