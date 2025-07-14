@@ -2,9 +2,17 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.7** (Updated: July 14, 2025)
+**Current Version: 1.22.11** (Updated: July 14, 2025)
 
 ---
+
+## 🆕 v1.22.11 Highlights
+- **Location Validation System**: Uses Nominatim geocoding to validate user-provided locations and prompt for clarification when needed
+- **Transcription Validation**: Automatically detects and corrects common speech recognition errors (e.g., "I Station 2" → "Station 2")
+- **Speech Monitoring**: Real-time monitoring and analysis tools for speech transcription quality and performance
+- **Performance Optimization**: Reduced TTS timeouts and enhanced speech recognition parameters for faster response times
+- **Query Rewriting**: Improved to preserve user's original query context and reduce overly generic terms
+- **No More Annoying Prompts**: Removed "I didn't hear anything" message that was playing after every response
 
 ## 🆕 v1.22.7 Highlights
 - **TTS Voice Parameter Error Fixed:** All TTS calls now use the correct OpenAI voice for each language (nova, shimmer, echo, onyx, etc.)

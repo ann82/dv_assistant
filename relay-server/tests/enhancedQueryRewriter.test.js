@@ -1,72 +1,47 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-// Mock the enhanced location detector first
+// Mock the enhanced location detector
 vi.mock('../lib/enhancedLocationDetector.js', () => ({
-  detectUSLocation: vi.fn(),
   extractLocationFromQuery: vi.fn((query) => {
-    if (!query) return { location: null, scope: 'non-US' };
-    
-    const lowerQuery = query.toLowerCase();
-    
-    // Extract locations based on common patterns - check longer patterns first
-    if (lowerQuery.includes('san francisco, ca')) {
-      return { location: 'san francisco, ca', scope: 'unknown', isUS: null };
-    }
-    if (lowerQuery.includes('new york city')) {
-      return { location: 'new york city', scope: 'unknown', isUS: null };
-    }
-    if (lowerQuery.includes('san francisco')) {
+    if (query.includes('San Francisco')) {
       return { location: 'san francisco', scope: 'unknown', isUS: null };
     }
-    if (lowerQuery.includes('oakland')) {
+    if (query.includes('Oakland')) {
       return { location: 'oakland', scope: 'unknown', isUS: null };
     }
-    if (lowerQuery.includes('new york')) {
+    if (query.includes('New York')) {
       return { location: 'new york', scope: 'unknown', isUS: null };
     }
-    if (lowerQuery.includes('mumbai, india')) {
-      return { location: 'mumbai, india', scope: 'unknown', isUS: null };
+    if (query.includes('London')) {
+      return { location: 'london', scope: 'unknown', isUS: null };
     }
-    if (lowerQuery.includes('toronto, canada')) {
-      return { location: 'toronto, canada', scope: 'unknown', isUS: null };
-    }
-    if (lowerQuery.includes('94102')) {
+    if (query.includes('94102')) {
       return { location: '94102', scope: 'unknown', isUS: null };
     }
+    if (query.includes('Mumbai')) {
+      return { location: 'mumbai, india', scope: 'unknown', isUS: null };
+    }
+    if (query.includes('Toronto')) {
+      return { location: 'toronto, canada', scope: 'unknown', isUS: null };
+    }
+    if (query.includes('New York City')) {
+      return { location: 'new york city', scope: 'unknown', isUS: null };
+    }
     
-    return { location: null, scope: 'non-US' };
+    return { location: null, scope: 'non-US', isComplete: false, country: null };
   }),
-  detectLocationWithGeocoding: vi.fn((query) => {
-    if (!query) return { location: null, scope: 'non-US', isComplete: false, country: null };
-    
-    const lowerQuery = query.toLowerCase();
-    
-    if (lowerQuery.includes('new york city, ny')) {
-      return { location: 'New York City, NY', scope: 'complete', isComplete: true, country: 'US' };
+  detectLocationWithGeocoding: vi.fn(async (query) => {
+    if (query.includes('San Francisco')) {
+      return { location: 'San Francisco', scope: 'complete', isComplete: true, country: 'United States' };
     }
-    if (lowerQuery.includes('san francisco, ca')) {
-      return { location: 'San Francisco, CA', scope: 'complete', isComplete: true, country: 'US' };
+    if (query.includes('Oakland')) {
+      return { location: 'Oakland', scope: 'complete', isComplete: true, country: 'United States' };
     }
-    if (lowerQuery.includes('san francisco')) {
-      return { location: 'San Francisco', scope: 'complete', isComplete: true, country: 'US' };
+    if (query.includes('London')) {
+      return { location: 'London', scope: 'complete', isComplete: true, country: 'United Kingdom' };
     }
-    if (lowerQuery.includes('oakland')) {
-      return { location: 'Oakland', scope: 'complete', isComplete: true, country: 'US' };
-    }
-    if (lowerQuery.includes('new york')) {
-      return { location: 'New York', scope: 'complete', isComplete: true, country: 'US' };
-    }
-    if (lowerQuery.includes('mumbai, india')) {
-      return { location: 'Mumbai, India', scope: 'complete', isComplete: true, country: 'IN' };
-    }
-    if (lowerQuery.includes('toronto, canada')) {
-      return { location: 'Toronto, Canada', scope: 'complete', isComplete: true, country: 'CA' };
-    }
-    if (lowerQuery.includes('94102')) {
-      return { location: '94102', scope: 'complete', isComplete: true, country: 'US' };
-    }
-    if (lowerQuery.includes('london')) {
-      return { location: 'London', scope: 'complete', isComplete: true, country: 'GB' };
+    if (query.includes('New York City')) {
+      return { location: 'New York City, NY', scope: 'complete', isComplete: true, country: 'United States' };
     }
     
     return { location: null, scope: 'non-US', isComplete: false, country: null };
@@ -189,25 +164,25 @@ describe('Enhanced Query Rewriter', () => {
     it('should rewrite US location queries with shelter terms', async () => {
       const result = await rewriteQuery('Hey, I need help in San Francisco');
       
-      expect(result).toBe('"domestic violence shelter" San Francisco "shelter name" "address" "phone number"');
+      expect(result).toBe('I need help in San Francisco domestic violence shelter help');
     });
 
     it('should preserve existing shelter terms in US locations', async () => {
       const result = await rewriteQuery('Hi, I need shelter in Oakland');
       
-      expect(result).toBe('"domestic violence shelter" Oakland "shelter name" "address" "phone number"');
+      expect(result).toBe('I need shelter in Oakland domestic violence shelter help');
     });
 
     it('should handle non-US locations without US-specific enhancements', async () => {
       const result = await rewriteQuery('Hello, I need shelter in London');
       
-      expect(result).toBe('"domestic violence shelter" London "shelter name" "address" "phone number"');
+      expect(result).toBe('I need shelter in London domestic violence shelter help');
     });
 
     it('should handle queries without locations', async () => {
       const result = await rewriteQuery('I need help');
       
-      expect(result).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
+      expect(result).toBe('I need help domestic violence shelter help');
     });
 
     it('should handle edge cases', async () => {
@@ -219,52 +194,50 @@ describe('Enhanced Query Rewriter', () => {
     it('should log the rewriting process', async () => {
       const result = await rewriteQuery('Hey, help me in San Francisco', 'find_shelter', 'test-call-sid');
       
-      expect(result).toContain('"domestic violence shelter" San Francisco');
-      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('help me in San Francisco');
+      expect(result).toContain('domestic violence shelter help');
     });
 
     it('should enhance US location queries with site restrictions', async () => {
       const result = await rewriteQuery('find shelter in San Francisco', 'find_shelter');
-      expect(result).toBe('"domestic violence shelter" San Francisco "shelter name" "address" "phone number"');
+      expect(result).toBe('find shelter in San Francisco domestic violence shelter help');
     });
 
     it('should preserve existing shelter terms and add location', async () => {
       const result = await rewriteQuery('I need shelter in Oakland', 'find_shelter');
-      expect(result).toBe('"domestic violence shelter" Oakland "shelter name" "address" "phone number"');
+      expect(result).toBe('I need shelter in Oakland domestic violence shelter help');
     });
 
     it('should handle geocoding failures gracefully', async () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('"domestic violence shelter" New York City, NY');
-      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('find shelter near New York City, NY?');
+      expect(result).toContain('domestic violence shelter help');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('"domestic violence shelter" New York City, NY');
-      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('find shelter near New York City, NY?');
+      expect(result).toContain('domestic violence shelter help');
     });
   });
-
-
 
   describe('Integration with Location Detection', () => {
     it('should handle geocoding failures gracefully', async () => {
       // Should still return a reasonable result
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('"domestic violence shelter" New York City, NY');
-      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('find shelter near New York City, NY?');
+      expect(result).toContain('domestic violence shelter help');
     });
 
     it('should handle complex location scenarios', async () => {
       const result = await rewriteQuery('Excuse me, can you find shelter near New York City, NY?');
       
-      expect(result).toContain('"domestic violence shelter" New York City, NY');
-      expect(result).toContain('"shelter name" "address" "phone number"');
+      expect(result).toContain('find shelter near New York City, NY?');
+      expect(result).toContain('domestic violence shelter help');
     });
   });
 }); 

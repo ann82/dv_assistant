@@ -2,6 +2,76 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.11] - 2025-07-14
+
+### Added
+- **Location Validation System**: Implemented comprehensive location validation using Nominatim geocoding
+  - **Geocoding Integration**: Uses Nominatim API to validate and geocode user-provided locations
+  - **Validation Rules**: Checks if location exists, is within target region, and has clear name matches
+  - **User Prompts**: Prompts for clarification when location is not found, incomplete, outside region, or unclear
+  - **Fallback Handling**: Graceful handling when geocoding service is unavailable
+  - **Impact**: Reduces incorrect location assumptions and improves resource accuracy
+- **Transcription Validation System**: Added intelligent transcription validation to detect and correct speech recognition errors
+  - **Regex Corrections**: Automatic correction of common transcription errors (e.g., "I Station 2" → "Station 2")
+  - **Confidence-Based Reprompting**: Reprompts user when speech confidence is low or transcription seems incorrect
+  - **Pattern Detection**: Identifies suspicious transcription patterns that may indicate recognition errors
+  - **User Feedback**: Provides clear feedback when transcription validation suggests corrections
+  - **Impact**: Improves speech recognition accuracy and reduces misunderstandings
+- **Speech Transcription Monitoring**: Added comprehensive monitoring and analysis tools for speech transcription quality
+  - **Real-time Monitoring**: Express routes for monitoring recent transcriptions and statistics
+  - **Quality Analysis**: Tracks transcription confidence, duration, and suspicious patterns
+  - **Error Detection**: Identifies common transcription errors and provides correction suggestions
+  - **Performance Metrics**: Monitors transcription success rates and response times
+  - **Debugging Tools**: Provides endpoints to analyze transcription data and clear monitoring data
+  - **Impact**: Better understanding of speech recognition performance and user experience
+
+### Fixed
+- **Long Response Delays**: Optimized TTS generation and speech recognition for faster response times
+  - **TTS Timeout Reduction**: Reduced TTS timeout from 15 seconds to 8 seconds
+  - **Retry Optimization**: Reduced max retries from 2 to 1 and retry delay from 2000ms to 1000ms
+  - **Speech Recognition Enhancement**: Added `speechTimeout: 'auto'`, `speechModel: 'phone_call'`, and `enhanced: 'true'` to `<Gather>` parameters
+  - **TTS Generation Timeout**: Added 6-second timeout for TTS generation in TwilioVoiceHandler
+  - **Impact**: Significantly faster response times and better speech recognition accuracy
+- **"I didn't hear anything" Message Issue**: Removed the noSpeech prompt that was playing after every response
+  - **Root Cause**: The `noSpeech` prompt was being added to every `<Gather>` element as a fallback message
+  - **Solution**: Removed the automatic noSpeech prompt from TwiML generation
+  - **Impact**: Users no longer hear "I didn't hear anything. Please try again." after every response
+- **Tavily Search Timeout**: Increased Tavily search timeout from 8 to 15 seconds for better reliability
+  - **Root Cause**: Complex search queries were timing out before completion
+  - **Solution**: Increased timeout and simplified search queries in enhanced query rewriter and hybrid response handler
+  - **Impact**: More reliable search results and reduced timeout errors
+- **Location Extraction Improvements**: Enhanced location extraction to handle more natural language patterns
+  - **Pattern Recognition**: Improved regex patterns to recognize locations like "I Station 2", "Building 5", etc.
+  - **Fallback Logic**: Added more lenient fallback logic for location detection
+  - **Context Preservation**: Better preservation of user's original location context
+  - **Impact**: More accurate location extraction from natural speech patterns
+
+### Enhanced
+- **Query Rewriting**: Improved query rewriting to preserve user's original query and location context
+  - **Context Preservation**: Query rewriter now preserves the user's original query structure better
+  - **Location Integration**: Better integration of extracted locations into rewritten queries
+  - **Generic Term Reduction**: Reduced over-use of generic terms in favor of user's specific language
+  - **Impact**: More relevant and specific search results that match user's actual needs
+- **Speech Processing Logging**: Enhanced speech transcription logging with detailed metadata
+  - **Raw Speech Logging**: Logs raw speech input, confidence scores, and speech model information
+  - **Twilio Parameters**: Tracks all Twilio speech recognition parameters for debugging
+  - **Transcription Quality**: Monitors transcription quality and identifies potential issues
+  - **Performance Tracking**: Tracks speech processing performance and response times
+  - **Impact**: Better debugging capabilities and quality monitoring for speech recognition
+
+### Technical Improvements
+- **Location Validation Pipeline**: Integrated location validation into the main speech processing flow
+- **Transcription Validation**: Added validation checks before processing user input
+- **Monitoring Integration**: Integrated transcription monitoring into the main Twilio route
+- **Error Handling**: Enhanced error handling for geocoding and validation services
+- **Test Coverage**: Updated test expectations to match simplified query format and new validation logic
+
+### Impact
+- **Before**: System made assumptions about locations, had transcription errors, and used overly generic queries
+- **After**: System validates locations, corrects transcription errors, and uses more specific queries
+- **User Experience**: More accurate responses, fewer misunderstandings, and better resource recommendations
+- **Developer Experience**: Better monitoring tools and debugging capabilities for speech processing
+
 ## [v1.22.10] - 2025-07-14
 
 ### Fixed

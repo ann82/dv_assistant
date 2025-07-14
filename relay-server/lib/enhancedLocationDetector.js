@@ -245,7 +245,13 @@ export function extractLocationFromQuery(query) {
     /at\s+([^,.?]+(?:,\s*[^,.?]+)?)/i,
     /around\s+([^,.?]+(?:,\s*[^,.?]+)?)/i,
     /within\s+([^,.?]+(?:,\s*[^,.?]+)?)/i,
-    /close\s+to\s+([^,.?]+(?:,\s*[^,.?]+)?)/i
+    /close\s+to\s+([^,.?]+(?:,\s*[^,.?]+)?)/i,
+    // New: Look for standalone location names (like "I Station 2")
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Station|Street|Avenue|Road|Drive|Lane|Place|Boulevard|Highway|Freeway|Interstate|Center|Plaza|Mall|Building|Complex|District|Neighborhood|Park|Area|Region|County|City|Town|State|Province|Country))\b/i,
+    // New: Look for numbered locations (like "Station 2", "Building 5")
+    /\b([A-Z][a-z]*\s+\d+)\b/i,
+    // New: Look for any capitalized word sequence that might be a location
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g
   ];
 
   logger.info('extractLocationFromQuery DEBUG - Checking simple patterns');
@@ -291,24 +297,28 @@ export function extractLocationFromQuery(query) {
         }
       }
       
-      // Only consider it a location if it has strong location indicators
+      // More lenient location detection - consider any capitalized word sequence as potential location
       const locationLower = location.toLowerCase();
       
-      // Must have at least one strong location indicator
+      // Check for strong location indicators
       const strongLocationIndicators = [
         /city|town|state|county|province|country/i,
         /street|avenue|road|drive|lane|place|boulevard|highway|freeway|interstate/i,
         /park|center|plaza|mall|building|complex|district|neighborhood/i,
         /new\s+\w+|north\s+\w+|south\s+\w+|east\s+\w+|west\s+\w+/i,
-        /upper\s+\w+|lower\s+\w+|central\s+\w+|downtown|uptown|midtown/i
+        /upper\s+\w+|lower\s+\w+|central\s+\w+|downtown|uptown|midtown/i,
+        /station|building|area|region|zone|section/i
       ];
       
       const hasStrongIndicator = strongLocationIndicators.some(pattern => pattern.test(locationLower));
       
-      // Or must be a known city/state pattern (like "Portland, Oregon")
+      // Check for known patterns
       const hasCommaPattern = /^[A-Z][a-z]+,\s*[A-Z][a-z]+$/.test(location);
+      const hasNumberPattern = /\d+/.test(location); // Contains numbers (like "Station 2")
+      const hasMultipleWords = location.split(' ').length > 1; // Multiple words
       
-      if (hasStrongIndicator || hasCommaPattern) {
+      // More lenient: accept if it has any of these characteristics
+      if (hasStrongIndicator || hasCommaPattern || hasNumberPattern || hasMultipleWords) {
         potentialLocations.push(location);
       }
       

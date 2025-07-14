@@ -154,19 +154,29 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   // Step 4: Build optimized search query
   let searchQuery = cleanedQuery;
 
-  // Always add 'domestic violence shelter' for resource-seeking intents
+  // For resource-seeking intents, enhance the query while preserving user's specific terms
   if (['find_shelter', 'legal_services', 'counseling_services', 'emergency_help', 'other_resources'].includes(intent)) {
-    let locationPart = locationInfo.location && locationInfo.isComplete ? ` ${locationInfo.location}` : '';
-    searchQuery = `"domestic violence shelter"${locationPart}`;
+    // Preserve the user's original query but add specific search terms
+    let enhancedQuery = cleanedQuery;
     
-    // Add specific resource details for all queries
-    if (intent === 'find_shelter') {
-      searchQuery += ' "shelter name" "address" "phone number"';
-    } else if (intent === 'legal_services') {
-      searchQuery += ' "legal aid" "attorney" "lawyer"';
-    } else if (intent === 'counseling_services') {
-      searchQuery += ' "counseling" "therapy" "support group"';
+    // Add location if detected and not already in the query
+    if (locationInfo.location && locationInfo.isComplete && !cleanedQuery.toLowerCase().includes(locationInfo.location.toLowerCase())) {
+      enhancedQuery += ` ${locationInfo.location}`;
     }
+    
+    // Add specific resource terms based on intent (simplified for better performance)
+    if (intent === 'find_shelter') {
+      enhancedQuery += ' domestic violence shelter help';
+    } else if (intent === 'legal_services') {
+      enhancedQuery += ' legal aid attorney lawyer';
+    } else if (intent === 'counseling_services') {
+      enhancedQuery += ' counseling therapy support group';
+    } else {
+      // For other resource intents, add general domestic violence terms
+      enhancedQuery += ' domestic violence help resources';
+    }
+    
+    searchQuery = enhancedQuery;
   }
 
   // Step 4.5: Clean up any problematic words that might have been added from context

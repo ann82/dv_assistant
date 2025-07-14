@@ -259,10 +259,10 @@ export class HybridResponseHandler {
       query += ` ${location}`;
     }
     
-    // Add specific terms for better results
-    query += ' "shelter name" "address" "phone number" "contact information"';
+    // Add simplified terms for better performance
+    query += ' help resources contact';
     
-    // Add site restrictions
+    // Add site restrictions (simplified)
     query += ' site:org OR site:gov';
     
     return query;

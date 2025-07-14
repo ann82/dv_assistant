@@ -237,7 +237,7 @@ describe('HybridResponseHandler', () => {
       
       expect(query).toContain('domestic violence shelter');
       expect(query).toContain('Austin, TX');
-      expect(query).toContain('shelter name');
+      expect(query).toContain('help resources contact');
       expect(query).toContain('site:org OR site:gov');
     });
 

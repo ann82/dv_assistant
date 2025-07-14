@@ -24,6 +24,8 @@ import { validateRequest, rateLimiter } from '../middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, performanceLogger } from '../middleware/logging.js';
 import { getLanguageConfig } from '../lib/languageConfig.js';
 import { addTranscriptionEntry } from './speech-monitor.js';
+import { validateTranscription, generateRepromptMessage, extractPotentialLocation } from '../lib/transcriptionValidator.js';
+import { geocodingIntegration } from '../integrations/geocodingIntegration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -310,19 +312,24 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     
     // Clean and process speech result
     const originalSpeech = SpeechResult || '';
-    cleanedSpeechResult = originalSpeech.trim();
+    const speechConfidence = parseFloat(req.body.SpeechResultConfidence) || null;
+    
+    // Validate and correct transcription errors
+    const validationResult = validateTranscription(originalSpeech, speechConfidence, CallSid);
+    cleanedSpeechResult = validationResult.corrected;
     
     // Add to speech monitor for real-time tracking
     addTranscriptionEntry({
       rawSpeechResult: originalSpeech,
       cleanedSpeechResult: cleanedSpeechResult,
       CallSid,
-      confidence: req.body.SpeechResultConfidence,
+      confidence: speechConfidence,
       speechModel: req.body.SpeechModel,
       enhanced: req.body.Enhanced,
       languageCode,
       voice,
-      requestId
+      requestId,
+      validationResult: validationResult
     });
     
     logger.info('🔊 SPEECH TRANSCRIPTION DEBUG - Processing', {
@@ -334,9 +341,225 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       cleanedLength: cleanedSpeechResult.length,
       wasTrimmed: originalSpeech !== cleanedSpeechResult,
       isEmpty: !cleanedSpeechResult,
+      confidence: speechConfidence,
+      confidenceLevel: validationResult.confidenceLevel,
+      hasErrors: validationResult.hasErrors,
+      corrections: validationResult.corrections.length,
+      shouldReprompt: validationResult.shouldReprompt,
       voice,
       timestamp: new Date().toISOString()
     });
+
+    // Handle very low confidence transcriptions by asking for clarification
+    if (validationResult.shouldReprompt) {
+      logger.info('🔊 SPEECH TRANSCRIPTION DEBUG - Very low confidence, asking for clarification', {
+        requestId,
+        CallSid,
+        originalSpeech,
+        confidence: speechConfidence,
+        timestamp: new Date().toISOString()
+      });
+
+      const repromptMessage = generateRepromptMessage(originalSpeech, speechConfidence);
+      const repromptTwiml = new twilio.twiml.VoiceResponse();
+      repromptTwiml.say(repromptMessage);
+      repromptTwiml.gather({
+        input: 'speech',
+        action: '/twilio/voice/process',
+        method: 'POST',
+        speechTimeout: 'auto',
+        speechModel: 'phone_call',
+        enhanced: 'true',
+        language: languageCode
+      });
+
+      clearTimeout(requestTimeout);
+      res.type('text/xml');
+      return res.send(repromptTwiml.toString());
+    }
+
+    // Validate extracted location using Nominatim geocoding
+    const extractedLocation = extractPotentialLocation(cleanedSpeechResult);
+    if (extractedLocation) {
+      logger.info('🔍 LOCATION VALIDATION - Validating extracted location', {
+        requestId,
+        CallSid,
+        extractedLocation,
+        originalSpeech,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const geoResult = await geocodingIntegration.geocode(extractedLocation, {}, requestId);
+        
+        if (!geoResult.success || !geoResult.data || geoResult.data.length === 0) {
+          logger.warn('🔍 LOCATION VALIDATION - Location not found in Nominatim', {
+            requestId,
+            CallSid,
+            extractedLocation,
+            geoResult,
+            timestamp: new Date().toISOString()
+          });
+
+          // Prompt user for clarification about the unrecognized location
+          const locationPrompt = `I couldn't find the location "${extractedLocation}" in my database. Could you please repeat the location name more clearly, or try saying the city or area name instead?`;
+          
+          const locationTwiml = new twilio.twiml.VoiceResponse();
+          locationTwiml.say(locationPrompt);
+          locationTwiml.gather({
+            input: 'speech',
+            action: '/twilio/voice/process',
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
+            language: languageCode
+          });
+
+          clearTimeout(requestTimeout);
+          res.type('text/xml');
+          return res.send(locationTwiml.toString());
+        }
+
+        // Check if the geocoding result has sufficient confidence and is in a reasonable location
+        const geoData = geoResult.data;
+        const hasValidLocation = geoData.city || geoData.state || geoData.country;
+        
+        // Additional validation: Check if the location is in the US (or your target region)
+        const isInTargetRegion = geoData.country === 'United States' || 
+                                geoData.country === 'Canada' || 
+                                geoData.country === 'Mexico';
+        
+        // Check if the location name similarity is reasonable
+        const locationName = geoData.displayName || '';
+        const extractedLower = extractedLocation.toLowerCase();
+        const displayLower = locationName.toLowerCase();
+        const hasReasonableMatch = displayLower.includes(extractedLower) || 
+                                  extractedLower.includes(displayLower.split(',')[0].toLowerCase());
+        
+        if (!hasValidLocation) {
+          logger.warn('🔍 LOCATION VALIDATION - Location found but lacks sufficient detail', {
+            requestId,
+            CallSid,
+            extractedLocation,
+            geoData,
+            timestamp: new Date().toISOString()
+          });
+
+          const detailPrompt = `I found "${extractedLocation}" but I need more specific location information. Could you please provide the city or area name?`;
+          
+          const detailTwiml = new twilio.twiml.VoiceResponse();
+          detailTwiml.say(detailPrompt);
+          detailTwiml.gather({
+            input: 'speech',
+            action: '/twilio/voice/process',
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
+            language: languageCode
+          });
+
+          clearTimeout(requestTimeout);
+          res.type('text/xml');
+          return res.send(detailTwiml.toString());
+        }
+        
+        // If location is not in target region, ask for clarification
+        if (!isInTargetRegion) {
+          logger.warn('🔍 LOCATION VALIDATION - Location found but outside target region', {
+            requestId,
+            CallSid,
+            extractedLocation,
+            geoData: {
+              country: geoData.country,
+              city: geoData.city,
+              state: geoData.state,
+              displayName: geoData.displayName
+            },
+            timestamp: new Date().toISOString()
+          });
+
+          const regionPrompt = `I found "${extractedLocation}" but it appears to be in ${geoData.country}. Are you looking for help in the United States? Please provide your city or area name.`;
+          
+          const regionTwiml = new twilio.twiml.VoiceResponse();
+          regionTwiml.say(regionPrompt);
+          regionTwiml.gather({
+            input: 'speech',
+            action: '/twilio/voice/process',
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
+            language: languageCode
+          });
+
+          clearTimeout(requestTimeout);
+          res.type('text/xml');
+          return res.send(regionTwiml.toString());
+        }
+        
+        // If the name match is not reasonable, ask for confirmation
+        if (!hasReasonableMatch) {
+          logger.warn('🔍 LOCATION VALIDATION - Location found but name match is unclear', {
+            requestId,
+            CallSid,
+            extractedLocation,
+            geoData: {
+              displayName: geoData.displayName,
+              city: geoData.city,
+              state: geoData.state,
+              country: geoData.country
+            },
+            hasReasonableMatch,
+            timestamp: new Date().toISOString()
+          });
+
+          const confirmPrompt = `I found a location called "${geoData.displayName}" for "${extractedLocation}". Is this the correct location? Please say yes or no, or provide a different location name.`;
+          
+          const confirmTwiml = new twilio.twiml.VoiceResponse();
+          confirmTwiml.say(confirmPrompt);
+          confirmTwiml.gather({
+            input: 'speech',
+            action: '/twilio/voice/process',
+            method: 'POST',
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
+            language: languageCode
+          });
+
+          clearTimeout(requestTimeout);
+          res.type('text/xml');
+          return res.send(confirmTwiml.toString());
+        }
+
+        logger.info('🔍 LOCATION VALIDATION - Location validated successfully', {
+          requestId,
+          CallSid,
+          extractedLocation,
+          geoData: {
+            city: geoData.city,
+            state: geoData.state,
+            country: geoData.country,
+            displayName: geoData.displayName
+          },
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (geoError) {
+        logger.error('🔍 LOCATION VALIDATION - Geocoding error', {
+          requestId,
+          CallSid,
+          extractedLocation,
+          error: geoError.message,
+          timestamp: new Date().toISOString()
+        });
+
+        // Continue processing even if geocoding fails
+        logger.info('🔍 LOCATION VALIDATION - Continuing without geocoding validation due to error');
+      }
+    }
     
     // Check if this is a consent response (yes/no to SMS question)
     const lowerSpeech = cleanedSpeechResult.toLowerCase();

@@ -152,7 +152,7 @@ describe('Intent Classification', () => {
   describe('rewriteQuery', () => {
     it('should add domestic violence context to queries', async () => {
       const result = await rewriteQuery('find shelter near me', 'find_shelter');
-      expect(result).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
+      expect(result).toBe('find shelter near me domestic violence shelter help');
     });
 
     it('should handle follow-up questions with context', async () => {
@@ -160,12 +160,12 @@ describe('Intent Classification', () => {
       const callSid = 'test-call-sid';
       // Test follow-up
       const result = await rewriteQuery(followUpQuery, 'legal_services', callSid);
-      expect(result).toBe('"domestic violence shelter" "legal aid" "attorney" "lawyer"');
+      expect(result).toBe('Tell me more about the first one legal aid attorney lawyer');
     });
 
     it('should add intent-specific terms', async () => {
       const shelterResult = await rewriteQuery('need housing', 'find_shelter');
-      expect(shelterResult).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
+      expect(shelterResult).toBe('need housing domestic violence shelter help');
 
       const legalResult = await rewriteQuery('need legal help', 'legal_services');
       expect(legalResult).toBe('"domestic violence shelter" "legal aid" "attorney" "lawyer"');
@@ -173,12 +173,12 @@ describe('Intent Classification', () => {
 
     it('should preserve location information', async () => {
       const result = await rewriteQuery('find help in San Jose, California', 'find_shelter');
-      expect(result).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
+      expect(result).toBe('find help in San Jose, California domestic violence shelter help');
     });
 
     it('should handle case-insensitive matching', async () => {
       const result = await rewriteQuery('DOMESTIC VIOLENCE shelter', 'find_shelter');
-      expect(result).toBe('"domestic violence shelter" "shelter name" "address" "phone number"');
+      expect(result).toBe('DOMESTIC VIOLENCE shelter domestic violence shelter help');
     });
   });
 
