@@ -160,6 +160,24 @@ export class TtsService extends BaseService {
             callSid: metadata.callSid,
             timestamp: new Date().toISOString()
           });
+          
+          // Also log the raw error object for complete debugging
+          this.logger.error('TTS Integration failed - Raw Error Object:', {
+            service: this.serviceName,
+            operation: 'generate speech',
+            error: {
+              message: ttsError.message,
+              code: ttsError.code,
+              status: ttsError.status,
+              name: ttsError.name,
+              stack: ttsError.stack,
+              constructor: ttsError.constructor.name
+            },
+            requestId: metadata.requestId,
+            callSid: metadata.callSid,
+            timestamp: new Date().toISOString()
+          });
+          
           throw ttsError;
         }
       }

@@ -228,11 +228,28 @@ export class OpenAIIntegration {
         errorDetails.requestUrl = error.request.url;
       }
       this.logOperation('createTTS.error', errorDetails, 'error', operationId);
+      
+      // Log the full error details separately to ensure they're not truncated
       logger.error('TTS creation failed - Full Error Details:', {
         ...errorDetails,
         requestId: operationId,
         timestamp: new Date().toISOString()
       });
+      
+      // Also log the raw error object for complete debugging
+      logger.error('TTS creation failed - Raw Error Object:', {
+        error: {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+          name: error.name,
+          stack: error.stack,
+          constructor: error.constructor.name
+        },
+        requestId: operationId,
+        timestamp: new Date().toISOString()
+      });
+      
       throw this.handleOpenAIError(error);
     }
   }
