@@ -238,11 +238,26 @@ export class TtsService extends BaseService {
       // Cache miss or error
       this.cacheStats.misses++;
       this.cacheStats.total++;
-      this.logger.debug('TTSService.getFromCache miss/error', {
-        cacheKey,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
+      
+      // Handle cache misses vs actual errors
+      if (error.code === 'ENOENT') {
+        // This is a normal cache miss
+        if (this.config.cache.logMisses) {
+          this.logger.debug('TTSService.getFromCache cache miss', {
+            cacheKey: cacheKey.substring(0, 8),
+            timestamp: new Date().toISOString()
+          });
+        }
+        return null;
+      } else {
+        // This is an actual error
+        this.logger.warn('TTSService.getFromCache error', {
+          cacheKey,
+          error: error.message,
+          errorCode: error.code,
+          timestamp: new Date().toISOString()
+        });
+      }
       return null;
     }
   }

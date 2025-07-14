@@ -111,6 +111,33 @@ export function updateConversationContext(callSid, intent, query, response, tavi
     // Update timestamp to keep context alive
     context.lastQueryContext.timestamp = Date.now();
     context.lastQueryContext.lastQuery = query;
+    // NEW: If a location is detected, update or create lastQueryContext with the new location
+    if (location) {
+      context.lastQueryContext.location = location;
+      context.lastQueryContext.intent = intent;
+      context.lastQueryContext.lastQuery = query;
+      // If results are not present, ensure it's an empty array
+      if (!context.lastQueryContext.results) {
+        context.lastQueryContext.results = [];
+      }
+      // If context was previously missing, fill in minimal fields
+      if (!context.lastQueryContext.timestamp) {
+        context.lastQueryContext.timestamp = Date.now();
+      }
+    }
+  }
+  // NEW: If there is no lastQueryContext but a location is detected, create a minimal context
+  else if (location) {
+    context.lastQueryContext = {
+      intent: intent,
+      location: location,
+      results: [],
+      timestamp: Date.now(),
+      smsResponse: response.smsResponse || null,
+      voiceResponse: response.voiceResponse || null,
+      needsLocation: false,
+      lastQuery: query
+    };
   }
 
   logger.info('Updated conversation context:', {

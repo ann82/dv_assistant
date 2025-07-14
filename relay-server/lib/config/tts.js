@@ -6,16 +6,16 @@
 export const ttsConfig = {
   // TTS General Settings
   enabled: process.env.ENABLE_TTS !== 'false', // Default to true
-  timeout: parseInt(process.env.TTS_TIMEOUT) || 8000, // TTS timeout in milliseconds (reduced for faster response)
+  timeout: parseInt(process.env.TTS_TIMEOUT) || 5000, // TTS timeout in milliseconds (optimized for faster response)
   fallbackToPolly: process.env.FALLBACK_TO_POLLY !== 'false', // Default to true
   
   // OpenAI TTS Configuration
   openai: {
     voice: process.env.TTS_VOICE || 'nova', // OpenAI TTS voice: nova, alloy, echo, fable, onyx, shimmer
     model: 'tts-1',
-    maxRetries: 1, // Reduced to 1 for faster fallback
-    maxRetryDelay: 1000, // Maximum retry delay in milliseconds (reduced for faster response)
-    bufferSize: 1024 * 1024, // 1MB chunks for large audio files
+    maxRetries: 0, // No retries for faster response
+    maxRetryDelay: 500, // Reduced retry delay for faster fallback
+    bufferSize: 512 * 1024, // 512KB chunks for faster processing
     supportedVoices: ['nova', 'alloy', 'echo', 'fable', 'onyx', 'shimmer']
   },
   
@@ -49,7 +49,8 @@ export const ttsConfig = {
     maxSize: parseInt(process.env.TTS_CACHE_MAX_SIZE) || 1000,
     directory: process.env.TTS_CACHE_DIR || './cache/audio',
     cleanupInterval: 1000 * 60 * 60 * 6, // 6 hours
-    maxFileAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+    maxFileAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    logMisses: process.env.TTS_CACHE_LOG_MISSES === 'true' // Only log cache misses if explicitly enabled
   },
   
   // Language-specific TTS Configuration

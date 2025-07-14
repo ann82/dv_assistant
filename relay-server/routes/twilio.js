@@ -268,7 +268,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   res.set('Connection', 'keep-alive');
   res.set('Keep-Alive', 'timeout=15');
   
-  // Set a timeout for this specific request - reduced for Twilio compatibility
+  // Set a timeout for this specific request - optimized for faster response
   const requestTimeout = setTimeout(() => {
     if (!res.headersSent) {
       logger.error('Voice process request timeout:', {
@@ -285,7 +285,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
           language="en-US"/>
 </Response>`);
     }
-  }, 12000); // Reduced to 12 seconds for Twilio compatibility
+  }, 8000); // Reduced to 8 seconds for faster response
   
   try {
     // NEW: Return 400 if required fields are missing

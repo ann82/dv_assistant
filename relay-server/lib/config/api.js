@@ -11,8 +11,8 @@ export const apiConfig = {
       gpt4: 'gpt-4',
       gpt35: 'gpt-3.5-turbo'
     },
-    timeout: parseInt(process.env.OPENAI_TIMEOUT) || 30000,
-    maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES) || 3,
+    timeout: parseInt(process.env.OPENAI_TIMEOUT) || 15000, // Reduced for faster response
+    maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES) || 1, // Reduced retries for faster fallback
     maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS) || 150
   },
   
@@ -21,8 +21,8 @@ export const apiConfig = {
     apiKey: process.env.TAVILY_API_KEY,
     searchDepth: process.env.TAVILY_SEARCH_DEPTH || 'basic',
     searchType: process.env.TAVILY_SEARCH_TYPE || 'basic',
-    maxResults: parseInt(process.env.TAVILY_MAX_RESULTS) || 8,
-    timeout: parseInt(process.env.TAVILY_TIMEOUT) || 15000,
+    maxResults: parseInt(process.env.TAVILY_MAX_RESULTS) || 5, // Reduced for faster response
+    timeout: parseInt(process.env.TAVILY_TIMEOUT) || 8000, // Reduced for faster response
     cacheEnabled: process.env.TAVILY_CACHE_ENABLED !== 'false',
     includeRawContent: false // Always false for performance
   },
@@ -33,8 +33,8 @@ export const apiConfig = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER,
     webhookUrl: process.env.TWILIO_WEBHOOK_URL,
-    timeout: parseInt(process.env.TWILIO_TIMEOUT) || 30000,
-    maxRetries: parseInt(process.env.TWILIO_MAX_RETRIES) || 3
+    timeout: parseInt(process.env.TWILIO_TIMEOUT) || 15000, // Reduced for faster response
+    maxRetries: parseInt(process.env.TWILIO_MAX_RETRIES) || 1 // Reduced retries for faster fallback
   },
   
   // Speech Recognition Configuration
@@ -51,7 +51,7 @@ export const apiConfig = {
   // Geocoding Configuration
   geocoding: {
     provider: process.env.GEOCODING_PROVIDER || 'nominatim',
-    timeout: parseInt(process.env.GEOCODING_TIMEOUT) || 10000,
+    timeout: parseInt(process.env.GEOCODING_TIMEOUT) || 5000, // Reduced for faster response
     cacheTtl: parseInt(process.env.GEOCODING_CACHE_TTL) || 1000 * 60 * 60 * 24, // 24 hours
     maxCacheSize: parseInt(process.env.GEOCODING_MAX_CACHE_SIZE) || 1000,
     userAgent: 'DomesticViolenceAssistant/1.0'

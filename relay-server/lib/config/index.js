@@ -52,9 +52,9 @@ export const config = {
   // Timeouts and Limits
   timeouts: {
     conversation: parseInt(process.env.CONVERSATION_TIMEOUT) || 15 * 60 * 1000, // 15 minutes
-    search: parseInt(process.env.SEARCH_TIMEOUT) || 8000,
-    intent: parseInt(process.env.INTENT_TIMEOUT) || 10000,
-    response: parseInt(process.env.RESPONSE_TIMEOUT) || 15000,
+    search: parseInt(process.env.SEARCH_TIMEOUT) || 6000, // Reduced for faster response
+    intent: parseInt(process.env.INTENT_TIMEOUT) || 8000, // Reduced for faster response
+    response: parseInt(process.env.RESPONSE_TIMEOUT) || 10000, // Reduced for faster response
     call: parseInt(process.env.CALL_TIMEOUT) || 30 * 60 * 1000 // 30 minutes
   },
   
