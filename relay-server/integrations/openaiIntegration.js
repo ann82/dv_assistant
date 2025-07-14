@@ -154,14 +154,18 @@ export class OpenAIIntegration {
       speed = 1.0
     } = options;
 
+    const startTime = Date.now();
     try {
       this.logOperation('createTTS.start', {
         textLength: text.length,
+        textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
         voice,
         model,
         responseFormat,
-        speed
-      }, 'info', operationId);
+        speed,
+        apiKeyPrefix: this.config.apiKey ? this.config.apiKey.substring(0, 7) : 'none',
+        timestamp: new Date().toISOString()
+      }, 'debug', operationId);
 
       const response = await this.client.audio.speech.create({
         model,
@@ -172,33 +176,62 @@ export class OpenAIIntegration {
       });
 
       const audioBuffer = Buffer.from(await response.arrayBuffer());
+      const durationMs = Date.now() - startTime;
 
       this.logOperation('createTTS.success', {
         textLength: text.length,
         audioSize: audioBuffer.length,
         voice,
         model,
-        responseFormat
+        responseFormat,
+        durationMs,
+        timestamp: new Date().toISOString()
       }, 'info', operationId);
+
+      logger.debug('OpenAIIntegration.createTTS output', {
+        requestId: operationId,
+        audioSize: audioBuffer.length,
+        voice,
+        model,
+        responseFormat,
+        durationMs,
+        timestamp: new Date().toISOString()
+      });
 
       return audioBuffer;
     } catch (error) {
-      this.logOperation('createTTS.error', {
+      const durationMs = Date.now() - startTime;
+      // Enhanced error logging with full details
+      const errorDetails = {
         textLength: text.length,
+        textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
         voice,
         model,
+        responseFormat,
+        speed,
         error: error.message,
         errorCode: error.code,
-        errorStatus: error.status
-      }, 'error', operationId);
-
-      logger.error('TTS creation failed', {
-        textLength: text.length,
-        voice,
-        error: error.message,
-        code: error.code,
-        status: error.status,
-        requestId: operationId
+        errorStatus: error.status,
+        errorType: error.constructor.name,
+        stack: error.stack,
+        apiKeyPrefix: this.config.apiKey ? this.config.apiKey.substring(0, 7) : 'none',
+        durationMs,
+        timestamp: new Date().toISOString()
+      };
+      if (error.response) {
+        errorDetails.responseStatus = error.response.status;
+        errorDetails.responseData = error.response.data;
+        errorDetails.responseHeaders = error.response.headers;
+      }
+      if (error.request) {
+        errorDetails.requestMethod = error.request.method;
+        errorDetails.requestUrl = error.request.url;
+      }
+      this.logOperation('createTTS.error', errorDetails, 'error', operationId);
+      logger.error('TTS creation failed - Full Error Details:', {
+        ...errorDetails,
+        requestId: operationId,
+        timestamp: new Date().toISOString()
       });
       throw this.handleOpenAIError(error);
     }

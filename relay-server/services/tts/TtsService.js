@@ -61,6 +61,7 @@ export class TtsService extends BaseService {
    * @returns {Promise<Object>} TTS result with audio data
    */
   async generateSpeech(text, options = {}, metadata = {}) {
+    const startTime = Date.now();
     return this.processRequest(
       { text, options, metadata },
       'generate speech',
@@ -69,39 +70,98 @@ export class TtsService extends BaseService {
         if (!isNotEmpty(text)) {
           throw new Error('Text is required for TTS generation');
         }
-        
+
         const ttsOptions = {
           voice: options.voice || this.config.openai.voice,
           language: options.language || 'en-US',
           ...options
         };
-        
+
+        // Debug log input
+        this.logger.debug('TTSService.generateSpeech input', {
+          requestId: metadata.requestId,
+          callSid: metadata.callSid,
+          textLength: text.length,
+          textPreview: text.slice(0, 100),
+          ttsOptions,
+          timestamp: new Date().toISOString()
+        });
+
         // Check cache first
         const cacheKey = this.generateCacheKey(text, ttsOptions);
         const cachedResult = await this.getFromCache(cacheKey);
-        
+
         if (cachedResult) {
-          this.logOperation('cache hit', { 
+          this.logOperation('cache hit', {
             cacheKey: cacheKey.substring(0, 8),
+            filePath: `${this.config.cache.directory}/${cacheKey}.mp3`,
             ...metadata
+          }, 'debug');
+          this.logger.debug('TTSService cache hit', {
+            cacheKey,
+            filePath: `${this.config.cache.directory}/${cacheKey}.mp3`,
+            audioSize: cachedResult.audioBuffer?.length,
+            timestamp: new Date().toISOString()
           });
           return cachedResult;
         }
-        
-        this.logOperation('cache miss', { 
+
+        this.logOperation('cache miss', {
           cacheKey: cacheKey.substring(0, 8),
           ...metadata
+        }, 'debug');
+        this.logger.debug('TTSService cache miss', {
+          cacheKey,
+          timestamp: new Date().toISOString()
         });
-        
+
         // Generate speech using TTSIntegration with metadata
-        const result = await TTSIntegration.generateTTS(text, ttsOptions, metadata.requestId);
-        
-        // Cache result with metadata
-        if (this.config.cache.enabled) {
-          await this.addToCache(cacheKey, result, metadata);
+        try {
+          const ttsStart = Date.now();
+          const result = await TTSIntegration.generateTTS(text, ttsOptions, metadata.requestId);
+          const ttsDuration = Date.now() - ttsStart;
+
+          this.logger.debug('TTSService.generateSpeech TTS output', {
+            requestId: metadata.requestId,
+            callSid: metadata.callSid,
+            audioSize: result.audioBuffer?.length || result.audio?.length,
+            provider: result.provider,
+            ttsDurationMs: ttsDuration,
+            timestamp: new Date().toISOString()
+          });
+
+          // Cache result with metadata
+          if (this.config.cache.enabled) {
+            await this.addToCache(cacheKey, result, metadata);
+          }
+
+          const totalDuration = Date.now() - startTime;
+          this.logger.debug('TTSService.generateSpeech completed', {
+            requestId: metadata.requestId,
+            callSid: metadata.callSid,
+            totalDurationMs: totalDuration,
+            timestamp: new Date().toISOString()
+          });
+
+          return result;
+        } catch (ttsError) {
+          // Enhanced error logging for TTS integration failures
+          this.logger.error('TTS Integration failed - Detailed Error:', {
+            service: this.serviceName,
+            operation: 'generate speech',
+            textLength: text.length,
+            textPreview: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+            ttsOptions,
+            error: ttsError.message,
+            errorCode: ttsError.code,
+            errorStatus: ttsError.status,
+            stack: ttsError.stack,
+            requestId: metadata.requestId,
+            callSid: metadata.callSid,
+            timestamp: new Date().toISOString()
+          });
+          throw ttsError;
         }
-        
-        return result;
       }
     );
   }
@@ -131,34 +191,40 @@ export class TtsService extends BaseService {
     if (!this.config.cache.enabled) {
       return null;
     }
-    
     try {
       const cacheFile = path.join(this.config.cache.directory, `${cacheKey}.json`);
       const cacheData = await fs.readFile(cacheFile, 'utf8');
       const cached = JSON.parse(cacheData);
-      
       // Check if cache is still valid
       const age = Date.now() - new Date(cached.timestamp).getTime();
       if (age > this.config.cache.ttl) {
         await this.removeFromCache(cacheKey);
         return null;
       }
-      
       // Load audio file
       const audioFile = path.join(this.config.cache.directory, `${cacheKey}.mp3`);
       const audio = await fs.readFile(audioFile);
-      
       this.cacheStats.hits++;
       this.cacheStats.total++;
-      
+      this.logger.debug('TTSService.getFromCache loaded audio', {
+        cacheKey,
+        filePath: audioFile,
+        audioSize: audio.length,
+        timestamp: new Date().toISOString()
+      });
       return {
         ...cached,
-        audio: audio
+        audioBuffer: audio // Return as audioBuffer to match TTS integration format
       };
     } catch (error) {
       // Cache miss or error
       this.cacheStats.misses++;
       this.cacheStats.total++;
+      this.logger.debug('TTSService.getFromCache miss/error', {
+        cacheKey,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
       return null;
     }
   }
@@ -173,32 +239,46 @@ export class TtsService extends BaseService {
     if (!this.config.cache.enabled) {
       return;
     }
-    
     try {
       // Save metadata
       const cacheMetadata = {
         ...result,
         audio: undefined, // Don't save audio in metadata
+        audioBuffer: undefined, // Don't save audioBuffer in metadata
         timestamp: new Date().toISOString()
       };
-      
       const cacheFile = path.join(this.config.cache.directory, `${cacheKey}.json`);
       await fs.writeFile(cacheFile, JSON.stringify(cacheMetadata, null, 2));
-      
-      // Save audio file
+      // Save audio file - handle both audio and audioBuffer properties
       const audioFile = path.join(this.config.cache.directory, `${cacheKey}.mp3`);
-      await fs.writeFile(audioFile, result.audio);
-      
-      this.logOperation('cached', { 
-        cacheKey: cacheKey.substring(0, 8),
-        ...metadata
-      });
+      const audioData = result.audioBuffer || result.audio;
+      if (audioData) {
+        await fs.writeFile(audioFile, audioData);
+        this.logOperation('cached', {
+          cacheKey: cacheKey.substring(0, 8),
+          audioSize: audioData.length,
+          filePath: audioFile,
+          ...metadata
+        }, 'debug');
+        this.logger.debug('TTSService.addToCache wrote audio', {
+          cacheKey,
+          filePath: audioFile,
+          audioSize: audioData.length,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        this.logger.warn('No audio data to cache:', {
+          cacheKey: cacheKey.substring(0, 8),
+          resultKeys: Object.keys(result),
+          ...metadata
+        });
+      }
     } catch (error) {
       this.logger.warn('Failed to cache TTS result:', {
         error: error.message,
         cacheKey: cacheKey.substring(0, 8),
         textLength: result.text?.length || 0,
-        audioSize: result.audio?.length || 0,
+        audioSize: (result.audioBuffer || result.audio)?.length || 0,
         provider: result.provider || 'unknown',
         ...metadata
       });
