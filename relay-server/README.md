@@ -10,6 +10,7 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 - **New Intent: provide_location**: The system now recognizes when a user provides or updates their location (e.g., "I live in Oakland, California") and classifies it as `provide_location`.
 - **Improved Intent Classifier**: The LLM prompt and fallback logic have been updated to include and detect `provide_location`.
 - **Downstream Flow Update**: When a user provides their location, the system saves it in the conversation context and prompts the user for their needs (e.g., "Thank you for sharing your location. What kind of help are you looking for? For example: emergency housing, legal help, or counseling?"). The system will not proceed to resource search until the user specifies what kind of help they need.
+- **Stricter Location Extraction**: Feature-related phrases (e.g., "allows dogs and kids", "accepts pets", "hours", etc.) are never treated as locations. Follow-up queries about features will not overwrite the saved location in context. This is enforced by new test coverage.
 - **All tests pass** after these changes (472 passed, 10 skipped).
 
 ## 🆕 v1.22.13 Highlights
@@ -271,6 +272,7 @@ Processes text input for web interface.
 2. **Geocoding** - Only for ambiguous cases requiring validation
 3. **Context Reuse** - Use previous location from conversation context
 4. **Follow-up Handling** - Detect location statements in follow-ups
+5. **Stricter Feature Filtering** - Phrases about features (e.g., "allows dogs and kids", "accepts pets", "hours", etc.) are never treated as locations. Follow-up queries about features will not overwrite the saved location.
 
 #### Location Types
 
@@ -471,6 +473,7 @@ const location = await extractLocationWithAI(query); // Always expensive
 - Context-aware location follow-ups
 - Non-resource intent processing
 - Error condition handling
+- **Feature-related phrase rejection**: Queries like "allows dogs and kids" or "accepts pets" are never extracted as locations (covered by automated tests)
 
 ## 🎤 Welcome Message System
 

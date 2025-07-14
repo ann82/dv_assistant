@@ -341,6 +341,27 @@ describe('Enhanced Location Detector', () => {
     });
   });
 
+  describe('Feature-related phrase rejection', () => {
+    it('should not extract feature-related phrases as locations', () => {
+      const featureQueries = [
+        'Do you think this shows that allows dogs and kids?',
+        'Does this shelter accept pets?',
+        'Is this place pet friendly?',
+        'Do they allow children?',
+        'Can I bring my dog?',
+        'Are kids allowed?',
+        'Does it support wheelchair access?',
+        'What are their hours?',
+        'Is there a cost?',
+        'Do they offer Spanish language support?'
+      ];
+      for (const query of featureQueries) {
+        const result = extractLocationFromQuery(query);
+        expect(result.location).toBeNull();
+      }
+    });
+  });
+
   describe('detectLocationFallback', () => {
     it('should detect complete locations with state/province', () => {
       expect(detectLocationFallback('San Francisco, California')).toEqual({

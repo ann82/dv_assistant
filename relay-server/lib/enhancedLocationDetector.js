@@ -241,6 +241,7 @@ export function extractLocationFromQuery(query) {
   logger.info('extractLocationFromQuery DEBUG - Checking isFollowUpQuestion:', text);
   if (isFollowUpQuestion(text)) {
     logger.info('extractLocationFromQuery DEBUG - Found follow-up question, returning follow-up scope');
+    // Never update location for follow-up questions
     return { location: null, scope: 'follow-up' };
   }
 
@@ -266,13 +267,15 @@ export function extractLocationFromQuery(query) {
       logger.info('extractLocationFromQuery DEBUG - Pattern match found:', { pattern: pattern.toString(), location });
       // Clean the location
       const cleanLocation = cleanExtractedLocation(location);
-      if (cleanLocation) {
-        logger.info('extractLocationFromQuery DEBUG - Simple location extraction found:', { query, location: cleanLocation });
-        return {
-          location: cleanLocation,
-          scope: 'unknown'
-        };
+      // NEW: If the cleaned location contains feature-related words, reject it
+      if (!cleanLocation) {
+        continue;
       }
+      logger.info('extractLocationFromQuery DEBUG - Simple location extraction found:', { query, location: cleanLocation });
+      return {
+        location: cleanLocation,
+        scope: 'unknown'
+      };
     }
   }
 
@@ -411,7 +414,20 @@ function cleanExtractedLocation(location) {
     'could', 'should', 'may', 'might', 'must', 'shall', 'cannot',
     'any', 'but', 'want', 'to', 'get', 'of', 'with', 'that', 'what'
   ];
-  
+
+  // NEW: Feature-related words that should never be considered a location
+  const featureWords = [
+    'allows', 'shows', 'accepts', 'accept', 'let', 'permit', 'pets', 'pet', 'dogs', 'dog', 'cats', 'cat', 'kids', 'children', 'family', 'elders', 'seniors', 'wheelchair', 'accessible', 'support', 'offer', 'provide', 'service', 'services', 'policy', 'policies', 'cost', 'price', 'free', 'payment', 'insurance', 'hours', 'open', 'close', 'available', 'language', 'spanish', 'french', 'german', 'translator', 'interpreter', 'transportation', 'bus', 'train', 'car', 'drive', 'walk', 'distance', 'number', 'phone', 'contact', 'address'
+  ];
+
+  // If the location contains any feature-related word, reject it
+  const lowerCleaned = cleaned.toLowerCase();
+  for (const word of featureWords) {
+    if (lowerCleaned.includes(word)) {
+      return null;
+    }
+  }
+
   // FIXED: More aggressive filtering - if the location contains too many non-location words, reject it
   const words = cleaned.split(/\s+/);
   const nonLocationCount = words.filter(word => {
