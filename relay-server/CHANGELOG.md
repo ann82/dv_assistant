@@ -31,6 +31,11 @@ All notable changes to this project will be documented in this file.
   - **Solution**: Updated `extractLocation()` to use enhanced location detection logic that properly filters non-location words
   - **Impact**: System now properly follows intent-first processing: Intent → Context → Follow-up → Location (only if needed)
   - **Example**: "Yeah, I need shelter" no longer triggers geocoding of "Yeah" as a location
+- **CRITICAL: Early Location Validation Violation**: Fixed critical violation in routes/twilio.js where location validation was happening before intent classification
+  - **Root Cause**: `extractPotentialLocation()` was being called in the route before intent classification, causing "Yeah" to be geocoded as a location
+  - **Solution**: Removed the entire early location validation block (lines 381-610) that was violating intent-first processing
+  - **Impact**: System now strictly follows intent-first processing: Intent → Context → Follow-up → Location (only if needed)
+  - **Example**: "Yeah, I'm not an angel. Can you help me find shelter?" no longer triggers geocoding of "Yeah" as a location
 
 ### Changed
 - **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times

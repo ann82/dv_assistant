@@ -11,6 +11,11 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
   - **Root Cause**: Simple pattern matching was extracting non-location words like "Yeah" as locations
   - **Solution**: Enhanced location detection that properly filters non-location words and follows intent-first processing
   - **Impact**: System now strictly follows: Intent → Context → Follow-up → Location (only if needed)
+- **CRITICAL: Early Location Validation Fix**: Fixed critical violation in routes/twilio.js where location validation was happening before intent classification
+  - **Root Cause**: `extractPotentialLocation()` was being called in the route before intent classification, causing "Yeah" to be geocoded as a location
+  - **Solution**: Removed the entire early location validation block that was violating intent-first processing
+  - **Impact**: System now strictly follows intent-first processing: Intent → Context → Follow-up → Location (only if needed)
+  - **Example**: "Yeah, I'm not an angel. Can you help me find shelter?" no longer triggers geocoding of "Yeah" as a location
 - **Enhanced "Near Me" Detection**: Improved location detection to properly handle current location phrases
   - **Robust Phrase Matching**: Enhanced detection of "near me", "around me", "close to me", "my location", "here", etc.
   - **Exact Match Handling**: Special handling for exact matches like "me", "near me", "my location", "here"
