@@ -321,7 +321,26 @@ export function createTwilioController(handlerManager) {
     });
 
     try {
-      // Get conversation context FIRST (for follow-up questions)
+      // STEP 1: Always classify intent first
+      let intent = null;
+      try {
+        intent = await getIntent(speechResult);
+        logger.info('Classified intent', {
+          requestId,
+          callSid,
+          intent
+        });
+      } catch (intentError) {
+        logger.error('Error classifying intent:', {
+          requestId,
+          callSid,
+          error: intentError.message,
+          stack: intentError.stack
+        });
+        intent = 'general_information'; // Fallback intent
+      }
+
+      // STEP 2: Get conversation context for follow-up detection
       let context = null;
       try {
         context = callSid ? await handlerManager.getConversationContext(callSid) : null;
@@ -340,7 +359,7 @@ export function createTwilioController(handlerManager) {
         // Continue without context
       }
 
-      // Check for follow-up questions BEFORE intent classification
+      // STEP 3: Check for follow-up questions using context
       let followUpResponse = null;
       try {
         followUpResponse = context?.lastQueryContext ? await handleFollowUp(speechResult, context.lastQueryContext) : null;
@@ -392,62 +411,57 @@ export function createTwilioController(handlerManager) {
         return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
       }
 
-      // Get intent classification (only if not a follow-up)
-      let intent = null;
-      try {
-        intent = await getIntent(speechResult);
-        logger.info('Classified intent', {
+      // STEP 4: Only extract location if the intent is a location-seeking one
+      let location = null;
+      const locationSeekingIntents = ['find_shelter', 'legal_services', 'counseling_services', 'other_resources'];
+      const isLocationSeekingIntent = locationSeekingIntents.includes(intent);
+      
+      if (isLocationSeekingIntent) {
+        try {
+          location = await extractLocation(speechResult);
+          logger.info('Extracted location for location-seeking intent', {
+            requestId,
+            callSid,
+            intent,
+            location
+          });
+        } catch (locationError) {
+          logger.error('Error extracting location:', {
+            requestId,
+            callSid,
+            error: locationError.message,
+            stack: locationError.stack
+          });
+        }
+
+        // If no location found for location-seeking intent, generate location prompt
+        if (!location) {
+          logger.info('No location found for location-seeking intent, generating prompt:', {
+            requestId,
+            callSid,
+            intent,
+            speechResult
+          });
+          try {
+            return await generateLocationPrompt();
+          } catch (promptError) {
+            logger.error('Error generating location prompt:', {
+              requestId,
+              callSid,
+              error: promptError.message
+            });
+            return "I'd be happy to help you find shelter. Could you please tell me which city, state, and country you're looking for?";
+          }
+        }
+      } else {
+        logger.info('Skipping location extraction for non-location-seeking intent:', {
           requestId,
           callSid,
           intent
         });
-      } catch (intentError) {
-        logger.error('Error classifying intent:', {
-          requestId,
-          callSid,
-          error: intentError.message,
-          stack: intentError.stack
-        });
-        intent = 'general_information'; // Fallback intent
       }
 
-      // Extract location from speech input
-      let location = null;
-      try {
-        location = await extractLocation(speechResult);
-        logger.info('Extracted location', {
-          requestId,
-          callSid,
-          location
-        });
-      } catch (locationError) {
-        logger.error('Error extracting location:', {
-          requestId,
-          callSid,
-          error: locationError.message,
-          stack: locationError.stack
-        });
-      }
-
-      if (!location) {
-        logger.info('No location found in speech, generating prompt:', {
-          requestId,
-          callSid,
-          speechResult
-        });
-        try {
-          return await generateLocationPrompt();
-        } catch (promptError) {
-          logger.error('Error generating location prompt:', {
-            requestId,
-            callSid,
-            error: promptError.message
-          });
-          return "I'd be happy to help you find shelter. Could you please tell me which city, state, and country you're looking for?";
-        }
-      }
-
-      // Rewrite query with context for better search results
+      // STEP 5: Rewrite query with context for better search results
       let rewrittenQuery = null;
       try {
         rewrittenQuery = await rewriteQuery(speechResult, intent, callSid);
@@ -482,7 +496,7 @@ export function createTwilioController(handlerManager) {
         }
       }
 
-      // Call Tavily API with rewritten query
+      // STEP 6: Call Tavily API with rewritten query
       logger.info('Calling Tavily API:', {
         requestId,
         callSid,

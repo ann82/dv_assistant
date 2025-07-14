@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ResponseGenerator } from '../lib/response.js';
+import { removeSSML } from '../lib/ssmlTemplates.js';
 
 describe('Tavily Response Formatting', () => {
   it('should format response with resources', () => {
@@ -170,7 +171,7 @@ describe('Tavily Response Formatting', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', 'find shelter', 3);
       
       expect(formatted.shelters).toHaveLength(2);
-      expect(formatted.voiceResponse).toContain('I found 2 shelters');
+      expect(removeSSML(formatted.voiceResponse)).toContain('I found 2 resources');
       expect(formatted.smsResponse).toContain('Safe Haven');
       expect(formatted.smsResponse).toContain('Women\'S Crisis Center');
       const dvKeywords = ['domestic', 'violence', 'abuse', 'shelter', 'crisis', 'center', 'safe house'];
@@ -186,7 +187,7 @@ describe('Tavily Response Formatting', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', 'find shelter', 3);
       
       expect(formatted.shelters).toHaveLength(0);
-      expect(formatted.voiceResponse).toContain('I couldn\'t find any shelters');
+      expect(removeSSML(formatted.voiceResponse)).toContain('I couldn\'t find any shelters');
       expect(formatted.smsResponse).toContain('No shelters found');
       expect(formatted.summary).toContain('I\'m sorry, I couldn\'t find any specific resources');
     });
@@ -196,7 +197,7 @@ describe('Tavily Response Formatting', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', 'find shelter', 3);
       
       expect(formatted.shelters).toHaveLength(0);
-      expect(formatted.voiceResponse).toContain('I couldn\'t find any shelters');
+      expect(removeSSML(formatted.voiceResponse)).toContain('I couldn\'t find any shelters');
       expect(formatted.summary).toContain('I\'m sorry, I couldn\'t find any specific resources');
     });
 

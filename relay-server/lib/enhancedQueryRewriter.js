@@ -85,12 +85,10 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   const cleanedQuery = cleanConversationalFillers(query);
   logger.info('Cleaned query:', { original: query, cleaned: cleanedQuery, callSid });
 
-  // Step 2: Extract and validate location using enhanced geocoding
-  const locationInfo = await detectLocationWithGeocoding(cleanedQuery);
-  logger.info('Location detection result:', { locationInfo, callSid });
-
-  // Step 3: Get conversation context for enhanced query building
+  // Step 2: Get conversation context for enhanced query building
   let contextEnhancement = '';
+  let locationInfo = { location: null, isComplete: false, scope: 'none' };
+  
   if (callSid) {
     const context = getConversationContext(callSid);
     if (context) {
@@ -149,6 +147,23 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
         });
       }
     }
+  }
+
+  // Step 3: Only extract location if the intent is a location-seeking one
+  const locationSeekingIntents = ['find_shelter', 'legal_services', 'counseling_services', 'other_resources'];
+  const isLocationSeekingIntent = locationSeekingIntents.includes(intent);
+  
+  if (isLocationSeekingIntent && !locationInfo.location) {
+    // Only extract location if we don't already have one from context
+    try {
+      locationInfo = await detectLocationWithGeocoding(cleanedQuery);
+      logger.info('Location detection result for location-seeking intent:', { locationInfo, intent, callSid });
+    } catch (locationError) {
+      logger.error('Error detecting location in query rewriter:', locationError);
+      // Continue without location
+    }
+  } else if (!isLocationSeekingIntent) {
+    logger.info('Skipping location extraction for non-location-seeking intent in query rewriter:', { intent, callSid });
   }
 
   // Step 4: Build optimized search query

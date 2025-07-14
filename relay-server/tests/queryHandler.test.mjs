@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleUserQuery } from '../lib/queryHandler.js';
+import { removeSSML } from '../lib/ssmlTemplates.js';
 
 // Mock dependencies
 vi.mock('../lib/intentClassifier.js', () => ({
@@ -69,7 +70,7 @@ describe('Query Handler', () => {
     
     expect(result.source).toBe('tavily');
     // Since test data is filtered out, expect the fallback message
-    expect(result.response).toContain("I'm sorry, I couldn't find any shelters");
+    expect(removeSSML(result.response)).toContain("I searched for resources in that area, but I couldn't find any shelters");
 
     // Verify logging
     const { logQueryHandling } = await import('../lib/queryLogger.js');

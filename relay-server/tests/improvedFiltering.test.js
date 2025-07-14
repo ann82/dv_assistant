@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ResponseGenerator } from '../lib/response.js';
+import { removeSSML } from '../lib/ssmlTemplates.js';
 
 describe('Improved Tavily Response Filtering', () => {
   const mockGenericResults = {
@@ -101,7 +102,7 @@ describe('Improved Tavily Response Filtering', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
       
       expect(formatted.shelters).toHaveLength(2);
-      expect(formatted.voiceResponse).toContain("I found 2 shelters");
+      expect(removeSSML(formatted.voiceResponse)).toContain("I found 2 resources");
 
       formatted.shelters.forEach(shelter => {
         expect(
@@ -137,7 +138,7 @@ describe('Improved Tavily Response Filtering', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
       
       expect(formatted.shelters).toHaveLength(3);
-      expect(formatted.voiceResponse).toContain("I found 3 shelters");
+      expect(removeSSML(formatted.voiceResponse)).toContain("I found 3 resources");
       expect(formatted.shelters[0].name).toContain("Domestic Violence Shelter");
       expect(formatted.shelters[1].name).toContain("Domestic Violence Shelter");
       expect(formatted.shelters[2].name).toContain("Domestic Violence Shelter");
@@ -176,7 +177,7 @@ describe('Improved Tavily Response Filtering', () => {
       const formatted = ResponseGenerator.formatTavilyResponse(mockResponse, 'web', '', 3);
       
       expect(formatted.shelters).toHaveLength(2);
-      expect(formatted.voiceResponse).toContain("I found 2 shelters");
+      expect(removeSSML(formatted.voiceResponse)).toContain("I found 2 resources");
       expect(formatted.shelters[0].name).toContain("Domestic Violence Shelter");
       expect(formatted.shelters[1].name).toContain("Domestic Violence Shelter");
 

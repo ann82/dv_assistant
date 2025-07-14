@@ -551,47 +551,50 @@ export async function handleFollowUp(query, lastQueryContext) {
   let isLocationFollowUp = false;
   let locationData = null;
   
+  // Only attempt location extraction for resource requests that need location
+  // This follows the principle of only extracting location for location-seeking intents
   if (isResourceRequest && needsLocation) {
-    try {
-      // Try to geocode the query to see if it's a location
-      const { detectLocationWithGeocoding } = await import('./enhancedLocationDetector.js');
-      locationData = await detectLocationWithGeocoding(query);
-      
-      // If geocoding succeeds and returns a location, treat it as a location follow-up
-      if (locationData && locationData.location) {
-        isLocationFollowUp = true;
-        logger.info('Detected location follow-up via geocoding:', {
-          query,
-          location: locationData.location,
-          isComplete: locationData.isComplete,
-          lastIntent: lastQueryContext.intent,
-          needsLocation
-        });
-      }
-    } catch (error) {
-      logger.error('Error in location geocoding for follow-up detection:', error);
-    }
-  }
-  
-  // Additional check for location statements that might not be caught by geocoding
-  const locationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'];
-  const hasLocationKeywords = locationKeywords.some(keyword => lowerQuery.includes(keyword));
-  const isShortLocationStatement = query.trim().length <= 50 && hasLocationKeywords;
-  
-  if (isResourceRequest && needsLocation && isShortLocationStatement && !isLocationFollowUp) {
-    // Try to extract location using the enhanced detector
-    const { extractLocationFromQuery } = await import('./enhancedLocationDetector.js');
-    const extractedLocation = extractLocationFromQuery(query);
+    // First try simple pattern matching for location keywords
+    const locationKeywords = ['live in', 'live at', 'live near', 'live by', 'i live', 'i\'m in', 'i am in', 'located in', 'from', 'in', 'at', 'i\'m from', 'i am from', 'i live in', 'i\'m located in', 'i am located in'];
+    const hasLocationKeywords = locationKeywords.some(keyword => lowerQuery.includes(keyword));
+    const isShortLocationStatement = query.trim().length <= 50 && hasLocationKeywords;
     
-    if (extractedLocation && extractedLocation.location) {
-      isLocationFollowUp = true;
-      locationData = { location: extractedLocation.location, isComplete: true };
-      logger.info('Detected location follow-up via keyword matching:', {
-        query,
-        location: extractedLocation.location,
-        lastIntent: lastQueryContext.intent,
-        needsLocation
-      });
+    // Only use geocoding for ambiguous cases where pattern matching is unclear
+    if (isShortLocationStatement) {
+      try {
+        // Try to extract location using the enhanced detector first (faster)
+        const { extractLocationFromQuery } = await import('./enhancedLocationDetector.js');
+        const extractedLocation = extractLocationFromQuery(query);
+        
+        if (extractedLocation && extractedLocation.location) {
+          isLocationFollowUp = true;
+          locationData = { location: extractedLocation.location, isComplete: true };
+          logger.info('Detected location follow-up via pattern matching:', {
+            query,
+            location: extractedLocation.location,
+            lastIntent: lastQueryContext.intent,
+            needsLocation
+          });
+        } else {
+          // Fall back to geocoding only for ambiguous cases
+          const { detectLocationWithGeocoding } = await import('./enhancedLocationDetector.js');
+          locationData = await detectLocationWithGeocoding(query);
+          
+          // If geocoding succeeds and returns a location, treat it as a location follow-up
+          if (locationData && locationData.location) {
+            isLocationFollowUp = true;
+            logger.info('Detected location follow-up via geocoding (ambiguous case):', {
+              query,
+              location: locationData.location,
+              isComplete: locationData.isComplete,
+              lastIntent: lastQueryContext.intent,
+              needsLocation
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('Error in location extraction for follow-up detection:', error);
+      }
     }
   }
   

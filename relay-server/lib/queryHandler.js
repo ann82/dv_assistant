@@ -35,11 +35,47 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
     const cleanQuery = query.trim();
     logger.info('Processing user query:', { query: cleanQuery });
 
-    // Step 1: Get intent
+    // STEP 1: Always classify intent first
     const intent = await getIntent(cleanQuery);
     logger.info('Intent classification:', { query: cleanQuery, intent });
 
-    // Step 2: Rewrite query based on intent using enhanced query rewriter
+    // STEP 2: Get conversation context for follow-up detection
+    let context = null;
+    if (callSid) {
+      try {
+        const { getConversationContext } = await import('./intentClassifier.js');
+        context = getConversationContext(callSid);
+        logger.info('Retrieved conversation context for query handler:', { callSid, context: !!context });
+      } catch (contextError) {
+        logger.error('Error getting conversation context in query handler:', contextError);
+        // Continue without context
+      }
+    }
+
+    // STEP 3: Check for follow-up questions using context
+    let followUpResponse = null;
+    if (context?.lastQueryContext) {
+      try {
+        const { handleFollowUp } = await import('./intentClassifier.js');
+        followUpResponse = await handleFollowUp(cleanQuery, context.lastQueryContext);
+        logger.info('Follow-up question check in query handler:', { isFollowUp: !!followUpResponse });
+      } catch (followUpError) {
+        logger.error('Error checking follow-up in query handler:', followUpError);
+        // Continue without follow-up handling
+      }
+    }
+
+    // If this is a follow-up question, handle it directly
+    if (followUpResponse) {
+      logger.info('Processing follow-up response in query handler:', {
+        followUpType: followUpResponse.type,
+        hasResults: !!followUpResponse.results,
+        resultCount: followUpResponse.results?.length || 0
+      });
+      return { response: followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available', source: 'follow-up' };
+    }
+
+    // STEP 4: Rewrite query based on intent using enhanced query rewriter
     const rewrittenQuery = await rewriteQuery(cleanQuery, intent);
     logger.info('Query rewritten:', { 
       original: cleanQuery,
@@ -59,10 +95,19 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
 
     const cleanRewrittenQuery = rewrittenQuery.trim();
 
-    // Step 3: Extract location for enhanced search
-    const location = ResponseGenerator.extractLocationFromQuery(cleanRewrittenQuery);
+    // STEP 5: Only extract location if the intent is a location-seeking one
+    let location = null;
+    const locationSeekingIntents = ['find_shelter', 'legal_services', 'counseling_services', 'other_resources'];
+    const isLocationSeekingIntent = locationSeekingIntents.includes(intent);
+    
+    if (isLocationSeekingIntent) {
+      location = ResponseGenerator.extractLocationFromQuery(cleanRewrittenQuery);
+      logger.info('Extracted location for location-seeking intent:', { intent, location });
+    } else {
+      logger.info('Skipping location extraction for non-location-seeking intent:', { intent });
+    }
 
-    // Step 4: Get Tavily results using SearchIntegration
+    // STEP 6: Get Tavily results using SearchIntegration
     const searchResult = await SearchIntegration.search(cleanRewrittenQuery);
     
     if (!searchResult.success) {
@@ -98,7 +143,7 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
       return { response: gptResponse, source: 'gpt' };
     }
 
-    // Step 5: Rerank results
+    // Step 7: Rerank results
     const rerankedResults = await rerankByRelevance(cleanRewrittenQuery, tavilyData.results);
     const topScore = rerankedResults[0]?.relevanceScore || 0;
     
@@ -121,7 +166,7 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
       return { response: gptResponse, source: 'gpt' };
     }
 
-    // Step 6: Format Tavily response
+    // Step 8: Format Tavily response
     const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', cleanQuery, 3);
     
     // Log query handling

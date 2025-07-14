@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ResponseGenerator } from '../lib/response.js';
+import { removeSSML } from '../lib/ssmlTemplates.js';
 
 describe('ResponseGenerator (real formatTavilyResponse implementation)', () => {
   beforeEach(async () => {
@@ -20,7 +21,7 @@ describe('ResponseGenerator (real formatTavilyResponse implementation)', () => {
 
     expect(formatted).toBeDefined();
     expect(formatted.voiceResponse).toBeDefined();
-    expect(formatted.voiceResponse).toContain("I found Women's Crisis Shelter:");
+    expect(removeSSML(formatted.voiceResponse)).toContain("The Women's Crisis Shelter is located at");
     expect(formatted.voiceResponse).toContain("408-280-8800");
     expect(formatted.smsResponse).toContain("408-280-8800");
     expect(formatted.shelters).toHaveLength(1);
@@ -41,7 +42,7 @@ describe('ResponseGenerator (real formatTavilyResponse implementation)', () => {
 
     expect(formatted).toBeDefined();
     expect(formatted.voiceResponse).toBeDefined();
-    expect(formatted.voiceResponse).toContain("I'm sorry, I couldn't find any shelters");
+    expect(removeSSML(formatted.voiceResponse)).toContain("I searched for resources in unknown location, but I couldn't find any shelters");
     expect(formatted.shelters).toHaveLength(0);
   });
 }); 

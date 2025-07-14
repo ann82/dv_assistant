@@ -26,6 +26,16 @@ import { getEnhancedVoiceInstructions } from './conversationContextBuilder.js';
 import { SearchIntegration } from '../integrations/searchIntegration.js';
 import { getIntent } from './intentClassifier.js';
 import { OpenAIIntegration } from '../integrations/openaiIntegration.js';
+import { 
+  applySSMLTemplate, 
+  isSSML, 
+  removeSSML,
+  locationTemplates,
+  resourceTemplates,
+  followUpTemplates,
+  errorTemplates,
+  conversationTemplates
+} from './ssmlTemplates.js';
 
 const openAIIntegration = new OpenAIIntegration();
 
@@ -596,7 +606,7 @@ export class ResponseGenerator {
     // Always return a defined object for null/undefined input
     if (tavilyResponse == null) {
       return {
-        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+        voiceResponse: errorTemplates.generalError(),
         smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
         summary: "I'm sorry, I couldn't find any specific resources.",
         shelters: []
@@ -612,10 +622,15 @@ export class ResponseGenerator {
         const phone = phoneMatch ? phoneMatch[1] : null;
         const orgMatch = answer.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:'s)?(?:\s+[A-Z][a-z]+)*)\s+(?:provides|operates|offers|supports)/);
         const orgName = orgMatch ? orgMatch[1] : "Women's Crisis Shelter";
-        let voiceResponse = `I found ${orgName}: ${answer}`;
-        if (phone) {
-          voiceResponse += `. You can call them at ${phone}`;
-        }
+        
+        // Use SSML template for single resource found
+        const resourceDetails = {
+          address: 'Address not available',
+          phone: phone,
+          petFriendly: false
+        };
+        const voiceResponse = resourceTemplates.shelterInfo(orgName, resourceDetails);
+        
         let smsResponse = phone ? 
           `${answer} Phone: ${phone}` : 
           answer;
@@ -635,10 +650,10 @@ export class ResponseGenerator {
         };
       }
       
-      
-      // If no answer field or empty answer, return the default no results message
+      // If no answer field or empty answer, return the default no results message using SSML
+      const location = this.extractLocationFromQuery(userQuery);
       return {
-        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+        voiceResponse: locationTemplates.noResourcesFound(location || 'that area'),
         smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
         summary: "I'm sorry, I couldn't find any specific resources.",
         shelters: []
@@ -706,11 +721,11 @@ export class ResponseGenerator {
       };
     }
 
-
     // If no results after processing and no answer, return default message
     if (processedResults.length === 0) {
+      const location = this.extractLocationFromQuery(userQuery);
       return {
-        voiceResponse: "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+        voiceResponse: locationTemplates.noResourcesFound(location || 'that area'),
         smsResponse: "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
         summary: "I'm sorry, I couldn't find any specific resources.",
         shelters: []
@@ -744,7 +759,7 @@ export class ResponseGenerator {
 
     // Return the processed results
     return {
-      voiceResponse: voiceResponse || "I'm sorry, I couldn't find any shelters. Would you like me to search for resources in a different location?",
+      voiceResponse: voiceResponse || locationTemplates.noResourcesFound(location || 'that area'),
       smsResponse: smsResponse || "No shelters found in that area. Please try a different location or contact the National Domestic Violence Hotline at 1-800-799-7233.",
       summary: summary || "I'm sorry, I couldn't find any specific resources.",
       shelters: shelters || []
@@ -1000,26 +1015,34 @@ export class ResponseGenerator {
     }
     
     if (results.length === 0) {
-      return `${contextPrefix}I'm sorry, I couldn't find any shelters${locationText}. I understand this can be frustrating, and I want to help. Would you like me to search for resources in a different location, or would you prefer to call the National Domestic Violence Hotline at 1-800-799-7233 for immediate assistance?`;
+      // Use SSML template for no results found
+      return locationTemplates.noResourcesFound(location || 'that area');
     }
 
-    let voiceResponse = `${contextPrefix}I found ${results.length} shelter${results.length > 1 ? 's' : ''}${locationText}: `;
+    // Use SSML template for resources found
+    const count = results.length;
+    const locationName = location || 'your area';
+    let voiceResponse = locationTemplates.resourcesFound(count, locationName);
     
+    // Add individual resource information
     results.forEach((result, index) => {
       const title = this.cleanTitleForVoice(result.processedTitle || result.title);
       const phone = this.extractPhone(result.content);
+      const address = result.physicalAddress || 'Address not available';
       
-      voiceResponse += `${index + 1}. ${title}`;
-      if (phone) {
-        voiceResponse += `. Phone number: ${phone}`;
-      }
-      if (result.physicalAddress) {
-        voiceResponse += `. Address: ${result.physicalAddress}`;
-      }
-      voiceResponse += '. ';
+      // Create resource details using SSML template
+      const resourceDetails = {
+        address: address,
+        phone: phone,
+        petFriendly: result.content?.toLowerCase().includes('pet') || false
+      };
+      
+      voiceResponse += resourceTemplates.shelterInfo(title, resourceDetails);
     });
 
-    voiceResponse += 'Would you like me to send you the complete details via text message?';
+    // Add follow-up question using SSML template
+    voiceResponse += followUpTemplates.contactInfoFollowUp();
+    
     return voiceResponse;
   }
 
