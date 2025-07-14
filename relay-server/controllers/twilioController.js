@@ -55,7 +55,7 @@ export function createTwilioController(handlerManager) {
   if (!call) {
     logControllerOperation('handleSMSConsent.error', { CallSid, error: 'No active call found', requestId }, 'error');
     logger.error(`No active call found for CallSid: ${CallSid}`);
-    const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+    const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false, null);
     const twimlResponse = new (await import('twilio')).twiml.VoiceResponse();
     const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
     if (audioUrl) {
@@ -87,7 +87,7 @@ export function createTwilioController(handlerManager) {
     "Thank you. You will receive a text message with the summary and resources shortly." :
     "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.";
   
-  const twiml = await handlerManager.generateTTSBasedTwiML(finalMessage, false);
+  const twiml = await handlerManager.generateTTSBasedTwiML(finalMessage, false, null);
   // Create a new TwiML response with hangup
   const twimlResponse = new (await import('twilio')).twiml.VoiceResponse();
   const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
@@ -121,7 +121,7 @@ export function createTwilioController(handlerManager) {
     if (!call) {
       logControllerOperation('handleConsent.error', { CallSid, error: 'No active call found', requestId }, 'error');
       logger.error(`No active call found for CallSid: ${CallSid}`);
-      const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+      const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false, null);
       const twimlResponse = new (await import('twilio')).twiml.VoiceResponse();
       const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
       if (audioUrl) {
@@ -152,7 +152,7 @@ export function createTwilioController(handlerManager) {
       "Thank you. You will receive a text message with the summary and resources shortly." :
       "Thank you for reaching out. You're not alone, and help is always available. Take care and stay safe.";
     
-    const twiml = await handlerManager.generateTTSBasedTwiML(finalMessage, false);
+    const twiml = await handlerManager.generateTTSBasedTwiML(finalMessage, false, null);
     
     // Create a new TwiML response with hangup
     const twimlResponse = new (await import('twilio')).twiml.VoiceResponse();
@@ -173,7 +173,7 @@ export function createTwilioController(handlerManager) {
   } catch (error) {
     logControllerOperation('handleConsent.error', { CallSid, error: error.message, requestId }, 'error');
     logger.error('Error processing consent response:', error);
-    const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false);
+    const twiml = await handlerManager.generateTTSBasedTwiML("I'm sorry, I encountered an error. The call will now end.", false, null);
     const twimlResponse = new (await import('twilio')).twiml.VoiceResponse();
     const audioUrl = twiml.match(/<Play>([^<]+)<\/Play>/)?.[1];
     if (audioUrl) {

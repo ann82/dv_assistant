@@ -471,8 +471,8 @@ if (process.env.NODE_ENV !== 'test') {
     });
   });
   
-  // Start the server after test routes are mounted
-  startServer();
+  // Don't start the server in test environment - just set up routes
+  logger.info('Test environment: Routes mounted, server not started');
 }
 
 /**

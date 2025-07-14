@@ -285,7 +285,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       };
       
       twiml = await Promise.race([
-        handlerManager.generateTTSBasedTwiML(response, !shouldEndCall, metadata),
+        handlerManager.generateTTSBasedTwiML(response, !shouldEndCall, null, metadata),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('TwiML generation timeout')), 12000)
         )
