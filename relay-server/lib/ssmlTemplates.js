@@ -403,6 +403,28 @@ export function removeSSML(ssmlText) {
     .trim();
 }
 
+/**
+ * Remove SSML tags from text for TTS processing
+ * @param {string} ssmlText - Text containing SSML tags
+ * @returns {string} Plain text without SSML tags
+ */
+export function stripSSMLForTTS(ssmlText) {
+  if (!ssmlText || typeof ssmlText !== 'string') {
+    return ssmlText;
+  }
+  
+  // Remove SSML tags but preserve the text content
+  return ssmlText
+    .replace(/<speak[^>]*>/gi, '') // Remove opening speak tag
+    .replace(/<\/speak>/gi, '') // Remove closing speak tag
+    .replace(/<prosody[^>]*>/gi, '') // Remove opening prosody tag
+    .replace(/<\/prosody>/gi, '') // Remove closing prosody tag
+    .replace(/<break[^>]*>/gi, ' ') // Replace break tags with spaces
+    .replace(/<[^>]*>/g, '') // Remove any other XML tags
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+}
+
 export default {
   emergencyTemplates,
   welcomeTemplates,
@@ -413,5 +435,6 @@ export default {
   conversationTemplates,
   applySSMLTemplate,
   isSSML,
-  removeSSML
+  removeSSML,
+  stripSSMLForTTS
 }; 

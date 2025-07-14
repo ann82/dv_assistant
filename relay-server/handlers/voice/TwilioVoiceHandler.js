@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { getLanguageConfig, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../lib/languageConfig.js';
 import logger from '../../lib/logger.js';
+import { stripSSMLForTTS } from '../../lib/ssmlTemplates.js';
 
 // Get validateRequest from twilio package
 const { validateRequest: twilioValidateRequest } = twilio;
@@ -575,18 +576,25 @@ export class TwilioVoiceHandler extends BaseHandler {
     const startTime = Date.now();
     try {
       // Handle undefined or null text
-      const safeText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
-
-              this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML input', {
-          requestId: metadata.requestId,
-          callSid: metadata.callSid,
-          textLength: safeText.length,
-          textPreview: safeText.slice(0, 100),
-          shouldGather,
-          languageCode: finalLanguageCode,
-          ...metadata,
-          timestamp: new Date().toISOString()
-        });
+      const inputText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
+      
+      // Clean and prepare text for TTS
+      const safeText = this.escapeXML(inputText);
+      
+      // Strip SSML tags for TTS processing since TTS services expect plain text
+      const plainTextForTTS = stripSSMLForTTS(safeText);
+      
+      this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML TTS input', {
+        requestId: metadata.requestId,
+        callSid: metadata.callSid,
+        originalText: text,
+        safeText: safeText,
+        plainTextForTTS: plainTextForTTS,
+        textLength: text?.length || 0,
+        shouldGather,
+        languageCode: finalLanguageCode,
+        timestamp: new Date().toISOString()
+      });
 
       // Use TTS service to generate audio with metadata
       const ttsStart = Date.now();
@@ -594,11 +602,11 @@ export class TwilioVoiceHandler extends BaseHandler {
         language: finalLanguageCode,
         voice: this._getLanguageConfig(finalLanguageCode)?.voice || 'nova'
       };
-      // Use a shorter timeout for TTS generation to reduce delays
+      // Use a longer timeout for TTS generation to handle SSML with x-slow rate and pauses
       const ttsResponse = await Promise.race([
-        this.services.tts.generateSpeech(safeText, ttsOptions, metadata),
+        this.services.tts.generateSpeech(plainTextForTTS, ttsOptions, metadata),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TTS timeout')), 6000)
+          setTimeout(() => reject(new Error('TTS timeout')), 15000)
         )
       ]);
       const ttsDuration = Date.now() - ttsStart;
@@ -689,7 +697,7 @@ export class TwilioVoiceHandler extends BaseHandler {
           ...metadata,
           timestamp: new Date().toISOString()
         });
-        const fallbackTwiml = this.generateTwiML(safeText, shouldGather, finalLanguageCode);
+        const fallbackTwiml = this.generateTwiML(inputText, shouldGather, finalLanguageCode);
         this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML Fallback TwiML XML', {
           requestId: metadata.requestId,
           callSid: metadata.callSid,
@@ -709,7 +717,8 @@ export class TwilioVoiceHandler extends BaseHandler {
         timestamp: new Date().toISOString()
       });
       // Fallback to regular TwiML
-      const fallbackTwiml = this.generateTwiML(text, shouldGather, finalLanguageCode);
+      const fallbackText = text || 'I\'m sorry, I didn\'t understand. Please try again.';
+      const fallbackTwiml = this.generateTwiML(fallbackText, shouldGather, finalLanguageCode);
       this.logger.debug('TwilioVoiceHandler.generateTTSBasedTwiML Error Fallback TwiML XML', {
         requestId: metadata.requestId,
         callSid: metadata.callSid,
