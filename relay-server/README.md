@@ -1,4 +1,4 @@
-# Relay Server
+# Domestic Violence Assistant Relay Server
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
@@ -615,3 +615,64 @@ TWILIO_AUTH_TOKEN=your_twilio_token
 2. **API Key Security** - Secure API key storage
 3. **Error Handling** - Don't expose sensitive information in errors
 4. **Rate Limiting** - Prevent abuse and DoS attacks
+
+## Minimal Conversation Context & LLM Prompt Usage
+
+### Minimal Context Structure
+
+The system now stores only the minimal, relevant context needed for follow-ups and user experience:
+- `lastIntent`: The last detected intent.
+- `lastQuery`: The last user query.
+- `location`: The most recent location (from the current or previous context).
+- `needsLocation`: Boolean if the last query needed a location.
+- `results`: Top 1–3 summarized results (title, url, score, short content, phoneNumbers, addresses).
+- `recentSummary`: A short summary of the last 2 turns (intent + short query).
+- (Optionally extracted) `familyConcerns`, `emotionalTone` for empathy and resource matching.
+
+This keeps the context small, fast, and focused, while still supporting rich, contextual follow-ups.
+
+### How to Use in LLM Prompts
+
+Use the helper functions in `lib/llmContextUsage.js` to generate LLM prompts with the minimal context:
+
+```js
+import { createLLMPromptWithOptimizedContext } from './lib/llmContextUsage.js';
+
+const { systemPrompt, userMessage, context } = createLLMPromptWithOptimizedContext(callSid, userQuery);
+
+// Use systemPrompt and userMessage as your LLM input:
+const llmResponse = await openai.createChatCompletion({
+  model: 'gpt-3.5-turbo',
+  messages: [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage }
+  ]
+});
+```
+
+### Benefits
+- **Efficient:** Only stores what is needed for follow-ups and user experience.
+- **Contextual:** Supports rich, personalized, and continuous conversations.
+- **Safe:** Avoids storing or sending large blobs, raw HTML, or unnecessary PII.
+- **Tested:** All logic is covered by automated tests in `tests/llmContextUsage.test.js` and `tests/contextSizeReduction.test.js`.
+
+### Example System Prompt
+```
+You are a helpful assistant for domestic violence support.
+
+CONVERSATION CONTEXT:
+- Recent Activity: find shelter: "I need a shelter in Austin"
+- Current Location: Austin
+- Last Intent: find_shelter
+- Family Concerns: pets
+- Emotional Tone: urgent
+
+INSTRUCTIONS:
+- Use the location for resource searches if available
+- Reference previous conversation when relevant
+- Show empathy based on emotional tone indicators
+- Consider family concerns (pets, children, elders) in recommendations
+- If this is a follow-up question, use the context to provide continuity
+```
+
+See `lib/llmContextUsage.js` for more details and usage patterns.

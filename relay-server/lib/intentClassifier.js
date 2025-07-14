@@ -21,7 +21,6 @@ export function updateConversationContext(callSid, intent, query, response, tavi
       history: [],
       lastIntent: null,
       lastQuery: null,
-      lastResponse: null,
       lastQueryContext: null
     });
   }
@@ -30,156 +29,70 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   context.history.push({
     intent,
     query,
-    response,
     timestamp: new Date().toISOString()
   });
-  
-  // Keep only last 5 interactions
-  if (context.history.length > 5) {
+  // Keep only last 2 interactions for summary
+  if (context.history.length > 2) {
     context.history.shift();
   }
 
   context.lastIntent = intent;
   context.lastQuery = query;
-  context.lastResponse = response;
 
-  // Update lastQueryContext with structured data for follow-ups
+  // Helper: summarize results
+  const summarizeResults = (results) => {
+    if (!results || !Array.isArray(results)) return [];
+    return results.slice(0, 3).map(result => ({
+      title: result.title || '',
+      url: result.url || '',
+      score: result.score || 0,
+      content: result.content ? result.content.substring(0, 120) + (result.content.length > 120 ? '...' : '') : '',
+      phoneNumbers: result.extracted_phone_numbers || [],
+      addresses: result.extracted_addresses || []
+    }));
+  };
+
+  // Helper: build recent summary
+  const buildRecentSummary = (history) => {
+    return history.map(h => {
+      const intent = h.intent?.replace('_', ' ') || 'general';
+      const q = h.query?.substring(0, 40) || 'no query';
+      return `${intent}: "${q}"`;
+    }).join(' | ');
+  };
+
+  // Extract location
   let location = extractLocationFromQuery(query);
   if (location) location = toTitleCase(location);
-  
-  // Debug logging for location extraction
-  logger.info('Location extraction in updateConversationContext:', {
-    callSid,
-    query,
-    extractedLocation: location,
-    intent,
-    hasLastQueryContext: !!context.lastQueryContext
-  });
-  
-  // Case 1: We have Tavily results - always update context with results
+
+  // Determine needsLocation
+  const needsLocation = !location && isResourceQuery(intent);
+
+  // Summarize results if present
+  let summarizedResults = [];
   if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
-    context.lastQueryContext = {
-      intent: intent,
-      location: location,
-      results: tavilyResults.results.slice(0, 3), // Top 3 results
-      timestamp: Date.now(),
-      smsResponse: response.smsResponse || null,
-      voiceResponse: response.voiceResponse || null,
-      needsLocation: !location && isResourceQuery(intent),
-      lastQuery: query
-    };
-  }
-  // Case 2: Resource query without results - preserve or create context
-  else if (isResourceQuery(intent)) {
-    // If we have a previous context that needs location and current query doesn't provide one, preserve it
-    if (context.lastQueryContext && context.lastQueryContext.needsLocation && !location) {
-      // Update timestamp but keep the context for location follow-up
-      context.lastQueryContext.timestamp = Date.now();
-      context.lastQueryContext.lastQuery = query;
-    }
-    // If we have location but no results, create context with location
-    else if (location) {
-      context.lastQueryContext = {
-        intent: intent,
-        location: location,
-        results: [],
-        timestamp: Date.now(),
-        smsResponse: response.smsResponse || null,
-        voiceResponse: response.voiceResponse || null,
-        needsLocation: false,
-        lastQuery: query
-      };
-    }
-    // If no location and no previous context, create context that needs location
-    else if (!context.lastQueryContext) {
-      context.lastQueryContext = {
-        intent: intent,
-        location: null,
-        results: [],
-        timestamp: Date.now(),
-        smsResponse: response.smsResponse || null,
-        voiceResponse: response.voiceResponse || null,
-        needsLocation: true,
-        lastQuery: query
-      };
-    }
-    // Otherwise, update timestamp of existing context
-    else {
-      context.lastQueryContext.timestamp = Date.now();
-      context.lastQueryContext.lastQuery = query;
-    }
-  }
-  // Case 3: Follow-up with matched result - update existing context
-  else if (matchedResult && context.lastQueryContext) {
-    context.lastQueryContext.focusResultTitle = cleanResultTitle(matchedResult.title);
-    context.lastQueryContext.matchedResult = matchedResult;
-    context.lastQueryContext.timestamp = Date.now(); // Refresh timestamp
-  }
-  // Case 4: Non-resource query - preserve context if it exists, don't clear it
-  else if (context.lastQueryContext) {
-    // Update timestamp to keep context alive
-    context.lastQueryContext.timestamp = Date.now();
-    context.lastQueryContext.lastQuery = query;
-    // NEW: If a location is detected, update or create lastQueryContext with the new location
-    if (location) {
-      context.lastQueryContext.location = location;
-      context.lastQueryContext.intent = intent;
-      context.lastQueryContext.lastQuery = query;
-      // If results are not present, ensure it's an empty array
-      if (!context.lastQueryContext.results) {
-        context.lastQueryContext.results = [];
-      }
-      // If context was previously missing, fill in minimal fields
-      if (!context.lastQueryContext.timestamp) {
-        context.lastQueryContext.timestamp = Date.now();
-      }
-    }
-  }
-  // NEW: If there is no lastQueryContext but a location is detected, create a minimal context
-  else if (location) {
-    logger.info('Creating new lastQueryContext with location:', {
-      callSid,
-      intent,
-      location,
-      query
-    });
-    context.lastQueryContext = {
-      intent: intent,
-      location: location,
-      results: [],
-      timestamp: Date.now(),
-      smsResponse: response.smsResponse || null,
-      voiceResponse: response.voiceResponse || null,
-      needsLocation: false,
-      lastQuery: query
-    };
-  }
-  // NEW: If no lastQueryContext and no location, create a basic context for non-resource queries
-  else {
-    logger.info('Creating new lastQueryContext without location:', {
-      callSid,
-      intent,
-      query
-    });
-    context.lastQueryContext = {
-      intent: intent,
-      location: null,
-      results: [],
-      timestamp: Date.now(),
-      smsResponse: response.smsResponse || null,
-      voiceResponse: response.voiceResponse || null,
-      needsLocation: false,
-      lastQuery: query
-    };
+    summarizedResults = summarizeResults(tavilyResults.results);
   }
 
-  logger.info('Updated conversation context:', {
+  // Build minimal context
+  context.lastQueryContext = {
+    lastIntent: intent,
+    lastQuery: query,
+    location: location || (context.lastQueryContext?.location ?? null),
+    needsLocation,
+    results: summarizedResults,
+    recentSummary: buildRecentSummary(context.history)
+  };
+
+  // If no new results, preserve previous results for follow-up
+  if (summarizedResults.length === 0 && context.lastQueryContext && context.lastQueryContext.results) {
+    context.lastQueryContext.results = context.lastQueryContext.results;
+  }
+
+  // Log for debug
+  logger.info('Updated minimal conversation context:', {
     callSid,
-    intent,
-    historyLength: context.history.length,
-    hasLastQueryContext: !!context.lastQueryContext,
-    focusResultTitle: context.lastQueryContext?.focusResultTitle || null,
-    needsLocation: context.lastQueryContext?.needsLocation || false
+    context: context.lastQueryContext
   });
 }
 
@@ -219,10 +132,65 @@ export function getConversationContext(callSid) {
 }
 
 export function clearConversationContext(callSid) {
-  conversationContexts.delete(callSid);
-  logger.info('Cleared conversation context for call:', callSid);
+  if (conversationContexts.has(callSid)) {
+    conversationContexts.delete(callSid);
+    logger.info('Cleared conversation context for callSid:', callSid);
+  }
 }
 
+/**
+ * Clean up old conversation contexts to prevent memory bloat
+ * @param {number} maxAgeMs - Maximum age in milliseconds (default: 30 minutes)
+ * @param {number} maxContexts - Maximum number of contexts to keep (default: 100)
+ */
+export function cleanupOldConversationContexts(maxAgeMs = 30 * 60 * 1000, maxContexts = 100) {
+  const now = Date.now();
+  const toDelete = [];
+  
+  // Find contexts to delete
+  for (const [callSid, context] of conversationContexts.entries()) {
+    const lastActivity = context.lastQueryContext?.timestamp || 
+                        (context.history.length > 0 ? new Date(context.history[context.history.length - 1].timestamp).getTime() : 0);
+    
+    if (now - lastActivity > maxAgeMs) {
+      toDelete.push(callSid);
+    }
+  }
+  
+  // Delete old contexts
+  toDelete.forEach(callSid => {
+    conversationContexts.delete(callSid);
+  });
+  
+  // If we still have too many contexts, delete the oldest ones
+  if (conversationContexts.size > maxContexts) {
+    const contextsArray = Array.from(conversationContexts.entries());
+    contextsArray.sort((a, b) => {
+      const aTime = a[1].lastQueryContext?.timestamp || 0;
+      const bTime = b[1].lastQueryContext?.timestamp || 0;
+      return aTime - bTime;
+    });
+    
+    const excessCount = contextsArray.length - maxContexts;
+    for (let i = 0; i < excessCount; i++) {
+      conversationContexts.delete(contextsArray[i][0]);
+    }
+  }
+  
+  if (toDelete.length > 0 || conversationContexts.size > maxContexts) {
+    logger.info('Cleaned up conversation contexts:', {
+      deletedCount: toDelete.length,
+      remainingCount: conversationContexts.size,
+      maxAgeMs: Math.round(maxAgeMs / 1000) + 's',
+      maxContexts
+    });
+  }
+}
+
+// Set up periodic cleanup every 10 minutes
+setInterval(() => {
+  cleanupOldConversationContexts();
+}, 10 * 60 * 1000);
 
 
 /**

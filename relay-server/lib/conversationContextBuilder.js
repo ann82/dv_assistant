@@ -2,7 +2,128 @@ import { getConversationContext } from './intentClassifier.js';
 import logger from './logger.js';
 
 /**
- * Build dynamic conversation context for voice instructions
+ * Build optimized conversation context with only relevant information
+ * @param {string} callSid - The call SID
+ * @param {string} currentQuery - The current user query
+ * @param {string} detectedLanguage - The detected language code
+ * @returns {Object} Optimized conversation context object
+ */
+export function buildOptimizedContext(callSid, currentQuery = '', detectedLanguage = 'en-US') {
+  try {
+    const fullContext = callSid ? getConversationContext(callSid) : null;
+    
+    if (!fullContext) {
+      return {
+        isNewConversation: true,
+        language: detectedLanguage
+      };
+    }
+
+    // Extract only relevant information from the new minimal structure
+    const optimizedContext = {
+      isNewConversation: false,
+      language: detectedLanguage,
+      timestamp: new Date().toISOString()
+    };
+
+    // Get the minimal context structure
+    const minimalContext = fullContext.lastQueryContext;
+
+    if (minimalContext) {
+      // Location information (most important for resource searches)
+      if (minimalContext.location) {
+        optimizedContext.location = minimalContext.location;
+      }
+
+      // Last intent (for follow-up detection)
+      if (minimalContext.lastIntent) {
+        optimizedContext.lastIntent = minimalContext.lastIntent;
+      }
+
+      // Last query (for context continuity) - limit to 80 chars
+      if (minimalContext.lastQuery) {
+        optimizedContext.lastQuery = minimalContext.lastQuery.substring(0, 80);
+      }
+
+      // Location needs status
+      if (minimalContext.needsLocation) {
+        optimizedContext.needsLocation = true;
+      }
+
+      // Recent conversation summary (already built in minimal context)
+      if (minimalContext.recentSummary) {
+        optimizedContext.recentSummary = minimalContext.recentSummary;
+      }
+
+      // Family concerns (pets, children, elders) - extract from results more efficiently
+      if (minimalContext.results && minimalContext.results.length > 0) {
+        const familyConcerns = [];
+        const content = minimalContext.results.map(r => r.content || '').join(' ').toLowerCase();
+        
+        if (content.includes('pet') || content.includes('dog') || content.includes('cat')) {
+          familyConcerns.push('pets');
+        }
+        if (content.includes('child') || content.includes('kid') || content.includes('family')) {
+          familyConcerns.push('children');
+        }
+        if (content.includes('elder') || content.includes('senior') || content.includes('aging')) {
+          familyConcerns.push('elders');
+        }
+        
+        if (familyConcerns.length > 0) {
+          optimizedContext.familyConcerns = familyConcerns;
+        }
+      }
+
+      // Emotional tone indicators - simplified extraction
+      if (minimalContext.results && minimalContext.results.length > 0) {
+        const emotionalIndicators = [];
+        const content = minimalContext.results.map(r => r.content || '').join(' ').toLowerCase();
+        
+        if (content.includes('emergency') || content.includes('urgent') || content.includes('immediate')) {
+          emotionalIndicators.push('urgent');
+        }
+        if (content.includes('scared') || content.includes('fear') || content.includes('afraid')) {
+          emotionalIndicators.push('fearful');
+        }
+        if (content.includes('confused') || content.includes('unsure') || content.includes('don\'t know')) {
+          emotionalIndicators.push('uncertain');
+        }
+        
+        if (emotionalIndicators.length > 0) {
+          optimizedContext.emotionalTone = emotionalIndicators;
+        }
+      }
+
+      // Add result count for context
+      if (minimalContext.results) {
+        optimizedContext.resultCount = minimalContext.results.length;
+      }
+    }
+
+    logger.info('Built optimized conversation context:', {
+      callSid,
+      contextSize: JSON.stringify(optimizedContext).length,
+      hasLocation: !!optimizedContext.location,
+      hasFamilyConcerns: !!optimizedContext.familyConcerns,
+      hasEmotionalTone: !!optimizedContext.emotionalTone,
+      resultCount: optimizedContext.resultCount || 0
+    });
+
+    return optimizedContext;
+
+  } catch (error) {
+    logger.error('Error building optimized conversation context:', error);
+    return {
+      isNewConversation: true,
+      language: detectedLanguage,
+      error: 'Context building failed'
+    };
+  }
+}
+
+/**
+ * Build dynamic conversation context for voice instructions (legacy method)
  * @param {string} callSid - The call SID
  * @param {string} currentQuery - The current user query
  * @param {string} detectedLanguage - The detected language code
@@ -10,111 +131,64 @@ import logger from './logger.js';
  */
 export function buildConversationContext(callSid, currentQuery = '', detectedLanguage = 'en-US') {
   try {
-    const context = callSid ? getConversationContext(callSid) : null;
+    const optimizedContext = buildOptimizedContext(callSid, currentQuery, detectedLanguage);
     
-    if (!context) {
+    if (optimizedContext.isNewConversation) {
       return 'No previous conversation context available.';
     }
 
     const contextParts = [];
 
-    // Basic conversation info
-    if (context.history && context.history.length > 0) {
-      const recentInteractions = context.history.slice(-3); // Last 3 interactions
-      const interactionSummary = recentInteractions.map((interaction, index) => {
-        const intent = interaction.intent?.replace('_', ' ') || 'general';
-        const query = interaction.query?.substring(0, 100) || 'no query';
-        return `${index + 1}. ${intent}: "${query}"`;
-      }).join('\n');
-      
-      contextParts.push(`**Recent Conversation History:**\n${interactionSummary}`);
+    // Recent conversation summary
+    if (optimizedContext.recentSummary) {
+      contextParts.push(`**Recent Conversation:** ${optimizedContext.recentSummary}`);
     }
 
     // Location context
-    if (context.lastQueryContext?.location) {
-      contextParts.push(`**Current Location:** ${context.lastQueryContext.location}`);
+    if (optimizedContext.location) {
+      contextParts.push(`**Current Location:** ${optimizedContext.location}`);
     }
 
-    // Family concerns (pets, children, elders)
-    const familyConcerns = [];
-    if (context.lastQueryContext?.results) {
-      const results = context.lastQueryContext.results;
-      const content = results.map(r => r.content || '').join(' ').toLowerCase();
-      
-      if (content.includes('pet') || content.includes('dog') || content.includes('cat')) {
-        familyConcerns.push('pets');
-      }
-      if (content.includes('child') || content.includes('kid') || content.includes('family')) {
-        familyConcerns.push('children');
-      }
-      if (content.includes('elder') || content.includes('senior') || content.includes('aging')) {
-        familyConcerns.push('elders');
-      }
-    }
-    
-    if (familyConcerns.length > 0) {
-      contextParts.push(`**Family Concerns:** ${familyConcerns.join(', ')}`);
+    // Family concerns
+    if (optimizedContext.familyConcerns) {
+      contextParts.push(`**Family Concerns:** ${optimizedContext.familyConcerns.join(', ')}`);
     }
 
     // Language preference
-    if (detectedLanguage && detectedLanguage !== 'en-US') {
+    if (optimizedContext.language && optimizedContext.language !== 'en-US') {
       const languageNames = {
         'es-ES': 'Spanish',
         'fr-FR': 'French',
         'de-DE': 'German'
       };
-      const languageName = languageNames[detectedLanguage] || detectedLanguage;
+      const languageName = languageNames[optimizedContext.language] || optimizedContext.language;
       contextParts.push(`**Language Preference:** ${languageName}`);
     }
 
     // Emotional tone indicators
-    const emotionalIndicators = [];
-    if (context.lastQueryContext?.results) {
-      const results = context.lastQueryContext.results;
-      const content = results.map(r => r.content || '').join(' ').toLowerCase();
-      
-      if (content.includes('emergency') || content.includes('urgent') || content.includes('immediate')) {
-        emotionalIndicators.push('urgent');
-      }
-      if (content.includes('scared') || content.includes('fear') || content.includes('afraid')) {
-        emotionalIndicators.push('fearful');
-      }
-      if (content.includes('confused') || content.includes('unsure') || content.includes('don\'t know')) {
-        emotionalIndicators.push('uncertain');
-      }
-    }
-    
-    if (emotionalIndicators.length > 0) {
-      contextParts.push(`**Emotional Tone:** ${emotionalIndicators.join(', ')}`);
+    if (optimizedContext.emotionalTone) {
+      contextParts.push(`**Emotional Tone:** ${optimizedContext.emotionalTone.join(', ')}`);
     }
 
     // Current needs assessment
-    if (context.lastIntent) {
-      const intent = context.lastIntent.replace('_', ' ');
+    if (optimizedContext.lastIntent) {
+      const intent = optimizedContext.lastIntent.replace('_', ' ');
       contextParts.push(`**Current Need:** ${intent}`);
     }
 
     // Resource focus
-    if (context.lastQueryContext?.focusResultTitle) {
-      contextParts.push(`**Focused Resource:** ${context.lastQueryContext.focusResultTitle}`);
+    if (optimizedContext.focusedResource) {
+      contextParts.push(`**Focused Resource:** ${optimizedContext.focusedResource}`);
     }
 
     // Location needs
-    if (context.lastQueryContext?.needsLocation) {
+    if (optimizedContext.needsLocation) {
       contextParts.push(`**Location Status:** Needs location information`);
     }
 
     // Build the final context string
     const contextString = contextParts.join('\n\n');
     
-    logger.info('Built conversation context:', {
-      callSid,
-      contextParts: contextParts.length,
-      hasLocation: !!context.lastQueryContext?.location,
-      hasFamilyConcerns: familyConcerns.length > 0,
-      hasEmotionalTone: emotionalIndicators.length > 0
-    });
-
     return contextString || 'No specific context available.';
 
   } catch (error) {
