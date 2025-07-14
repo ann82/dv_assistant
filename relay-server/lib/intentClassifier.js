@@ -261,7 +261,7 @@ export async function getIntent(query) {
     const prompt = `Classify the following user query into one of these predefined intents for a domestic violence support assistant:
 
 Available intents:
-- find_shelter: For requests to find domestic violence shelters, safe houses, or emergency housing — including questions about shelter policies (pet accommodation, family accommodation, accessibility), planning to leave safely, or bringing children, pets, or elders.
+- find_shelter: For requests to find domestic violence shelters, safe houses, or emergency housing — including questions about shelter policies (pet accommodation, family accommodation, accessibility), planning to leave safely, or bringing children, pets, or elders. ALSO includes any housing-related requests like "I'm looking for a house", "I need housing", "I need a place to stay", "I need a home", "I'm looking for housing", etc.
 - legal_services: For requests about legal help, restraining orders, court assistance, or legal representation.
 - counseling_services: For requests about therapy, counseling, mental health support, or emotional help.
 - emergency_help: For urgent requests, immediate danger, or crisis situations.
@@ -273,9 +273,9 @@ Available intents:
 
 IMPORTANT:
 - Any query involving safety, housing, planning to leave, shelter access, bringing pets/kids/elders, or understanding resource needs related to shelters — should be classified as **find_shelter**.
+- Housing-related requests like "I'm looking for a house", "I need housing", "I need a place to stay", "I need a home" should ALWAYS be classified as **find_shelter**.
 - Only classify as "off_topic" if the query is completely unrelated to domestic violence, shelter, legal help, counseling, or support resources.
 - If the user provides or updates their location (e.g., 'I live in Oakland, California'), classify as **provide_location**.
-- Respond with only the intent name (e.g., find_shelter), without quotes or extra text.
 
 User query: "${query}"
 
@@ -372,7 +372,7 @@ function calculateIntentConfidence(intent, query, response) {
   // Boost confidence for clear keyword matches
   const queryLower = query.toLowerCase();
   const intentKeywords = {
-    'find_shelter': ['shelter', 'housing', 'safe', 'place to stay', 'home'],
+    'find_shelter': ['shelter', 'housing', 'safe', 'place to stay', 'home', 'house'],
     'legal_services': ['legal', 'lawyer', 'attorney', 'court', 'restraining order', 'divorce'],
     'counseling_services': ['counseling', 'therapy', 'counselor', 'therapist', 'mental health', 'emotional'],
     'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
@@ -493,7 +493,7 @@ function classifyIntentFallback(query) {
   }
   
   // Pattern matching for specific intents (only for domestic violence related queries)
-  if (/\b(shelter|home|housing|place to stay|safe place|refuge)\b/i.test(lowerQuery)) {
+  if (/\b(shelter|home|housing|place to stay|safe place|refuge|house)\b/i.test(lowerQuery)) {
     return 'find_shelter';
   }
   

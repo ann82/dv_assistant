@@ -25,6 +25,7 @@ import { ResponseHandler } from './response/ResponseHandler.js';
 import { IntentHandler } from './intent/IntentHandler.js';
 import { HandlerFactory } from './HandlerFactory.js';
 import { UnifiedResponseHandler } from '../lib/unifiedResponseHandler.js';
+import { getConversationContext, updateConversationContext, clearConversationContext } from '../lib/intentClassifier.js';
 import logger from '../lib/logger.js';
 
 /**
@@ -566,10 +567,7 @@ export class HandlerManager {
    * @param {string} callSid - Call SID
    */
   clearConversationContext(callSid) {
-    const contextService = this.services.context;
-    if (contextService) {
-      contextService.clearConversationContext(callSid);
-    }
+    clearConversationContext(callSid);
   }
 
   /**
@@ -592,29 +590,19 @@ export class HandlerManager {
    * @returns {Promise<Object>} Conversation context
    */
   async getConversationContext(callSid) {
-    const contextService = this.services.context;
-    return contextService ? await contextService.getConversationContext(callSid) : null;
+    return getConversationContext(callSid);
   }
 
   /**
    * Update conversation context (legacy compatibility)
    * 
    * @param {string} callSid - Call SID
-   * @param {Object} intent - Intent classification result
+   * @param {string} intent - Intent classification result
    * @param {string} query - User query
    * @param {Object} response - Generated response
    * @param {Object} tavilyResponse - Tavily search response
    */
   async updateConversationContext(callSid, intent, query, response, tavilyResponse) {
-    const contextService = this.services.context;
-    if (contextService) {
-      await contextService.updateConversationContext(callSid, {
-        intent,
-        query,
-        response,
-        tavilyResponse,
-        timestamp: Date.now()
-      });
-    }
+    updateConversationContext(callSid, intent, query, response, tavilyResponse);
   }
 } 

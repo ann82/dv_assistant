@@ -1818,3 +1818,27 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - All tests pass after these changes (472 passed, 10 skipped).
+
+## [v1.22.15] - 2025-07-14
+
+### Fixed
+- **Housing-Related Intent Classification**: Fixed critical issue where housing requests like "I'm looking for a house" were being classified as `off_topic` instead of `find_shelter`
+  - **Root Cause**: The intent classifier prompt was not explicit enough about housing-related requests
+  - **Solution**: Updated the LLM prompt to explicitly include housing requests as `find_shelter` and added "house" to the fallback pattern matching
+  - **Impact**: Housing requests now correctly trigger shelter searches and use saved location context
+  - **Example**: "I live in Sacramento, California" → "I'm looking for a house" now correctly searches for shelters in Sacramento
+- All tests pass after these changes (472 passed, 10 skipped).
+
+## [v1.22.16] - 2025-07-14
+
+### Fixed
+- **CRITICAL: Conversation Context Not Being Saved/Retrieved**: Fixed critical issue where conversation context was not being preserved between requests
+  - **Root Cause**: HandlerManager was trying to use `this.services.context` for conversation context, but conversation context is actually managed by `intentClassifier.js` module
+  - **Solution**: Updated HandlerManager to import and use `getConversationContext`, `updateConversationContext`, and `clearConversationContext` functions directly from `intentClassifier.js`
+  - **Impact**: Conversation context is now properly saved and retrieved, enabling location context to be used in follow-up queries
+  - **Example**: "I live in Sacramento, California" → "emergency housing" now correctly uses the saved location for shelter searches
+
+### Technical Improvements
+- **HandlerManager Integration**: Fixed conversation context integration between HandlerManager and intentClassifier module
+- **Context Persistence**: Ensured conversation context persists across multiple user interactions
+- **Location Context Usage**: Fixed follow-up queries to properly use saved location context
