@@ -23,6 +23,7 @@ import { createTwilioController } from '../controllers/twilioController.js';
 import { validateRequest, rateLimiter } from '../middleware/validation.js';
 import { enhancedRequestLogger, enhancedErrorLogger, performanceLogger } from '../middleware/logging.js';
 import { getLanguageConfig } from '../lib/languageConfig.js';
+import { addTranscriptionEntry } from './speech-monitor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -131,10 +132,83 @@ router.post('/voice', async (req, res) => {
   if (!CallSid || !From || !To) {
     return res.status(400).json({ error: 'Missing required fields: CallSid, From, and To are required.' });
   }
-  // Return a working TwiML response to prove the endpoint works
-  const twiml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Hello, and thank you for reaching out. I\'m here to listen and help you find the support and resources you need.</Say><Gather input="speech" action="/twilio/voice/process" method="POST"></Gather></Response>';
-  res.type('text/xml');
-  res.send(twiml);
+
+  const requestId = Math.random().toString(36).substring(7);
+  const languageCode = req.body.Language || 'en-US';
+  const voice = getLanguageConfig(languageCode)?.voice || 'nova';
+  
+  logger.info('🎯 VOICE CALL INITIATED', {
+    requestId,
+    CallSid,
+    From,
+    To,
+    languageCode,
+    voice,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    // Get the full configurable welcome message from language config
+    const welcomeMessage = getLanguageConfig(languageCode)?.prompts?.welcome || 
+                          'Hello, and thank you for reaching out. I\'m here to listen and help you find the support and resources you need.';
+    
+    logger.info('🎯 VOICE CALL - Using welcome message', {
+      requestId,
+      CallSid,
+      welcomeMessageLength: welcomeMessage.length,
+      welcomeMessage: welcomeMessage.substring(0, 100) + '...',
+      voice,
+      timestamp: new Date().toISOString()
+    });
+
+    // Generate TTS-based TwiML for the welcome message
+    const metadata = {
+      requestId,
+      callSid: CallSid,
+      text: welcomeMessage,
+      voice,
+      isWelcomeMessage: true,
+      timestamp: new Date().toISOString()
+    };
+
+    const twiml = await handlerManager.generateTTSBasedTwiML(welcomeMessage, true, languageCode, metadata);
+    
+    logger.info('🎯 VOICE CALL - Welcome message generated', {
+      requestId,
+      CallSid,
+      twimlLength: twiml?.length || 0,
+      voice,
+      timestamp: new Date().toISOString()
+    });
+
+    res.type('text/xml');
+    const twimlString = typeof twiml === 'object' && twiml.toString ? twiml.toString() : twiml;
+    res.send(twimlString);
+
+  } catch (error) {
+    logger.error('🎯 VOICE CALL - Error generating welcome message', {
+      requestId,
+      CallSid,
+      error: error.message,
+      stack: error.stack,
+      voice,
+      timestamp: new Date().toISOString()
+    });
+
+    // Fallback to simple TwiML if TTS generation fails
+    const fallbackTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Amy">${welcomeMessage}</Say>
+  <Gather input="speech" action="/twilio/voice/process" method="POST" 
+          speechTimeout="auto" 
+          speechModel="phone_call"
+          enhanced="true"
+          language="${languageCode}"/>
+</Response>`;
+    
+    res.type('text/xml');
+    res.send(fallbackTwiml);
+  }
 });
 
 /**
@@ -161,13 +235,31 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   const voice = getLanguageConfig(languageCode)?.voice || 'nova';
   let cleanedSpeechResult = ''; // Initialize outside try block
 
-  logger.info('Incoming /twilio/voice/process request', {
+  // Enhanced speech transcription logging
+  logger.info('🔊 SPEECH TRANSCRIPTION DEBUG - Incoming request', {
     requestId,
     CallSid,
-    text: SpeechResult,
+    rawSpeechResult: SpeechResult,
+    speechResultLength: SpeechResult?.length || 0,
+    speechResultType: typeof SpeechResult,
     voice,
-    headers: req.headers,
-    body: req.body
+    languageCode,
+    confidence: req.body.SpeechResultConfidence,
+    speechModel: req.body.SpeechModel,
+    enhanced: req.body.Enhanced,
+    speechTimeout: req.body.SpeechTimeout,
+    // Log all Twilio speech-related parameters
+    twilioSpeechParams: {
+      SpeechResult: req.body.SpeechResult,
+      SpeechResultConfidence: req.body.SpeechResultConfidence,
+      SpeechModel: req.body.SpeechModel,
+      Enhanced: req.body.Enhanced,
+      SpeechTimeout: req.body.SpeechTimeout,
+      Language: req.body.Language,
+      From: req.body.From,
+      To: req.body.To
+    },
+    timestamp: new Date().toISOString()
   });
 
   // Send immediate acknowledgment to prevent 499 errors
@@ -217,12 +309,33 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     }
     
     // Clean and process speech result
-    cleanedSpeechResult = SpeechResult ? SpeechResult.trim() : '';
-    logger.info('Cleaned speech result', {
+    const originalSpeech = SpeechResult || '';
+    cleanedSpeechResult = originalSpeech.trim();
+    
+    // Add to speech monitor for real-time tracking
+    addTranscriptionEntry({
+      rawSpeechResult: originalSpeech,
+      cleanedSpeechResult: cleanedSpeechResult,
+      CallSid,
+      confidence: req.body.SpeechResultConfidence,
+      speechModel: req.body.SpeechModel,
+      enhanced: req.body.Enhanced,
+      languageCode,
+      voice,
+      requestId
+    });
+    
+    logger.info('🔊 SPEECH TRANSCRIPTION DEBUG - Processing', {
       requestId,
       CallSid,
-      text: cleanedSpeechResult,
-      voice
+      originalSpeech,
+      originalLength: originalSpeech.length,
+      cleanedSpeech: cleanedSpeechResult,
+      cleanedLength: cleanedSpeechResult.length,
+      wasTrimmed: originalSpeech !== cleanedSpeechResult,
+      isEmpty: !cleanedSpeechResult,
+      voice,
+      timestamp: new Date().toISOString()
     });
     
     // Check if this is a consent response (yes/no to SMS question)
@@ -245,12 +358,16 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
       )
     ]);
 
-    logger.info('processSpeechResult response', {
+    logger.info('🔊 SPEECH TRANSCRIPTION DEBUG - Processing response', {
       requestId,
       CallSid,
-      text: cleanedSpeechResult,
+      inputSpeech: cleanedSpeechResult,
+      inputLength: cleanedSpeechResult.length,
+      responseType: typeof processedResponse,
+      response: processedResponse,
+      responseLength: typeof processedResponse === 'string' ? processedResponse.length : 'N/A',
       voice,
-      processedResponse
+      timestamp: new Date().toISOString()
     });
     
     // Clear the request timeout since we got a response

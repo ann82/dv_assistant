@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.22.7] - 2025-07-14
+## [v1.22.8] - 2025-07-14
+
+### Added
+- **Streamlined Configurable Welcome Message**: Updated voice call endpoint to use a concise, configurable welcome message from language configuration
+  - **Before**: Simple hardcoded message "Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need."
+  - **After**: Concise configurable message with safety assessment: "Hello, and thank you for reaching out. I'm here to help you find support and resources. Are you in immediate danger right now? If so, please call 911. Otherwise, what brings you to call today?"
+  - **TTS Integration**: Welcome message uses TTS generation for high-quality audio delivery
+  - **Language Support**: Welcome message adapts to the caller's language preference (English, Spanish, French, German)
+  - **Safety Assessment**: Includes critical emergency assessment and 911 guidance
+  - **Consistent Fallback**: Fallback TwiML also uses the same configurable message
+  - **Enhanced Logging**: Comprehensive logging for welcome message generation and delivery
 
 ### Fixed
 - **TTS Voice Parameter Error**: Resolved critical OpenAI TTS error "Input should be 'nova', 'shimmer', 'echo', 'onyx', 'fable', 'alloy', 'ash', 'sage' or 'coral'"

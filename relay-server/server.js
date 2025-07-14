@@ -31,6 +31,7 @@ import http from 'http';
 import { config } from './lib/config.js';
 import createTwilioRouter from './routes/twilio.js';
 import healthRoutes from './routes/health.js';
+import speechMonitorRoutes from './routes/speech-monitor.js';
 import { TwilioWebSocketServer } from './websocketServer.js';
 import logger from './lib/logger.js';
 import { SearchIntegration } from './integrations/searchIntegration.js';
@@ -193,6 +194,9 @@ app.use('/audio', express.static(audioDir));
 
 // Health check and monitoring routes
 app.use('/health', healthRoutes);
+
+// Mount speech monitoring routes
+app.use('/speech-monitor', speechMonitorRoutes);
 
 // Simple test route to verify basic routing works
 app.get('/test', (req, res) => {

@@ -17,7 +17,7 @@ export const SUPPORTED_LANGUAGES = {
     twilioSpeechRecognitionLanguage: 'en-US',
     fallback: null,
     prompts: {
-      welcome: `Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need. Your safety is my top priority. Are you in immediate danger right now? If so, please call 911. Otherwise, I'm here to help you find shelters, counseling, legal services, or any other support you might need. What brings you to call today?`,
+      welcome: `Hello, and thank you for reaching out. I'm here to help you find support and resources. Are you in immediate danger right now? If so, please call 911. Otherwise, what brings you to call today?`,
       incompleteLocation: `I'd be happy to help you find shelter. Could you please tell me which city, state, and country you're looking for? For example, you could say 'near San Francisco, California, USA' or 'in London, England, UK'.`,
       currentLocation: `I understand you want resources near your current location. To help you find the closest shelters, could you please tell me which city, state, and country you're in? For example, you could say 'I'm in San Francisco, California, USA' or 'near London, England, UK'.`,
       locationPrompt: `To help you find the right resources, could you please tell me which city, state, and country you're looking for? For example, you could say 'San Francisco, California, USA' or 'London, England, UK'.`,
@@ -39,7 +39,7 @@ export const SUPPORTED_LANGUAGES = {
     twilioSpeechRecognitionLanguage: 'es-ES',
     fallback: 'en-US',
     prompts: {
-      welcome: `Hola, y gracias por contactarnos. Estoy aquí para escuchar y ayudarte a encontrar el apoyo y los recursos que necesitas. Tu seguridad es mi prioridad principal. ¿Estás en peligro inmediato en este momento? Si es así, por favor llama al 911. De lo contrario, estoy aquí para ayudarte a encontrar refugios, asesoramiento, servicios legales o cualquier otro apoyo que puedas necesitar. ¿Qué te trae a llamar hoy?`,
+      welcome: `Hola, y gracias por contactarnos. Estoy aquí para ayudarte a encontrar apoyo y recursos. ¿Estás en peligro inmediato en este momento? Si es así, por favor llama al 911. De lo contrario, ¿qué te trae a llamar hoy?`,
       incompleteLocation: `Me encantaría ayudarte a encontrar un refugio. ¿Podrías decirme en qué ciudad, estado y país estás buscando? Por ejemplo, podrías decir 'cerca de San Francisco, California, Estados Unidos' o 'en Londres, Inglaterra, Reino Unido'.`,
       currentLocation: `Entiendo que quieres recursos cerca de tu ubicación actual. Para ayudarte a encontrar los refugios más cercanos, ¿podrías decirme en qué ciudad, estado y país te encuentras? Por ejemplo, podrías decir 'estoy en San Francisco, California, Estados Unidos' o 'cerca de Londres, Inglaterra, Reino Unido'.`,
       locationPrompt: `Para ayudarte a encontrar los recursos adecuados, ¿podrías decirme en qué ciudad, estado y país estás buscando? Por ejemplo, podrías decir 'San Francisco, California, Estados Unidos' o 'Londres, Inglaterra, Reino Unido'.`,
@@ -61,7 +61,7 @@ export const SUPPORTED_LANGUAGES = {
     twilioSpeechRecognitionLanguage: 'fr-FR',
     fallback: 'en-US',
     prompts: {
-      welcome: `Bonjour, et merci de nous avoir contactés. Je suis ici pour écouter et vous aider à trouver le soutien et les ressources dont vous avez besoin. Votre sécurité est ma priorité absolue. Êtes-vous en danger immédiat en ce moment ? Si c'est le cas, veuillez appeler le 911. Sinon, je suis ici pour vous aider à trouver des refuges, des conseils, des services juridiques ou tout autre soutien dont vous pourriez avoir besoin. Qu'est-ce qui vous amène à appeler aujourd'hui ?`,
+      welcome: `Bonjour, et merci de nous avoir contactés. Je suis ici pour vous aider à trouver du soutien et des ressources. Êtes-vous en danger immédiat en ce moment ? Si c'est le cas, veuillez appeler le 911. Sinon, qu'est-ce qui vous amène à appeler aujourd'hui ?`,
       incompleteLocation: `Je serais ravi de vous aider à trouver un refuge. Pourriez-vous me dire dans quelle ville, état et pays vous cherchez ? Par exemple, vous pourriez dire 'près de San Francisco, Californie, États-Unis' ou 'à Londres, Angleterre, Royaume-Uni'.`,
       currentLocation: `Je comprends que vous voulez des ressources près de votre emplacement actuel. Pour vous aider à trouver les refuges les plus proches, pourriez-vous me dire dans quelle ville, état et pays vous vous trouvez ? Par exemple, vous pourriez dire 'je suis à San Francisco, Californie, États-Unis' ou 'près de Londres, Angleterre, Royaume-Uni'.`,
       locationPrompt: `Pour vous aider à trouver les bonnes ressources, pourriez-vous me dire dans quelle ville, état et pays vous cherchez ? Par exemple, vous pourriez dire 'San Francisco, Californie, États-Unis' ou 'Londres, Angleterre, Royaume-Uni'.`,
@@ -83,7 +83,7 @@ export const SUPPORTED_LANGUAGES = {
     twilioSpeechRecognitionLanguage: 'de-DE',
     fallback: 'en-US',
     prompts: {
-      welcome: `Hallo und vielen Dank, dass Sie sich gemeldet haben. Ich bin hier, um zuzuhören und Ihnen zu helfen, die Unterstützung und Ressourcen zu finden, die Sie benötigen. Ihre Sicherheit hat für mich oberste Priorität. Sind Sie derzeit in unmittelbarer Gefahr? Wenn ja, rufen Sie bitte 911 an. Ansonsten bin ich hier, um Ihnen zu helfen, Unterkünfte, Beratung, Rechtsdienstleistungen oder jede andere Unterstützung zu finden, die Sie benötigen könnten. Was bringt Sie dazu, heute anzurufen?`,
+      welcome: `Hallo und vielen Dank, dass Sie sich gemeldet haben. Ich bin hier, um Ihnen zu helfen, Unterstützung und Ressourcen zu finden. Sind Sie derzeit in unmittelbarer Gefahr? Wenn ja, rufen Sie bitte 911 an. Ansonsten, was bringt Sie dazu, heute anzurufen?`,
       incompleteLocation: `Ich helfe Ihnen gerne dabei, eine Unterkunft zu finden. Könnten Sie mir bitte sagen, in welcher Stadt, welchem Bundesland und welchem Land Sie suchen? Zum Beispiel könnten Sie sagen 'in der Nähe von San Francisco, Kalifornien, USA' oder 'in London, England, Großbritannien'.`,
       currentLocation: `Ich verstehe, dass Sie Ressourcen in der Nähe Ihres aktuellen Standorts möchten. Um Ihnen zu helfen, die nächsten Unterkünfte zu finden, könnten Sie mir bitte sagen, in welcher Stadt, welchem Bundesland und welchem Land Sie sich befinden? Zum Beispiel könnten Sie sagen 'ich bin in San Francisco, Kalifornien, USA' oder 'in der Nähe von London, England, Großbritannien'.`,
       locationPrompt: `Um Ihnen zu helfen, die richtigen Ressourcen zu finden, könnten Sie mir bitte sagen, in welcher Stadt, welchem Bundesland und welchem Land Sie suchen? Zum Beispiel könnten Sie sagen 'San Francisco, Kalifornien, USA' oder 'London, England, Großbritannien'.`,
