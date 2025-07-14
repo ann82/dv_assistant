@@ -152,6 +152,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
   const requestId = Math.random().toString(36).substring(7);
   const { CallSid, SpeechResult } = req.body;
   const voice = req.body.voice || 'unknown';
+  let cleanedSpeechResult = ''; // Initialize outside try block
 
   logger.info('Incoming /twilio/voice/process request', {
     requestId,
@@ -211,7 +212,7 @@ router.post('/voice/process', validateRequest('twilioVoice'), async (req, res) =
     }
     
     // Clean and process speech result
-    const cleanedSpeechResult = SpeechResult ? SpeechResult.trim() : '';
+    cleanedSpeechResult = SpeechResult ? SpeechResult.trim() : '';
     logger.info('Cleaned speech result', {
       requestId,
       CallSid,
