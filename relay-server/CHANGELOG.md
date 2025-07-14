@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.5] - 2025-07-14
+
+### Changed
+- **Welcome Message Now Uses TTS**: The welcome message for incoming calls is now generated using the TTS pipeline, ensuring the full, configurable prompt is played to callers. Falls back to a simple TwiML <Say> if TTS fails.
+- **Robust TTS Fallback**: If TTS generation fails (e.g., OpenAI API error), the system gracefully falls back to a simple TwiML <Say> so callers always hear a message.
+- **Improved Metadata Logging**: All TTS and TwiML generation logs now include requestId, callSid, text preview, and other metadata for easier debugging and traceability.
+- **TTS Pipeline Compatibility**: The TTS pipeline now works with the actual TTS service response format, handling both audioBuffer and audioUrl, and saving audio files as needed.
+
 ## [v1.22.4] - 2025-01-27
 
 ### Fixed
