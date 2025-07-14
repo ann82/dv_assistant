@@ -516,9 +516,7 @@ export class ResponseGenerator {
         model,
         messages,
         maxTokens: config.DEFAULT_MAX_TOKENS,
-        temperature: 0.7,
-        presencePenalty: 0.6,
-        frequencyPenalty: 0.3
+        temperature: 0.7
       });
       return response;
     };
