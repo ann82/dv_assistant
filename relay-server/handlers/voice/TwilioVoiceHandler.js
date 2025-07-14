@@ -189,14 +189,8 @@ export class TwilioVoiceHandler extends BaseHandler {
         this.logger.info('Selected welcome message', { callSid, language, welcomeMessage });
         this.logOperation('generating welcome message', { welcomeMessage });
         
-        // Create a simple TwiML response
-        const twiml = new this.VoiceResponseClass();
-        twiml.say(welcomeMessage);
-        twiml.gather({
-          input: 'speech',
-          action: '/twilio/voice/process',
-          method: 'POST'
-        });
+        // Create TTS-based TwiML response for better audio quality
+        const twiml = await this.generateTTSBasedTwiML(welcomeMessage, true, language);
         this.logger.info('Sending welcome message TwiML', { callSid, language, twiml: twiml.toString() });
 
         this.logOperation('incoming call handled', { callSid, from, to });
@@ -590,18 +584,33 @@ export class TwilioVoiceHandler extends BaseHandler {
       // Use TTS service to generate audio with metadata
       const audioResult = await this.services.tts.generateSpeech(safeText, languageCode, metadata);
       
-      if (audioResult.success && audioResult.data.audioUrl) {
+      // Check if we have audio data (either audioBuffer or audioUrl)
+      if (audioResult && (audioResult.audioBuffer || audioResult.audioUrl)) {
         const twiml = new this.VoiceResponseClass();
         
-        // Play the generated audio
-        twiml.play(audioResult.data.audioUrl);
+        // Play the generated audio - use audioUrl if available, otherwise we need to save audioBuffer
+        if (audioResult.audioUrl) {
+          twiml.play(audioResult.audioUrl);
+        } else if (audioResult.audioBuffer) {
+          // For audioBuffer, we need to save it to a file and serve it
+          // This is a simplified approach - in production you might want to use a CDN or file service
+          const fs = await import('fs/promises');
+          const path = await import('path');
+          const audioDir = path.join(process.cwd(), 'public', 'audio');
+          await fs.mkdir(audioDir, { recursive: true });
+          const fileName = `audio_${Date.now()}.mp3`;
+          const audioPath = `/audio/${fileName}`;
+          await fs.writeFile(path.join(audioDir, fileName), audioResult.audioBuffer);
+          
+          twiml.play(audioPath);
+        }
 
         if (shouldGather) {
           const gather = twiml.gather({
             input: 'speech',
             language: languageCode,
             speechTimeout: 30,
-            action: '/twilio/speech',
+            action: '/twilio/voice/process',
             method: 'POST'
           });
           
@@ -615,7 +624,9 @@ export class TwilioVoiceHandler extends BaseHandler {
         }
 
         this.logger.info('TTS-based TwiML generated successfully:', {
-          audioUrl: audioResult.data.audioUrl,
+          hasAudioBuffer: !!audioResult.audioBuffer,
+          hasAudioUrl: !!audioResult.audioUrl,
+          provider: audioResult.provider,
           shouldGather,
           languageCode,
           ...metadata
@@ -625,8 +636,8 @@ export class TwilioVoiceHandler extends BaseHandler {
       } else {
         // Fallback to regular TwiML if TTS fails
         this.logger.warn('TTS failed, falling back to regular TwiML:', {
-          ttsSuccess: audioResult.success,
-          ttsError: audioResult.error,
+          hasAudioResult: !!audioResult,
+          audioResultKeys: audioResult ? Object.keys(audioResult) : [],
           ...metadata
         });
         return this.generateTwiML(safeText, shouldGather, languageCode);
