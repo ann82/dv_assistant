@@ -93,10 +93,32 @@ export function enhancedRequestLogger(req, res, next) {
   const originalJson = res.json;
   res.json = function(data) {
     const responseTime = Date.now() - startTime;
+    
+    // Handle TwiML objects that have circular references
+    let responseSize = 0;
+    if (typeof data === 'string') {
+      responseSize = data.length;
+    } else if (data && typeof data === 'object') {
+      // Check if it's a TwiML object (has toString method and _propertyName)
+      if (data.toString && typeof data.toString === 'function' && data._propertyName) {
+        try {
+          responseSize = data.toString().length;
+        } catch (error) {
+          responseSize = '[TwiML object - size unknown]';
+        }
+      } else {
+        try {
+          responseSize = JSON.stringify(data).length;
+        } catch (error) {
+          responseSize = '[Circular object - size unknown]';
+        }
+      }
+    }
+    
     const responseData = {
       statusCode: res.statusCode,
       responseTime: `${responseTime}ms`,
-      responseSize: JSON.stringify(data).length
+      responseSize
     };
     
     // Log successful responses (not errors)
