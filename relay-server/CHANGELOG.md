@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.10] - 2025-07-14
+
+### Fixed
+- **"I didn't hear anything" Message Issue**: Removed the noSpeech prompt that was playing after every response
+  - **Root Cause**: The `noSpeech` prompt was being added to every `<Gather>` element as a fallback message
+  - **Solution**: Removed the automatic noSpeech prompt from TwiML generation
+  - **Impact**: Users no longer hear "I didn't hear anything. Please try again." after every response
+- **Long Response Delays**: Optimized TTS generation to reduce gaps between user input and system response
+  - **TTS Timeout**: Reduced from 15 seconds to 8 seconds for faster response
+  - **Retry Configuration**: Reduced max retries from 2 to 1 and retry delay from 2000ms to 1000ms
+  - **TTS Generation Timeout**: Added 6-second timeout for TTS generation in TwilioVoiceHandler
+  - **Speech Recognition**: Enhanced `<Gather>` parameters with `speechTimeout: 'auto'`, `speechModel: 'phone_call'`, and `enhanced: 'true'`
+  - **Impact**: Significantly faster response times and better speech recognition
+
+### Added
+- **Streamlined Configurable Welcome Message**: Updated voice call endpoint to use a concise, configurable welcome message from language configuration
+  - **Before**: Simple hardcoded message "Hello, and thank you for reaching out. I'm here to listen and help you find the support and resources you need."
+  - **After**: Concise configurable message with safety assessment: "Hello, and thank you for reaching out. I'm here to help you find support and resources. Are you in immediate danger right now? If so, please call 911. Otherwise, what brings you to call today?"
+  - **TTS Integration**: Welcome message uses TTS generation for high-quality audio delivery
+  - **Language Support**: Welcome message adapts to the caller's language preference (English, Spanish, French, German)
+  - **Safety Assessment**: Includes critical emergency assessment and 911 guidance
+  - **Consistent Fallback**: Fallback TwiML also uses the same configurable message
+  - **Enhanced Logging**: Comprehensive logging for welcome message generation and delivery
+
 ## [v1.22.8] - 2025-07-14
 
 ### Added

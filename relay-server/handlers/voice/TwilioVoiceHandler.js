@@ -594,7 +594,13 @@ export class TwilioVoiceHandler extends BaseHandler {
         language: finalLanguageCode,
         voice: this._getLanguageConfig(finalLanguageCode)?.voice || 'nova'
       };
-      const ttsResponse = await this.services.tts.generateSpeech(safeText, ttsOptions, metadata);
+      // Use a shorter timeout for TTS generation to reduce delays
+      const ttsResponse = await Promise.race([
+        this.services.tts.generateSpeech(safeText, ttsOptions, metadata),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('TTS timeout')), 6000)
+        )
+      ]);
       const ttsDuration = Date.now() - ttsStart;
 
       // Handle BaseService response format (wrapped in success/data structure)
@@ -637,17 +643,11 @@ export class TwilioVoiceHandler extends BaseHandler {
           const gather = twiml.gather({
             input: 'speech',
             language: finalLanguageCode,
-            speechTimeout: 30,
+            speechTimeout: 'auto',
+            speechModel: 'phone_call',
+            enhanced: 'true',
             action: '/twilio/voice/process',
             method: 'POST'
-          });
-
-          // Add fallback message if no speech detected
-          const langConfig = this._getLanguageConfig(finalLanguageCode);
-          const noSpeechPrompt = this.getLocalizedPrompt(finalLanguageCode, 'noSpeech') || 'I didn\'t hear anything. Please try again.';
-          gather.say(noSpeechPrompt, {
-            voice: langConfig.voice,
-            language: finalLanguageCode
           });
         }
 

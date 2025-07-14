@@ -6,15 +6,15 @@
 export const ttsConfig = {
   // TTS General Settings
   enabled: process.env.ENABLE_TTS !== 'false', // Default to true
-  timeout: parseInt(process.env.TTS_TIMEOUT) || 15000, // TTS timeout in milliseconds
+  timeout: parseInt(process.env.TTS_TIMEOUT) || 8000, // TTS timeout in milliseconds (reduced for faster response)
   fallbackToPolly: process.env.FALLBACK_TO_POLLY !== 'false', // Default to true
   
   // OpenAI TTS Configuration
   openai: {
     voice: process.env.TTS_VOICE || 'nova', // OpenAI TTS voice: nova, alloy, echo, fable, onyx, shimmer
     model: 'tts-1',
-    maxRetries: 2, // Reduced from 3 to 2 for faster fallback
-    maxRetryDelay: 2000, // Maximum retry delay in milliseconds
+    maxRetries: 1, // Reduced to 1 for faster fallback
+    maxRetryDelay: 1000, // Maximum retry delay in milliseconds (reduced for faster response)
     bufferSize: 1024 * 1024, // 1MB chunks for large audio files
     supportedVoices: ['nova', 'alloy', 'echo', 'fable', 'onyx', 'shimmer']
   },
