@@ -341,6 +341,25 @@ describe('Enhanced Location Detector', () => {
     });
   });
 
+  describe('Equivalent shelter terms', () => {
+    it('should handle equivalent shelter terms correctly', () => {
+      const equivalentQueries = [
+        'I need domestic shelter homes in Portland',
+        'Looking for emergency housing in Seattle',
+        'Find domestic violence shelter in Austin',
+        'Need safe house in Denver',
+        'Looking for crisis center in Miami',
+        'Find refuge in Phoenix'
+      ];
+      
+      for (const query of equivalentQueries) {
+        const result = extractLocationFromQuery(query);
+        expect(result.location).toBeTruthy();
+        expect(['complete', 'unknown']).toContain(result.scope);
+      }
+    });
+  });
+
   describe('Feature-related phrase rejection', () => {
     it('should not extract feature-related phrases as locations', () => {
       const featureQueries = [
@@ -420,7 +439,7 @@ describe('Enhanced Location Detector', () => {
 
       expect(extractLocationFromQuery('help in Mumbai, India')).toEqual({
         location: 'Mumbai, India',
-        scope: 'unknown'
+        scope: 'complete'
       });
     });
 

@@ -85,8 +85,7 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
   const cleanedQuery = cleanConversationalFillers(query);
   logger.info('Cleaned query:', { original: query, cleaned: cleanedQuery, callSid });
 
-  // Step 2: Get conversation context for enhanced query building
-  let contextEnhancement = '';
+  // Step 2: Get conversation context for location only
   let locationInfo = { location: null, isComplete: false, scope: 'none' };
   
   if (callSid) {
@@ -116,36 +115,6 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
           callSid 
         });
       }
-
-      // Add context from previous queries if this seems like a follow-up
-      if (context.history && context.history.length > 0) {
-        const recentQueries = context.history.slice(-2).map(h => h.query).join(' ');
-        if (recentQueries && recentQueries.length > 0) {
-          // Only add location-related context, not general conversation
-          const locationKeywords = /\b(?:shelter|housing|safe|place|home|location|city|town|state|area|near|in|at)\b/i;
-          if (locationKeywords.test(recentQueries)) {
-            contextEnhancement = ` ${recentQueries}`;
-            logger.info('Added location-related conversation context to query:', { 
-              contextEnhancement, 
-              callSid 
-            });
-          } else {
-            logger.info('Skipped adding non-location conversation context:', { 
-              recentQueries, 
-              callSid 
-            });
-          }
-        }
-      }
-
-      // Use previous intent context if current intent is different
-      if (context.lastIntent && context.lastIntent !== intent) {
-        contextEnhancement += ` ${context.lastIntent.replace('_', ' ')}`;
-        logger.info('Added previous intent context:', { 
-          previousIntent: context.lastIntent, 
-          callSid 
-        });
-      }
     }
   }
 
@@ -166,12 +135,12 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     logger.info('Skipping location extraction for non-location-seeking intent in query rewriter:', { intent, callSid });
   }
 
-  // Step 4: Build optimized search query
+  // Step 4: Build clean, focused search query
   let searchQuery = cleanedQuery;
 
   // For resource-seeking intents, enhance the query while preserving user's specific terms
   if (['find_shelter', 'legal_services', 'counseling_services', 'emergency_help', 'other_resources'].includes(intent)) {
-    // Preserve the user's original query but add specific search terms
+    // Start with the cleaned user query
     let enhancedQuery = cleanedQuery;
     
     // Add location if detected and not already in the query
@@ -181,48 +150,24 @@ export async function rewriteQuery(query, intent = 'find_shelter', callSid = nul
     
     // Add specific resource terms based on intent (simplified for better performance)
     if (intent === 'find_shelter') {
-      enhancedQuery += ' domestic violence shelter help';
+      enhancedQuery += ' domestic violence shelter OR emergency housing OR domestic shelter homes';
     } else if (intent === 'legal_services') {
-      enhancedQuery += ' legal aid attorney lawyer';
+      enhancedQuery += ' legal aid attorney';
     } else if (intent === 'counseling_services') {
-      enhancedQuery += ' counseling therapy support group';
+      enhancedQuery += ' counseling therapy';
     } else {
       // For other resource intents, add general domestic violence terms
-      enhancedQuery += ' domestic violence help resources';
+      enhancedQuery += ' domestic violence help';
     }
     
     searchQuery = enhancedQuery;
   }
 
-  // Step 4.5: Clean up any problematic words that might have been added from context
-  // This prevents words like "Accept" from being added to search queries
-  if (contextEnhancement) {
-    // Remove common non-search words that might have been added from context
-    const problematicWords = ['accept', 'allow', 'let', 'permit', 'enable', 'provide', 'offer', 'give', 'take', 'have', 'get', 'want', 'need', 'like', 'love'];
-    let cleanedContext = contextEnhancement;
-    
-    problematicWords.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'gi');
-      cleanedContext = cleanedContext.replace(regex, '');
-    });
-    
-    // Clean up extra spaces
-    cleanedContext = cleanedContext.replace(/\s+/g, ' ').trim();
-    
-    if (cleanedContext && cleanedContext !== contextEnhancement) {
-      logger.info('Cleaned context enhancement:', { 
-        original: contextEnhancement, 
-        cleaned: cleanedContext, 
-        callSid 
-      });
-      contextEnhancement = cleanedContext;
-    }
-  }
-
-  // Step 5: Add conversation context enhancement
-  if (contextEnhancement) {
-    searchQuery = `${searchQuery}${contextEnhancement}`;
-  }
+  // Step 5: Clean up the final query to ensure it's focused and not too long
+  searchQuery = searchQuery
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim()
+    .substring(0, 200); // Limit query length to prevent timeouts
 
   logger.info('Final rewritten query:', { original: query, rewritten: searchQuery, callSid });
   return searchQuery;

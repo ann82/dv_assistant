@@ -5,7 +5,7 @@ const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const TAVILY_SEARCH_DEPTH = process.env.TAVILY_SEARCH_DEPTH || 'advanced';
 const TAVILY_SEARCH_TYPE = process.env.TAVILY_SEARCH_TYPE || 'basic';
 const TAVILY_MAX_RESULTS = parseInt(process.env.TAVILY_MAX_RESULTS) || 5;
-const TAVILY_TIMEOUT = parseInt(process.env.TAVILY_TIMEOUT) || 6000; // Reduced from 15000 to 6000ms for faster response
+const TAVILY_TIMEOUT = parseInt(process.env.TAVILY_TIMEOUT) || 15000; // Increased from 6000 to 15000ms for better reliability
 
 // Default domains for domestic violence shelter searches
 const DEFAULT_INCLUDE_DOMAINS = [
@@ -32,11 +32,41 @@ const DEFAULT_EXCLUDE_DOMAINS = [
 
 // Shelter-related keywords for filtering
 const SHELTER_KEYWORDS = [
+  // Core shelter terms
   'shelter', 'safe house', 'refuge', 'crisis center', 'emergency housing',
   'domestic violence', 'battered women', 'women\'s shelter', 'family shelter',
   'transitional housing', 'emergency shelter', 'crisis shelter', 'safe haven',
   'protective housing', 'emergency accommodation', 'crisis accommodation',
-  'domestic abuse', 'family violence', 'intimate partner violence'
+  'domestic abuse', 'family violence', 'intimate partner violence',
+  
+  // Additional equivalent terms
+  'domestic shelter homes', 'domestic shelter home', 'shelter homes', 'shelter home',
+  'domestic violence shelter', 'domestic violence shelters', 'domestic violence safe house',
+  'domestic violence refuge', 'domestic violence crisis center', 'domestic violence emergency housing',
+  'domestic violence emergency shelter', 'domestic violence transitional housing',
+  'domestic violence protective housing', 'domestic violence safe haven',
+  
+  // Emergency housing variations
+  'emergency housing', 'emergency housings', 'emergency home', 'emergency homes',
+  'crisis housing', 'crisis home', 'crisis homes', 'temporary housing', 'temporary home',
+  'immediate housing', 'immediate shelter', 'urgent housing', 'urgent shelter',
+  
+  // Support and help terms
+  'support center', 'support centre', 'help center', 'help centre', 'assistance center',
+  'resource center', 'resource centre', 'service center', 'service centre',
+  'domestic violence support', 'domestic violence help', 'domestic violence assistance',
+  'domestic violence resources', 'domestic violence services',
+  
+  // Alternative terminology
+  'abuse shelter', 'abuse shelters', 'violence shelter', 'violence shelters',
+  'family violence shelter', 'family violence shelters', 'intimate partner violence shelter',
+  'battered women shelter', 'battered women shelters', 'women shelter', 'women shelters',
+  'men shelter', 'men shelters', 'youth shelter', 'youth shelters',
+  
+  // Housing assistance terms
+  'housing assistance', 'housing help', 'housing support', 'housing resources',
+  'domestic violence housing', 'domestic violence housing assistance',
+  'domestic violence housing help', 'domestic violence housing support'
 ];
 
 // Phone number patterns for content filtering
@@ -366,33 +396,53 @@ export const SearchIntegration = {
   buildDvSearchQuery(location, filters = {}, requestId = null) {
     const operationId = requestId || uuidv4();
     
-    let query = `domestic violence shelters resources help ${location}`;
+    // Build comprehensive search terms using OR operators to catch equivalent terms
+    let searchTerms = [
+      'domestic violence shelter',
+      'domestic violence shelters', 
+      'domestic shelter homes',
+      'domestic shelter home',
+      'emergency housing',
+      'emergency shelter',
+      'crisis center',
+      'safe house',
+      'domestic violence help',
+      'domestic violence support',
+      'domestic violence resources'
+    ];
+    
+    // Add location-specific terms
+    let query = `(${searchTerms.join(' OR ')}) ${location}`;
+    
+    // Add additional context terms
+    query += ' help resources contact support';
     
     if (filters.pets) {
-      query += ' pet friendly';
+      query += ' pet friendly pets dogs cats';
     }
     
     if (filters.children) {
-      query += ' children families';
+      query += ' children families kids family';
     }
     
     if (filters.emergency) {
-      query += ' emergency crisis immediate help';
+      query += ' emergency crisis immediate help urgent';
     }
     
     if (filters.legal) {
-      query += ' legal assistance advocacy';
+      query += ' legal assistance advocacy lawyer attorney';
     }
     
     if (filters.counseling) {
-      query += ' counseling therapy support groups';
+      query += ' counseling therapy support groups mental health';
     }
     
     logSearchOperation('buildDvSearchQuery', { 
       location, 
       filters, 
       queryLength: query.length,
-      queryPreview: query.substring(0, 100) + (query.length > 100 ? '...' : '')
+      queryPreview: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
+      searchTerms: searchTerms.length
     }, 'info', operationId);
     
     return query;

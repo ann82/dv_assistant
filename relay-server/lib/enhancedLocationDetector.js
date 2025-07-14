@@ -245,6 +245,22 @@ export function extractLocationFromQuery(query) {
     return { location: null, scope: 'follow-up' };
   }
 
+  // NEW: Look for city, state combinations first (most common pattern)
+  const cityStatePattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g;
+  const cityStateMatches = query.match(cityStatePattern);
+  if (cityStateMatches && cityStateMatches.length > 0) {
+    const location = cityStateMatches[0];
+    logger.info('extractLocationFromQuery DEBUG - City, state pattern match found:', { query, location });
+    const cleanLocation = cleanExtractedLocation(location);
+    if (cleanLocation) {
+      logger.info('extractLocationFromQuery DEBUG - City, state location extraction found:', { query, location: cleanLocation });
+      return {
+        location: cleanLocation,
+        scope: 'complete'
+      };
+    }
+  }
+
   // Simple pattern: look for "near [location]" or "in [location]" or "at [location]"
   const simplePatterns = [
     /near\s+([^,.?]+(?:,\s*[^,.?]+)?)/i,
