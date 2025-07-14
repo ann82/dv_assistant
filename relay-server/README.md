@@ -6,6 +6,12 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 
 ---
 
+## 🆕 v1.22.14 Highlights
+- **New Intent: provide_location**: The system now recognizes when a user provides or updates their location (e.g., "I live in Oakland, California") and classifies it as `provide_location`.
+- **Improved Intent Classifier**: The LLM prompt and fallback logic have been updated to include and detect `provide_location`.
+- **Downstream Flow Update**: When a user provides their location, the system saves it in the conversation context and prompts the user for their needs (e.g., "Thank you for sharing your location. What kind of help are you looking for? For example: emergency housing, legal help, or counseling?"). The system will not proceed to resource search until the user specifies what kind of help they need.
+- **All tests pass** after these changes (472 passed, 10 skipped).
+
 ## 🆕 v1.22.13 Highlights
 - **Critical Intent-First Processing Fix**: Fixed critical violation where location extraction was happening before intent classification
   - **Root Cause**: Simple pattern matching was extracting non-location words like "Yeah" as locations

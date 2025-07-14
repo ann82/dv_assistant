@@ -411,13 +411,62 @@ export function createTwilioController(handlerManager) {
         return followUpResponse.voiceResponse || followUpResponse.smsResponse || 'No response available';
       }
 
-      // STEP 4: Only extract location if the intent is a location-seeking one
+      // STEP 4: Handle provide_location intent
+      if (intent === 'provide_location') {
+        let location = null;
+        try {
+          location = await extractLocation(speechResult);
+          logger.info('Extracted location for provide_location intent', {
+            requestId,
+            callSid,
+            intent,
+            location
+          });
+        } catch (locationError) {
+          logger.error('Error extracting location for provide_location:', {
+            requestId,
+            callSid,
+            error: locationError.message,
+            stack: locationError.stack
+          });
+        }
+        // Save location in context
+        if (callSid) {
+          try {
+            await handlerManager.updateConversationContext(callSid, intent, speechResult, {
+              voiceResponse: null,
+              smsResponse: null
+            }, null);
+            logger.info('Updated conversation context for provide_location', {
+              requestId,
+              callSid,
+              intent,
+              location
+            });
+          } catch (updateError) {
+            logger.error('Error updating conversation context for provide_location:', {
+              requestId,
+              callSid,
+              error: updateError.message
+            });
+          }
+        }
+        // Prompt user for their needs
+        const prompt = "Thank you for sharing your location. What kind of help are you looking for? For example: emergency housing, legal help, or counseling?";
+        if (requestType === 'web') {
+          return prompt;
+        }
+        return prompt;
+      }
+
+      // STEP 4: Extract location or use saved context location for location-seeking intents
       let location = null;
       const locationSeekingIntents = ['find_shelter', 'legal_services', 'counseling_services', 'other_resources'];
       const isLocationSeekingIntent = locationSeekingIntents.includes(intent);
       
       if (isLocationSeekingIntent) {
         try {
+          // First try to extract location from current speech
           location = await extractLocation(speechResult);
           logger.info('Extracted location for location-seeking intent', {
             requestId,
@@ -425,6 +474,18 @@ export function createTwilioController(handlerManager) {
             intent,
             location
           });
+          
+          // If no location found in current speech, check conversation context for saved location
+          if (!location && context?.lastQueryContext?.location) {
+            location = context.lastQueryContext.location;
+            logger.info('Using saved location from conversation context', {
+              requestId,
+              callSid,
+              intent,
+              savedLocation: location,
+              contextLocation: context.lastQueryContext.location
+            });
+          }
         } catch (locationError) {
           logger.error('Error extracting location:', {
             requestId,
@@ -440,7 +501,9 @@ export function createTwilioController(handlerManager) {
             requestId,
             callSid,
             intent,
-            speechResult
+            speechResult,
+            hasContext: !!context,
+            contextLocation: context?.lastQueryContext?.location
           });
           try {
             return await generateLocationPrompt();

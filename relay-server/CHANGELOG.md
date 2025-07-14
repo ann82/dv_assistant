@@ -55,6 +55,18 @@ All notable changes to this project will be documented in this file.
   - **Debug Logging**: Added comprehensive logging to track result filtering and processing
   - **Impact**: Tavily search results now properly display instead of showing "No shelters found"
   - **Example**: "domestic violence shelter Austin, Texas" now returns actual shelter results instead of empty response
+- **CRITICAL: Location Context Preservation Issue**: Fixed critical issue where location information was not being saved in conversation context for non-resource queries
+  - **Root Cause**: Location extraction was working but context was only being created for resource-seeking intents, not for "off_topic" intents
+  - **Solution**: Enhanced context update logic to always create `lastQueryContext` when location is detected, regardless of intent type
+  - **Debug Logging**: Added comprehensive logging to track location extraction and context creation
+  - **Impact**: Location information is now properly saved and can be used in follow-up conversations
+  - **Example**: "I live in Oakland, California" now saves the location for future resource searches
+- **CRITICAL: Context Location Usage Issue**: Fixed critical issue where saved location context was not being used for follow-up resource requests
+  - **Root Cause**: When users said "counseling centers nearby", the system only looked at current speech for location, ignoring saved context
+  - **Solution**: Enhanced location extraction logic to check conversation context for saved location when current speech doesn't contain specific location
+  - **Debug Logging**: Added comprehensive logging to track when saved location is used from context
+  - **Impact**: Follow-up resource requests now properly use previously mentioned locations
+  - **Example**: "I live in Oakland, California" → "counseling centers nearby" now searches for counseling centers in Oakland
 
 ### Changed
 - **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times
@@ -1790,3 +1802,19 @@ All notable changes to this project will be documented in this file.
 - **Voice Profiles**: Configurable prosody settings for different emotional contexts
 - **Pause Management**: Strategic timing for natural conversation flow
 - **Template Categories**: Emergency, welcome, location, resource, follow-up, error, conversation
+
+## [v1.22.14] - 2025-07-14
+
+### Added
+- **New Intent: provide_location**
+  - Added a new intent `provide_location` to the intent classifier and LLM prompt.
+  - Updated fallback (pattern-based) classifier to recognize statements like "I live in...", "My city is...", etc. as `provide_location`.
+  - Updated valid intents and keyword logic for confidence scoring.
+
+### Changed
+- **Downstream Handling for provide_location**
+  - When the system detects `provide_location`, it now saves the location in the conversation context and prompts the user for their needs (e.g., "Thank you for sharing your location. What kind of help are you looking for? For example: emergency housing, legal help, or counseling?").
+  - The system does not proceed to resource search until the user specifies what kind of help they need.
+
+### Fixed
+- All tests pass after these changes (472 passed, 10 skipped).

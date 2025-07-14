@@ -47,6 +47,15 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   let location = extractLocationFromQuery(query);
   if (location) location = toTitleCase(location);
   
+  // Debug logging for location extraction
+  logger.info('Location extraction in updateConversationContext:', {
+    callSid,
+    query,
+    extractedLocation: location,
+    intent,
+    hasLastQueryContext: !!context.lastQueryContext
+  });
+  
   // Case 1: We have Tavily results - always update context with results
   if (tavilyResults && tavilyResults.results && tavilyResults.results.length > 0) {
     context.lastQueryContext = {
@@ -128,9 +137,33 @@ export function updateConversationContext(callSid, intent, query, response, tavi
   }
   // NEW: If there is no lastQueryContext but a location is detected, create a minimal context
   else if (location) {
+    logger.info('Creating new lastQueryContext with location:', {
+      callSid,
+      intent,
+      location,
+      query
+    });
     context.lastQueryContext = {
       intent: intent,
       location: location,
+      results: [],
+      timestamp: Date.now(),
+      smsResponse: response.smsResponse || null,
+      voiceResponse: response.voiceResponse || null,
+      needsLocation: false,
+      lastQuery: query
+    };
+  }
+  // NEW: If no lastQueryContext and no location, create a basic context for non-resource queries
+  else {
+    logger.info('Creating new lastQueryContext without location:', {
+      callSid,
+      intent,
+      query
+    });
+    context.lastQueryContext = {
+      intent: intent,
+      location: null,
       results: [],
       timestamp: Date.now(),
       smsResponse: response.smsResponse || null,
@@ -154,6 +187,13 @@ export function updateConversationContext(callSid, intent, query, response, tavi
 function extractLocationFromQuery(query) {
   if (!query) return null;
   const result = enhancedExtractLocation(query);
+  
+  logger.info('Location extraction result:', {
+    query,
+    result,
+    extractedLocation: result?.location || null
+  });
+  
   return result?.location || null;
 }
 
@@ -227,12 +267,14 @@ Available intents:
 - emergency_help: For urgent requests, immediate danger, or crisis situations.
 - general_information: For general questions about domestic violence, recognizing abuse, or available support resources.
 - other_resources: For non-shelter support like financial assistance, job training, child care (not related to entering a shelter), or unrelated services.
+- provide_location: For statements where the user provides or updates their location, such as 'I live in Oakland, California', 'My city is Austin', 'I'm in Chicago', or 'I am from Dallas'.
 - end_conversation: For requests to end the call, hang up, or stop the conversation.
 - off_topic: For requests unrelated to domestic violence support (e.g., entertainment, weather, personal issues not involving abuse).
 
 IMPORTANT:
 - Any query involving safety, housing, planning to leave, shelter access, bringing pets/kids/elders, or understanding resource needs related to shelters — should be classified as **find_shelter**.
 - Only classify as "off_topic" if the query is completely unrelated to domestic violence, shelter, legal help, counseling, or support resources.
+- If the user provides or updates their location (e.g., 'I live in Oakland, California'), classify as **provide_location**.
 - Respond with only the intent name (e.g., find_shelter), without quotes or extra text.
 
 User query: "${query}"
@@ -319,7 +361,7 @@ function calculateIntentConfidence(intent, query, response) {
   const validIntents = [
     'find_shelter', 'legal_services', 'counseling_services', 
     'emergency_help', 'general_information', 'other_resources', 
-    'end_conversation', 'off_topic'
+    'provide_location', 'end_conversation', 'off_topic'
   ];
   
   if (!validIntents.includes(intent)) {
@@ -336,6 +378,7 @@ function calculateIntentConfidence(intent, query, response) {
     'emergency_help': ['emergency', 'urgent', 'danger', 'help now', 'immediate', 'crisis'],
     'general_information': ['what is', 'how to', 'information', 'about', 'tell me'],
     'other_resources': ['financial', 'money', 'job', 'work', 'childcare', 'transportation'],
+    'provide_location': ['i live in', 'my city is', "i'm in", 'i am in', 'i am from', 'my location is', 'my address is', 'i reside in', 'i am located in', 'i stay in'],
     'end_conversation': ['goodbye', 'bye', 'end', 'stop', 'hang up', 'finish', 'thank you', 'thanks'],
     'off_topic': ['weather', 'sports', 'joke', 'funny', 'movie', 'music']
   };
@@ -392,6 +435,11 @@ function classifyIntentFallback(query) {
   // Check for end conversation first (before other checks)
   if (/\b(end|stop|goodbye|bye|hang up|disconnect|thank you|thanks)\b/i.test(lowerQuery)) {
     return 'end_conversation';
+  }
+
+  // --- NEW: Check for location-providing statements ---
+  if (/\b(i live in|my city is|i am in|i'm in|i am from|my location is|my address is|i reside in|i am located in|i stay in)\b/i.test(lowerQuery)) {
+    return 'provide_location';
   }
 
   // --- NEW: Check for resource-seeking queries with 'near me', 'my location', etc. ---
