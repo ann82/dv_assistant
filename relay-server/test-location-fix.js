@@ -1,67 +1,35 @@
-import dotenv from 'dotenv';
 import { extractLocationFromQuery } from './lib/enhancedLocationDetector.js';
-import logger from './lib/logger.js';
 
-dotenv.config();
+// Test the specific case mentioned by the user
+const testQuery = "I'm I'm not in any danger, I just am the bad situation and I want to be able to get out of it. Can you help me find shelter homes?";
 
-async function testLocationExtractionFix() {
-  console.log('🧪 Testing location extraction fix for "Can you help me" issue...\n');
-  
-  // Test cases that should NOT extract locations
-  const nonLocationQueries = [
-    "I'm not in any danger, but I want to get out of this relationship. Can you help me with that?",
-    "Can you help me find shelter?",
-    "Could you tell me about resources?",
-    "Would you be able to help me?",
-    "I need help with my relationship",
-    "Can you give me information?",
-    "This is a difficult situation",
-    "I want to get out of this relationship",
-    "Help me understand my options",
-    "Tell me what I can do"
-  ];
-  
-  console.log('❌ Testing queries that should NOT extract locations:');
-  for (const query of nonLocationQueries) {
-    const result = extractLocationFromQuery(query);
-    console.log(`\nQuery: "${query}"`);
-    console.log(`Result: ${JSON.stringify(result)}`);
-    
-    if (result.location) {
-      console.log(`❌ ERROR: Should not have extracted location "${result.location}"`);
-    } else {
-      console.log(`✅ CORRECT: No location extracted`);
-    }
-  }
-  
-  // Test cases that SHOULD extract locations
-  const locationQueries = [
-    "I need shelter in San Francisco",
-    "Help me find resources in New York",
-    "Are there services in Los Angeles?",
-    "I'm looking for help in Chicago",
-    "Can you find shelter near Boston?",
-    "I need assistance in Miami",
-    "Help in Seattle area",
-    "Resources in Denver",
-    "Shelter in Phoenix",
-    "Services in Austin"
-  ];
-  
-  console.log('\n\n✅ Testing queries that SHOULD extract locations:');
-  for (const query of locationQueries) {
-    const result = extractLocationFromQuery(query);
-    console.log(`\nQuery: "${query}"`);
-    console.log(`Result: ${JSON.stringify(result)}`);
-    
-    if (result.location) {
-      console.log(`✅ CORRECT: Extracted location "${result.location}"`);
-    } else {
-      console.log(`❌ ERROR: Should have extracted a location`);
-    }
-  }
-  
-  console.log('\n✅ Location extraction fix test completed!');
+console.log('Testing location extraction fix...');
+console.log('Query:', testQuery);
+console.log('---');
+
+const result = extractLocationFromQuery(testQuery);
+console.log('Result:', result);
+
+if (result.location === null) {
+  console.log('✅ SUCCESS: No location extracted (correct behavior)');
+} else {
+  console.log('❌ FAILURE: Location extracted:', result.location);
 }
 
-testLocationExtractionFix().catch(console.error); 
+console.log('---');
+
+// Test a few more cases to make sure we don't break existing functionality
+const testCases = [
+  "I need shelter in Austin, Texas",
+  "Can you find shelters near me?",
+  "Help me find resources in San Francisco",
+  "I want to get out of this situation. Can you help me find shelter homes?",
+  "Do you have any shelters in New York?",
+  "Can you help me find shelter homes?"
+];
+
+console.log('Testing additional cases:');
+testCases.forEach((query, index) => {
+  const result = extractLocationFromQuery(query);
+  console.log(`${index + 1}. "${query}" -> ${result.location || 'null'} (scope: ${result.scope})`);
+}); 

@@ -2,9 +2,23 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.12** (Updated: January 2025)
+**Current Version: 1.22.13** (Updated: January 2025)
 
 ---
+
+## 🆕 v1.22.13 Highlights
+- **Enhanced "Near Me" Detection**: Improved location detection to properly handle current location phrases
+  - **Robust Phrase Matching**: Enhanced detection of "near me", "around me", "close to me", "my location", "here", etc.
+  - **Exact Match Handling**: Special handling for exact matches like "me", "near me", "my location", "here"
+  - **Length-Based Processing**: Processes longer phrases first to avoid partial matches
+  - **Comprehensive Coverage**: Supports multiple variations of current location expressions
+  - **Context-Aware Follow-ups**: Enhanced follow-up detection for location mentions in "off_topic" intents
+- **Location Follow-up Enhancement**: System now detects when users mention locations in follow-up conversations
+  - **Intent-Aware Processing**: Treats location mentions in "off_topic" intents as resource requests when previous context was resource-seeking
+  - **Smart Query Rewriting**: Automatically rewrites queries to include location context for resource searches
+  - **Seamless Transitions**: Users can naturally mention locations in follow-up conversations without repeating their request
+- **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times
+- **TTS Compatibility**: Removed SSML from welcome messages for OpenAI TTS compatibility and improved speed
 
 ## 🆕 v1.22.12 Highlights
 - **SSML Voice Enhancement**: Implemented Speech Synthesis Markup Language for empathetic, human-like voice responses

@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.22.13] - 2025-01-XX
+
+### Added
+- **Enhanced "Near Me" Detection**: Improved location detection to properly handle current location phrases
+  - **Robust Phrase Matching**: Enhanced detection of "near me", "around me", "close to me", "my location", "here", etc.
+  - **Exact Match Handling**: Special handling for exact matches like "me", "near me", "my location", "here"
+  - **Length-Based Processing**: Processes longer phrases first to avoid partial matches
+  - **Comprehensive Coverage**: Supports multiple variations of current location expressions
+  - **Context-Aware Follow-ups**: Enhanced follow-up detection for location mentions in "off_topic" intents
+- **Location Follow-up Enhancement**: System now detects when users mention locations in follow-up conversations
+  - **Intent-Aware Processing**: Treats location mentions in "off_topic" intents as resource requests when previous context was resource-seeking
+  - **Smart Query Rewriting**: Automatically rewrites queries to include location context for resource searches
+  - **Seamless Transitions**: Users can naturally mention locations in follow-up conversations without repeating their request
+
+### Improved
+- **Location Detection Reliability**: More robust detection of current location phrases prevents incorrect location extraction
+- **Follow-up Conversation Flow**: Enhanced ability to handle location mentions in natural conversation flow
+- **Query Context Preservation**: Better preservation of user's original query context when handling location follow-ups
+
+### Fixed
+- **"Near Me" False Positives**: Fixed issue where "me" was being incorrectly extracted as a location in some contexts
+- **Location Follow-up Detection**: Fixed issue where location mentions in "off_topic" intents weren't triggering resource searches
+- **Test Reliability**: Updated tests to reflect improved location detection behavior
+
+### Changed
+- **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times
+- **TTS Compatibility**: Removed SSML from welcome messages for OpenAI TTS compatibility and improved speed
+
+### Technical Improvements
+- **Enhanced Location Detection Logic**: Improved `containsCurrentLocationWord` function with better phrase matching
+- **Query Handler Enhancement**: Added logic to detect and handle location follow-ups in "off_topic" intents
+- **Test Coverage**: Updated test expectations to match improved location detection behavior
+
+### Impact
+- **Before**: System could incorrectly extract "me" as a location and missed location follow-ups in conversations
+- **After**: System properly handles current location phrases and seamlessly processes location follow-ups
+- **User Experience**: More natural conversation flow and accurate location detection
+- **Developer Experience**: Better test coverage and more reliable location detection logic
+
 ## [v1.22.12] - 2025-07-14
 
 ### Added

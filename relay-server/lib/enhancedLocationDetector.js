@@ -26,8 +26,7 @@ const CURRENT_LOCATION_WORDS = [
   'close to me',
   'around me',
   'nearby',
-  'here',
-  'me'
+  'here'
 ];
 
 // Cache for location detection results
@@ -96,14 +95,15 @@ export async function detectLocation(location) {
   if (!location || typeof location !== 'string') {
     return { location: null, scope: 'none', isComplete: false };
   }
-  
-  const normalizedLocation = location.trim();
 
-  // Check for current-location words FIRST - before any other processing
-  if (containsCurrentLocationWord(normalizedLocation)) {
+  // Special case: If the input is exactly 'me', 'near me', 'my location', or 'here', treat as current location
+  const currentLocationPhrases = ['me', 'near me', 'my location', 'here'];
+  if (currentLocationPhrases.includes(location.trim().toLowerCase())) {
     return { location: null, scope: 'current-location', isComplete: false };
   }
   
+  const normalizedLocation = location.trim();
+
   // Normalize whitespace, lowercase, and pad with spaces for phrase matching
   let paddedInput = ' ' + location.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
   
@@ -207,7 +207,13 @@ export function extractLocationFromQuery(query) {
     return { location: null, scope: 'none' };
   }
 
-  logger.info('extractLocationFromQuery DEBUG - Input query:', query);
+  logger.info('extractLocationFromQuery DEBUG - Input query:', { query, queryLength: query.length });
+
+  // Special case: If the input is exactly 'me', 'near me', 'my location', or 'here', treat as current location
+  const currentLocationPhrases = ['me', 'near me', 'my location', 'here'];
+  if (currentLocationPhrases.includes(query.trim().toLowerCase())) {
+    return { location: null, scope: 'current-location' };
+  }
 
   // Simple approach: Look for common location patterns in the text
   const text = query.toLowerCase();
@@ -273,6 +279,7 @@ export function extractLocationFromQuery(query) {
   // Fallback: look for capitalized words that might be locations
   // This is more conservative and focuses on actual location patterns
   const words = query.split(/\s+/);
+  logger.info('extractLocationFromQuery DEBUG - Processing words:', { words, wordCount: words.length });
   const potentialLocations = [];
   
   // Common non-location words that should be ignored
@@ -285,16 +292,26 @@ export function extractLocationFromQuery(query) {
     'my', 'mine', 'you', 'your', 'yours', 'he', 'she', 'they', 'them',
     'we', 'us', 'our', 'ours', 'i', 'am', 'is', 'are', 'was', 'were', 'be',
     'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-    'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'cannot'
+    'could', 'should', 'may', 'might', 'must', 'shall', 'cannot'
   ];
+  
+  // Check if the query starts with a question word - if so, skip location extraction
+  const questionWords = ['can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall', 'do', 'does', 'did', 'are', 'is', 'was', 'were', 'have', 'has', 'had', 'what', 'where', 'when', 'why', 'how', 'which', 'who', 'whom', 'whose'];
+  const firstWord = words[0]?.replace(/[^\w]/g, '').toLowerCase();
+  if (questionWords.includes(firstWord)) {
+    logger.info('Query starts with question word, skipping location extraction:', { query, firstWord });
+    return { location: null, scope: 'none' };
+  }
   
   for (let i = 0; i < words.length; i++) {
     const word = words[i].replace(/[^\w]/g, '');
     
     // FIXED: More conservative check: must be capitalized, longer than 3 chars OR contain numbers
     // AND must not be a common non-location word
+    // AND must not be a single word that's too short (unless it contains numbers)
     if (((word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) || /\d/.test(word)) &&
-        !commonNonLocationWords.includes(word.toLowerCase())) {
+        !commonNonLocationWords.includes(word.toLowerCase()) &&
+        (word.length > 4 || /\d/.test(word) || words.length > 1)) {
       
       // Look for consecutive capitalized words or words with numbers
       let location = word;
@@ -527,6 +544,11 @@ export async function detectLocationWithGeocoding(query) {
     return locationInfo;
   }
   
+  // Special case: If the input is exactly 'me', treat as current location
+  if (query.trim().toLowerCase() === 'me') {
+    return { location: null, scope: 'current-location', isComplete: false };
+  }
+
   // Use geocoding to determine completeness
   const locationData = await detectLocation(locationInfo.location);
   

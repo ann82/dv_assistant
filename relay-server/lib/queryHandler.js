@@ -43,9 +43,52 @@ export async function handleUserQuery(query, callSid = null, detectedLanguage = 
     let context = null;
     if (callSid) {
       try {
-        const { getConversationContext } = await import('./intentClassifier.js');
+        const { getConversationContext, isResourceQuery } = await import('./intentClassifier.js');
         context = getConversationContext(callSid);
         logger.info('Retrieved conversation context for query handler:', { callSid, context: !!context });
+
+        // ENHANCEMENT: If current intent is off_topic, but a location is provided, and previous context was a resource-seeking intent, treat as location follow-up
+        if (intent === 'off_topic' && context?.lastQueryContext && isResourceQuery(context.lastQueryContext.intent)) {
+          // Try to extract location from the current query
+          const location = ResponseGenerator.extractLocationFromQuery(cleanQuery);
+          if (location && location.length > 0) {
+            logger.info('Detected location follow-up in off_topic intent. Forcing resource search with previous intent:', {
+              previousIntent: context.lastQueryContext.intent,
+              extractedLocation: location,
+              query: cleanQuery
+            });
+            // Rewrite the query as a resource request for the new location
+            const resourceIntent = context.lastQueryContext.intent;
+            const rewrittenQuery = await rewriteQuery(`find shelter in ${location}`, resourceIntent);
+            logger.info('Rewritten query for location follow-up:', { rewrittenQuery, resourceIntent });
+            // Proceed to search as if this was a resource request
+            const searchResult = await SearchIntegration.search(rewrittenQuery);
+            if (!searchResult.success) {
+              logger.info('Search integration failed, using GPT fallback:', searchResult.error);
+              const gptResponse = await fallbackResponse(rewrittenQuery, resourceIntent, callSid, detectedLanguage);
+              await logQueryHandling({ query: cleanQuery, intent: resourceIntent, usedGPT: true, score: 0 });
+              return { response: gptResponse, source: 'gpt' };
+            }
+            const tavilyData = searchResult.data;
+            if (!tavilyData.results || tavilyData.results.length === 0) {
+              logger.info('No Tavily results, using GPT fallback');
+              const gptResponse = await fallbackResponse(rewrittenQuery, resourceIntent, callSid, detectedLanguage);
+              await logQueryHandling({ query: cleanQuery, intent: resourceIntent, usedGPT: true, score: 0 });
+              return { response: gptResponse, source: 'gpt' };
+            }
+            const rerankedResults = await rerankByRelevance(rewrittenQuery, tavilyData.results);
+            const topScore = rerankedResults[0]?.relevanceScore || 0;
+            if (topScore < MIN_CONFIDENCE_SCORE) {
+              logger.info('Low confidence results, using GPT fallback', { topScore, threshold: MIN_CONFIDENCE_SCORE });
+              const gptResponse = await fallbackResponse(rewrittenQuery, resourceIntent, callSid, detectedLanguage);
+              await logQueryHandling({ query: cleanQuery, intent: resourceIntent, usedGPT: true, score: topScore });
+              return { response: gptResponse, source: 'gpt' };
+            }
+            const formattedResponse = ResponseGenerator.formatTavilyResponse({results: rerankedResults}, 'web', cleanQuery, 3);
+            await logQueryHandling({ query: cleanQuery, intent: resourceIntent, usedGPT: false, score: topScore });
+            return { response: formattedResponse.voiceResponse, source: 'tavily' };
+          }
+        }
       } catch (contextError) {
         logger.error('Error getting conversation context in query handler:', contextError);
         // Continue without context
