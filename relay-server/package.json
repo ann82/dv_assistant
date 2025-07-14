@@ -1,6 +1,6 @@
 {
   "name": "relay-server",
-  "version": "1.22.12",
+  "version": "1.28.0",
   "description": "A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.",
   "type": "module",
   "main": "server.js",

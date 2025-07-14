@@ -2,25 +2,32 @@
 
 A Node.js server for handling Twilio voice calls and web requests, providing domestic violence support resources.
 
-**Current Version: 1.22.11** (Updated: July 14, 2025)
+**Current Version: 1.22.12** (Updated: January 2025)
 
 ---
 
+## 🆕 v1.22.12 Highlights
+- **SSML Voice Enhancement**: Implemented Speech Synthesis Markup Language for empathetic, human-like voice responses
+- **Empathetic Voice Profiles**: Different voice characteristics for emotional contexts (empathetic, calm, clear, urgent)
+- **Natural Conversation Flow**: Strategic pauses and prosody for human-like interaction
+- **Multi-Language SSML Support**: Enhanced voice responses in English, Spanish, French, and German
+- **Comprehensive Template System**: SSML templates for all response types (emergency, welcome, location, resources, follow-ups, errors)
+
 ## 🆕 v1.22.11 Highlights
+- **Intent-First Flow Restoration**: Restored proper intent classification and location extraction behavior
+- **Processing Pipeline Optimization**: Implemented intent-first approach across all processing pipelines
+- **Conditional Location Extraction**: Only extract location for location-seeking intents (`find_shelter`, `legal_services`, `counseling_services`, `other_resources`)
+- **Context-Aware Follow-ups**: Enhanced follow-up detection using conversation context
+- **Performance Improvements**: Reduced unnecessary API calls and improved response quality
+- **New Processing Flow**: Intent → Context → Follow-up detection → Location extraction (only if needed) → Query rewriting → Search → Response
+
+## 🆕 v1.22.10 Highlights
 - **Location Validation System**: Uses Nominatim geocoding to validate user-provided locations and prompt for clarification when needed
 - **Transcription Validation**: Automatically detects and corrects common speech recognition errors (e.g., "I Station 2" → "Station 2")
 - **Speech Monitoring**: Real-time monitoring and analysis tools for speech transcription quality and performance
 - **Performance Optimization**: Reduced TTS timeouts and enhanced speech recognition parameters for faster response times
 - **Query Rewriting**: Improved to preserve user's original query context and reduce overly generic terms
 - **No More Annoying Prompts**: Removed "I didn't hear anything" message that was playing after every response
-
-## 🆕 v1.22.7 Highlights
-- **TTS Voice Parameter Error Fixed:** All TTS calls now use the correct OpenAI voice for each language (nova, shimmer, echo, onyx, etc.)
-- **No More Circular JSON Errors:** Logging middleware now handles TwiML objects with circular references safely
-- **Voice Selection:** Voice is now determined from language config, not request body, ensuring correct TTS voice for every call
-- **API Validation:** `/twilio/voice` and `/twilio/voice/process` endpoints now validate required fields and return 400 errors if missing
-- **Request Sanitization:** Sensitive fields (password, token, apiKey, etc.) are now redacted in logs
-- **Test Suite:** All tests pass (482 total, 472 passed, 10 skipped)
 
 ---
 
@@ -78,6 +85,7 @@ npm test
 ## 🎯 Features
 
 ### Core Functionality
+- **Intent-First Processing**: Always classify intent before any other processing for optimal efficiency
 - **Voice Call Processing**: Handle incoming Twilio voice calls with speech recognition
 - **AI-Powered Responses**: Generate contextual responses using OpenAI GPT models
 - **TTS-Based Welcome Messages**: Welcome messages are generated using OpenAI TTS for natural, high-quality audio
@@ -88,6 +96,9 @@ npm test
 - **Emergency Handling**: Immediate 911 guidance for emergency situations
 
 ### Enhanced Features
+- **Conditional Location Extraction**: Only extract location for resource-seeking intents
+- **Context-Aware Follow-ups**: Use conversation context to detect and handle follow-ups
+- **Pattern Matching Priority**: Use fast pattern matching before expensive APIs
 - **Comprehensive Logging**: Detailed request/response logging with requestId, CallSid, and text tracking
 - **Error Handling**: Robust error handling with graceful degradation and fallback responses
 - **Performance Monitoring**: Real-time performance tracking and optimization
@@ -95,29 +106,330 @@ npm test
 - **WebSocket Support**: Real-time communication for web clients
 - **SMS Integration**: Send follow-up messages and resource summaries via SMS
 
-### Recent Improvements (v1.22.6)
-- **TTS Language Configuration Fix**: Resolved critical issue where welcome messages were failing due to incorrect language configuration handling
-- **Enhanced Debug Logging**: Comprehensive debug logging throughout the TTS pipeline for better troubleshooting
-- **Language Configuration Consistency**: All language-related operations now use injected configuration consistently
-- **Improved Error Handling**: Enhanced error handling with detailed logging for debugging TTS issues
+## 🏗️ Architecture Overview
 
-### Recent Improvements (v1.22.5)
-- **TTS-Based Welcome Messages**: The welcome message for incoming calls is now generated using the TTS pipeline, ensuring the full, configurable prompt is played to callers with natural, high-quality audio
-- **Robust TTS Fallback**: If TTS generation fails (e.g., OpenAI API error), the system gracefully falls back to a simple TwiML `<Say>` so callers always hear a message
-- **Improved Metadata Logging**: All TTS and TwiML generation logs now include requestId, callSid, text preview, and other metadata for easier debugging and traceability
-- **TTS Pipeline Compatibility**: The TTS pipeline now works with the actual TTS service response format, handling both audioBuffer and audioUrl, and saving audio files as needed
-- **Enhanced Error Handling**: Comprehensive error handling throughout the speech processing pipeline with graceful degradation
+### Intent-First Processing Pipeline
 
-### Recent Improvements (v1.22.4)
-- **Configurable Welcome Messages**: Welcome messages now use language-specific configuration from the language config system
-- **Enhanced Route-Level Debugging**: Added comprehensive console logging for route entry points with request tracking
-- **Speech Processing Robustness**: Significantly improved error resilience in speech processing with graceful degradation
+The system follows a structured processing flow to ensure accurate and efficient responses:
 
-### Recent Improvements (v1.22.3)
-- **Fixed SpeechHandler Errors**: Resolved critical speech processing validation errors
-- **Enhanced Debugging**: Added comprehensive logging throughout the speech processing flow
-- **Improved Error Handling**: Better error recovery and fallback mechanisms
-- **Streamlined Processing**: Optimized request processing pipeline for better reliability
+```mermaid
+graph TD
+    A[User Input] --> B[Intent Classification]
+    B --> C[Context Retrieval]
+    C --> D[Follow-up Detection]
+    D --> E{Is Follow-up?}
+    E -->|Yes| F[Handle Follow-up]
+    E -->|No| G{Location-Seeking Intent?}
+    G -->|Yes| H[Extract Location]
+    G -->|No| I[Skip Location Extraction]
+    H --> J[Query Rewriting]
+    I --> J
+    J --> K[Search & Response]
+    F --> L[Return Response]
+    K --> L
+```
+
+### Key Principles
+
+1. **Intent Classification First** - Always determine user intent before any other processing
+2. **Conditional Location Extraction** - Only extract location for resource-seeking intents
+3. **Context-Aware Follow-ups** - Use conversation context to detect and handle follow-ups
+4. **Pattern Matching Priority** - Use fast pattern matching before expensive APIs
+5. **Graceful Degradation** - Fallback mechanisms for all critical components
+
+### Location-Seeking Intents
+
+Location extraction is only performed for the following intents:
+- `find_shelter` - Domestic violence shelters and safe housing
+- `legal_services` - Legal aid and attorney services
+- `counseling_services` - Therapy and mental health support
+- `other_resources` - General domestic violence resources
+
+## 📡 API Documentation
+
+### Processing Flow
+
+The system uses an **intent-first processing approach** to efficiently handle user queries:
+
+1. **Intent Classification** - Always performed first to determine user intent
+2. **Context Retrieval** - Get conversation context for follow-up detection
+3. **Follow-up Detection** - Check if query is a follow-up to previous conversation
+4. **Conditional Location Extraction** - Only extract location for location-seeking intents
+5. **Query Rewriting** - Enhance query based on intent and context
+6. **Search & Response** - Generate appropriate response using Tavily or GPT
+
+### Voice Processing
+
+#### POST /twilio/voice/process
+
+Processes voice input and returns TwiML response.
+
+**Request Body:**
+```json
+{
+  "CallSid": "string",
+  "SpeechResult": "string",
+  "SpeechResultConfidence": "number"
+}
+```
+
+**Processing Steps:**
+1. **Intent Classification** - Classify user intent using GPT-3.5-turbo
+2. **Context Check** - Retrieve conversation context for follow-up detection
+3. **Follow-up Handling** - If follow-up detected, use context for response
+4. **Location Extraction** - Only for location-seeking intents
+5. **Query Enhancement** - Rewrite query with intent-specific terms
+6. **Response Generation** - Use Tavily search or GPT fallback
+
+**Response:**
+- TwiML with TTS-generated audio response
+- SMS details if requested
+- Follow-up prompts for location if needed
+
+### Web Processing
+
+#### POST /twilio/voice/web
+
+Processes text input for web interface.
+
+**Request Body:**
+```json
+{
+  "speechResult": "string"
+}
+```
+
+**Processing Steps:**
+- Same intent-first flow as voice processing
+- Returns text response instead of TwiML
+
+### Intent Classification
+
+#### Available Intents
+
+- `find_shelter` - Shelter and housing requests
+- `legal_services` - Legal aid and attorney requests
+- `counseling_services` - Therapy and mental health requests
+- `emergency_help` - Urgent crisis situations
+- `other_resources` - General resource requests
+- `general_information` - General questions
+- `end_conversation` - Conversation termination
+- `off_topic` - Non-domestic violence topics
+
+#### Intent Detection
+
+- **Primary**: GPT-3.5-turbo classification with structured prompts
+- **Fallback**: Pattern matching for API failures
+- **Confidence**: Calculated based on response quality
+
+### Location Processing
+
+#### Location Extraction Strategy
+
+1. **Pattern Matching** - Fast, cost-effective location detection
+2. **Geocoding** - Only for ambiguous cases requiring validation
+3. **Context Reuse** - Use previous location from conversation context
+4. **Follow-up Handling** - Detect location statements in follow-ups
+
+#### Location Types
+
+- **Complete** - Full location with city/state/country
+- **Incomplete** - Partial location requiring clarification
+- **Current Location** - "near me" or "my location" requests
+- **Follow-up** - Location provided in response to previous request
+
+### Conversation Context
+
+#### Context Management
+
+- **Storage**: In-memory with 15-minute timeout
+- **Content**: Intent, location, results, timestamps
+- **Follow-up Detection**: Uses context to identify related queries
+- **Location Persistence**: Maintains location across conversation
+
+#### Context Structure
+
+```json
+{
+  "lastQueryContext": {
+    "intent": "string",
+    "location": "string",
+    "results": "array",
+    "timestamp": "number",
+    "needsLocation": "boolean",
+    "lastQuery": "string"
+  }
+}
+```
+
+### Error Handling
+
+#### Fallback Strategies
+
+1. **Intent Classification Failure** - Use pattern matching fallback
+2. **Location Extraction Failure** - Prompt user for location
+3. **Search Failure** - Use GPT fallback response
+4. **Context Loss** - Request user to repeat information
+
+#### Error Responses
+
+- **Voice**: TTS-generated error messages with retry prompts
+- **Web**: Text error messages with guidance
+- **Logging**: Comprehensive error logging for debugging
+
+## 🛠️ Development Guide
+
+### File Structure
+
+```
+relay-server/
+├── controllers/
+│   └── twilioController.js          # Main voice processing controller
+├── lib/
+│   ├── intentClassifier.js          # Intent classification and follow-up handling
+│   ├── queryHandler.js              # Main query processing pipeline
+│   ├── enhancedQueryRewriter.js     # Query rewriting with intent awareness
+│   ├── enhancedLocationDetector.js  # Location extraction (conditional)
+│   └── response.js                  # Response generation
+├── routes/
+│   └── twilio.js                    # API endpoints
+└── docs/
+    └── DEPLOYMENT_GUIDE.md          # Deployment instructions
+```
+
+### Core Components
+
+#### 1. Intent Classification (`intentClassifier.js`)
+
+**Purpose**: Classify user intent using AI and pattern matching
+
+**Key Functions**:
+- `getIntent(query)` - Primary intent classification
+- `handleFollowUp(query, context)` - Follow-up detection and handling
+- `updateConversationContext()` - Context management
+
+#### 2. Query Processing (`queryHandler.js`)
+
+**Purpose**: Main processing pipeline following intent-first approach
+
+**Processing Steps**:
+1. Intent classification
+2. Context retrieval
+3. Follow-up detection
+4. Conditional location extraction
+5. Query rewriting
+6. Search and response generation
+
+#### 3. Query Rewriting (`enhancedQueryRewriter.js`)
+
+**Purpose**: Enhance queries based on intent and context
+
+**Features**:
+- Intent-specific query enhancement
+- Context-aware location handling
+- Conversation context integration
+
+#### 4. Location Detection (`enhancedLocationDetector.js`)
+
+**Purpose**: Extract location only when needed
+
+**Strategy**:
+- Pattern matching first (fast)
+- Geocoding only for ambiguous cases
+- Context reuse for follow-ups
+
+### Best Practices
+
+#### 1. Intent-First Processing
+
+**Always classify intent first**:
+```javascript
+// ✅ Correct
+const intent = await getIntent(query);
+if (locationSeekingIntents.includes(intent)) {
+  const location = await extractLocation(query);
+}
+
+// ❌ Incorrect
+const location = await extractLocation(query);
+const intent = await getIntent(query);
+```
+
+#### 2. Conditional Location Extraction
+
+**Only extract location when needed**:
+```javascript
+// ✅ Correct
+const isLocationSeekingIntent = locationSeekingIntents.includes(intent);
+if (isLocationSeekingIntent) {
+  location = await extractLocation(query);
+}
+
+// ❌ Incorrect
+location = await extractLocation(query); // Always extracts
+```
+
+#### 3. Context-Aware Processing
+
+**Use conversation context for follow-ups**:
+```javascript
+// ✅ Correct
+const context = getConversationContext(callSid);
+if (context?.lastQueryContext) {
+  const followUp = await handleFollowUp(query, context.lastQueryContext);
+  if (followUp) return followUp;
+}
+
+// ❌ Incorrect
+// Process without checking context
+```
+
+#### 4. Pattern Matching Priority
+
+**Use fast pattern matching before expensive APIs**:
+```javascript
+// ✅ Correct
+const location = extractLocationByPattern(query);
+if (!location) {
+  location = await extractLocationWithAI(query);
+}
+
+// ❌ Incorrect
+const location = await extractLocationWithAI(query); // Always expensive
+```
+
+### Performance Optimizations
+
+#### Efficiency Improvements
+
+- **Intent-First Processing** - Avoid unnecessary location extraction
+- **Pattern Matching Priority** - Use fast pattern matching before expensive APIs
+- **Context Reuse** - Leverage conversation context to reduce API calls
+- **Conditional Processing** - Only perform location extraction when needed
+
+#### API Call Optimization
+
+- **Reduced Geocoding Calls** - Only for ambiguous cases
+- **Context-Aware Follow-ups** - Use existing context instead of re-processing
+- **Intent-Based Filtering** - Skip location extraction for non-resource intents
+
+### Testing
+
+#### Test Coverage
+
+- Intent classification accuracy
+- Location extraction precision
+- Follow-up detection reliability
+- Context management persistence
+- Error handling robustness
+
+#### Test Scenarios
+
+- New resource requests with location
+- Follow-up questions without location
+- Context-aware location follow-ups
+- Non-resource intent processing
+- Error condition handling
 
 ## 🎤 Welcome Message System
 
@@ -198,83 +510,64 @@ Welcome messages are now configurable per language using the language configurat
 - `POST /twilio/web/process` - Process web-based speech input
 - `GET /health` - Health check endpoint
 
-### SMS Endpoints
-- `POST /twilio/sms` - Handle SMS messages
-- `POST /twilio/consent` - Handle SMS consent
-
-## 🔧 Configuration
-
-### TTS Configuration
-```javascript
-// TTS Provider and Voice Settings
-TTS_PROVIDER=openai          // TTS provider (openai, polly, stub)
-TTS_VOICE=nova               // OpenAI TTS voice (nova, alloy, echo, fable, onyx, shimmer)
-ENABLE_TTS=true              // Enable/disable TTS functionality
-TTS_TIMEOUT=15000            // TTS timeout in milliseconds
-```
-
-### Voice Configuration
-```javascript
-// Supported voices per language
-'en-US': { twilioVoice: 'Polly.Amy', openaiVoice: 'nova' }
-'es-ES': { twilioVoice: 'Polly.Lupe', openaiVoice: 'shimmer' }
-'fr-FR': { twilioVoice: 'Polly.Lea', openaiVoice: 'echo' }
-'de-DE': { twilioVoice: 'Polly.Vicki', openaiVoice: 'onyx' }
-```
-
-### Logging Configuration
-The system now includes comprehensive logging with:
-- Request/response tracking with unique requestIds
-- CallSid tracking for Twilio calls
-- Text content logging for debugging
-- Voice configuration tracking
-- TTS operation logging with metadata
-- Step-by-step processing logs
-
-## 🧪 Testing
-
-Run the test suite:
-```bash
-npm test
-```
-
-The test suite includes:
-- Unit tests for all core components
-- Integration tests for API endpoints
-- TTS functionality tests
-- Performance and error handling tests
-- 470+ tests with comprehensive coverage
-
-## 📊 Monitoring
-
-### Health Checks
+### Health Check Endpoints
 - `GET /health` - Basic health status
-- `GET /health/detailed` - Detailed system status including TTS service health
+- `GET /health/detailed` - Comprehensive system health
+- `GET /health/integrations` - External integration status
+- `GET /health/config` - Configuration status
+- `GET /health/ready` - Kubernetes readiness probe
+- `GET /health/live` - Kubernetes liveness probe
+- `GET /health/performance` - Performance metrics
 
-### Logging
-All requests are logged with:
-- Unique requestId for tracking
-- CallSid for Twilio calls
-- Processing time and status
-- TTS operation details and metadata
-- Error details when applicable
+## 📊 Monitoring and Debugging
 
-## 🤝 Contributing
+### Key Metrics
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
+Monitor these metrics to ensure system health:
 
-## 📄 License
+1. **Intent Classification Accuracy** - Should be >90%
+2. **Location Extraction Precision** - Should be >85%
+3. **Follow-up Detection Rate** - Should be >80%
+4. **Processing Time** - Should be <5 seconds
+5. **API Call Reduction** - Should see 30-50% reduction in geocoding calls
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Debugging Tools
 
-## 🆘 Support
+1. **Request Logging** - All requests logged with unique IDs
+2. **Processing Steps** - Each step logged with timing
+3. **Error Tracking** - Comprehensive error logging
+4. **Context Inspection** - Conversation context debugging
 
-For support and questions:
-- Check the [API Documentation](docs/API_DOCUMENTATION.md)
-- Review the [Developer Guide](docs/DEVELOPER_GUIDE.md)
-- Check the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
+### Common Issues
+
+1. **Intent Misclassification** - Check intent prompts and fallback patterns
+2. **Location Extraction Failures** - Verify pattern matching and geocoding
+3. **Follow-up Detection Issues** - Check context management and patterns
+4. **Performance Degradation** - Monitor API call frequency and timing
+
+## 🚀 Deployment
+
+### Environment Variables
+
+Ensure these are configured:
+
+```bash
+OPENAI_API_KEY=your_openai_key
+TAVILY_API_KEY=your_tavily_key
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+```
+
+### Performance Optimization
+
+1. **Caching** - Implement caching for frequently requested data
+2. **Rate Limiting** - Configure appropriate rate limits
+3. **Monitoring** - Set up comprehensive monitoring
+4. **Scaling** - Plan for horizontal scaling
+
+### Security Considerations
+
+1. **Input Validation** - Validate all user inputs
+2. **API Key Security** - Secure API key storage
+3. **Error Handling** - Don't expose sensitive information in errors
+4. **Rate Limiting** - Prevent abuse and DoS attacks

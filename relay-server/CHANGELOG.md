@@ -801,7 +801,7 @@ All notable changes to this project will be documented in this file.
   - **State Management**: Dynamic conversation state detection and progression tracking
   - **Semantic Caching**: Intelligent caching for performance optimization
 - **Context Integration Layer**: Bridge connecting enhanced and legacy systems
-  - **Backward Compatibility**: Seamless integration with existing conversation system
+  - **Backward Compatibility**: Seamlessly integrated with existing conversation system
   - **Fallback Handling**: Automatic fallback to legacy system if enhanced features fail
   - **Comprehensive Context**: Unified access to both enhanced and legacy context
   - **Debugging Tools**: Context insights and statistics for monitoring
@@ -1647,3 +1647,75 @@ All notable changes to this project will be documented in this file.
 - All Twilio webhook endpoints are now reliably accessible and functional
 
 ## [Previous versions...]
+
+## [v1.22.11] - 2025-01-XX
+
+### Fixed
+- **Intent-First Flow Restoration**: Restored proper intent classification and location extraction behavior
+  - **Root Cause**: System was extracting location before intent classification, leading to inefficient processing
+  - **Solution**: Implemented proper intent-first flow across all processing pipelines
+  - **Changes**:
+    - **twilioController.js**: Modified `processSpeechResult` to classify intent first, then only extract location for location-seeking intents
+    - **queryHandler.js**: Updated `handleUserQuery` to follow intent-first approach with proper follow-up detection
+    - **enhancedQueryRewriter.js**: Modified `rewriteQuery` to only extract location for location-seeking intents
+    - **intentClassifier.js**: Updated `handleFollowUp` to use pattern matching first, geocoding only for ambiguous cases
+  - **New Flow**: Intent → Context → Follow-up detection → Location extraction (only if needed) → Query rewriting → Search → Response
+  - **Location-Seeking Intents**: Only `find_shelter`, `legal_services`, `counseling_services`, `other_resources` trigger location extraction
+  - **Impact**: Improved accuracy, reduced unnecessary API calls, better follow-up handling
+
+### Technical Details
+- **Intent Classification Priority**: Always happens first in processing pipeline
+- **Context-Aware Follow-ups**: Uses conversation context to detect and handle follow-up questions
+- **Conditional Location Extraction**: Only extracts location for resource-seeking intents
+- **Pattern Matching First**: Uses fast pattern matching before expensive geocoding
+- **Ambiguous Case Handling**: Falls back to geocoding only when pattern matching is unclear
+
+## [v1.22.12] - 2025-01-XX
+
+### Added
+- **SSML Voice Enhancement**: Implemented Speech Synthesis Markup Language for empathetic, human-like voice responses
+  - **New SSML Templates System**: Created comprehensive template library for different response types
+    - Emergency and crisis response templates with empathetic tone
+    - Welcome and introduction templates with warm, caring voice
+    - Location and resource templates with clear, helpful guidance
+    - Follow-up question templates for natural conversation flow
+    - Error and fallback templates with supportive messaging
+    - Conversation end templates with compassionate closing
+  - **Voice Characteristics**: Implemented different voice profiles for emotional contexts
+    - Empathetic: Slower rate, higher pitch for emotional support
+    - Calm: Medium rate, slightly higher pitch for reassurance
+    - Clear: Standard rate and pitch for information delivery
+    - Urgent: Faster rate for emergency situations
+  - **Natural Pauses**: Added strategic breaks for human-like conversation pacing
+    - Short pauses (300ms) for natural flow
+    - Medium pauses (500ms) for emphasis
+    - Long pauses (800ms) for emotional impact
+    - Very long pauses (1200ms) for crisis situations
+  - **Multi-Language Support**: Updated language configuration with SSML formatting
+    - English (US): Enhanced with empathetic prosody and pauses
+    - Spanish (ES): Culturally appropriate SSML patterns
+    - French (FR): Natural French speech patterns
+    - German (DE): German-specific prosody and timing
+  - **Integration Points**: Seamlessly integrated SSML into existing response pipeline
+    - Response generation system now uses SSML templates
+    - Language configuration updated with SSML-formatted prompts
+    - Error handling enhanced with empathetic SSML responses
+    - Follow-up detection improved with natural conversation flow
+  - **Utility Functions**: Added helper functions for SSML management
+    - `applySSMLTemplate()`: Apply appropriate SSML formatting
+    - `isSSML()`: Check if text is already SSML-formatted
+    - `removeSSML()`: Clean SSML tags for logging/processing
+  - **Benefits**: 
+    - More empathetic and human-like voice responses
+    - Better user engagement and trust building
+    - Reduced cognitive load for users in crisis
+    - Professional voice application standards
+    - Enhanced accessibility and user experience
+
+### Technical Details
+- **File**: `relay-server/lib/ssmlTemplates.js` - New SSML template system
+- **File**: `relay-server/lib/response.js` - Updated to use SSML templates
+- **File**: `relay-server/lib/languageConfig.js` - Enhanced with SSML formatting
+- **Voice Profiles**: Configurable prosody settings for different emotional contexts
+- **Pause Management**: Strategic timing for natural conversation flow
+- **Template Categories**: Emergency, welcome, location, resource, follow-up, error, conversation

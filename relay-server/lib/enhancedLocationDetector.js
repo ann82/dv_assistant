@@ -97,7 +97,14 @@ export async function detectLocation(location) {
     return { location: null, scope: 'none', isComplete: false };
   }
   
-  // Normalize whitespace, lowercase, and pad with spaces
+  const normalizedLocation = location.trim();
+
+  // Check for current-location words FIRST - before any other processing
+  if (containsCurrentLocationWord(normalizedLocation)) {
+    return { location: null, scope: 'current-location', isComplete: false };
+  }
+  
+  // Normalize whitespace, lowercase, and pad with spaces for phrase matching
   let paddedInput = ' ' + location.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
   
   // Sort phrases by length (longest first)
@@ -108,13 +115,6 @@ export async function detectLocation(location) {
     if (paddedInput.includes(phraseWithSpaces)) {
       return { location: null, scope: 'current-location', isComplete: false };
     }
-  }
-
-  const normalizedLocation = location.trim();
-
-  // Treat current-location words as incomplete (word boundary match)
-  if (containsCurrentLocationWord(normalizedLocation)) {
-    return { location: null, scope: 'current-location', isComplete: false };
   }
 
   // Check cache first
@@ -147,7 +147,7 @@ export async function detectLocation(location) {
   }
   
   // Fallback to pattern matching
-  // Prevent fallback from extracting 'me', 'here', etc. as a location
+  // Double-check that we haven't missed any current-location words
   if (containsCurrentLocationWord(normalizedLocation)) {
     return { location: null, scope: 'current-location', isComplete: false };
   }
@@ -249,9 +249,7 @@ export function extractLocationFromQuery(query) {
     // New: Look for standalone location names (like "I Station 2")
     /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Station|Street|Avenue|Road|Drive|Lane|Place|Boulevard|Highway|Freeway|Interstate|Center|Plaza|Mall|Building|Complex|District|Neighborhood|Park|Area|Region|County|City|Town|State|Province|Country))\b/i,
     // New: Look for numbered locations (like "Station 2", "Building 5")
-    /\b([A-Z][a-z]*\s+\d+)\b/i,
-    // FIXED: More specific pattern for location names - avoid matching single words like "Yeah"
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g
+    /\b([A-Z][a-z]*\s+\d+)\b/i
   ];
 
   logger.info('extractLocationFromQuery DEBUG - Checking simple patterns');
@@ -277,11 +275,26 @@ export function extractLocationFromQuery(query) {
   const words = query.split(/\s+/);
   const potentialLocations = [];
   
+  // Common non-location words that should be ignored
+  const commonNonLocationWords = [
+    'can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall',
+    'yes', 'no', 'okay', 'sure', 'right', 'left', 'here', 'there', 'yeah',
+    'help', 'need', 'want', 'looking', 'find', 'get', 'give', 'tell', 'show',
+    'know', 'think', 'feel', 'hope', 'wish', 'like', 'love', 'hate', 'want',
+    'danger', 'relationship', 'out', 'this', 'that', 'these', 'those',
+    'my', 'mine', 'you', 'your', 'yours', 'he', 'she', 'they', 'them',
+    'we', 'us', 'our', 'ours', 'i', 'am', 'is', 'are', 'was', 'were', 'be',
+    'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+    'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'cannot'
+  ];
+  
   for (let i = 0; i < words.length; i++) {
     const word = words[i].replace(/[^\w]/g, '');
     
     // FIXED: More conservative check: must be capitalized, longer than 3 chars OR contain numbers
-    if ((word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) || /\d/.test(word)) {
+    // AND must not be a common non-location word
+    if (((word.length > 3 && word.charAt(0) === word.charAt(0).toUpperCase()) || /\d/.test(word)) &&
+        !commonNonLocationWords.includes(word.toLowerCase())) {
       
       // Look for consecutive capitalized words or words with numbers
       let location = word;
@@ -290,7 +303,8 @@ export function extractLocationFromQuery(query) {
       while (j < words.length) {
         const nextWord = words[j].replace(/[^\w]/g, '');
         // FIXED: Include words with numbers or capitalized words
-        if ((nextWord.length > 3 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) || /\d/.test(nextWord)) {
+        if (((nextWord.length > 3 && nextWord.charAt(0) === nextWord.charAt(0).toUpperCase()) || /\d/.test(nextWord)) &&
+            !commonNonLocationWords.includes(nextWord.toLowerCase())) {
           location += ' ' + nextWord;
           j++;
         } else {
@@ -318,9 +332,9 @@ export function extractLocationFromQuery(query) {
       const hasNumberPattern = /\d+/.test(location); // Contains numbers (like "Station 2")
       const hasMultipleWords = location.split(' ').length > 1; // Multiple words
       
-      // FIXED: Prefer multi-word locations and avoid single words like "Yeah"
+      // FIXED: Prefer multi-word locations and avoid common non-location words
       if ((hasStrongIndicator || hasCommaPattern || hasNumberPattern || hasMultipleWords) && 
-          !['yeah', 'yes', 'no', 'okay', 'sure', 'right', 'left', 'here', 'there'].includes(locationLower)) {
+          !commonNonLocationWords.includes(locationLower)) {
         potentialLocations.push(location);
       }
       
@@ -366,15 +380,37 @@ function cleanExtractedLocation(location) {
 
   let cleaned = location.trim();
   
-  // FIXED: Preserve the original location structure, only remove very basic non-location words
-  const basicNonLocationWords = ['me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere'];
+  // FIXED: Expanded list of non-location words to filter out
+  const nonLocationWords = [
+    'me', 'here', 'nearby', 'close', 'around', 'somewhere', 'anywhere',
+    'can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall',
+    'yes', 'no', 'okay', 'sure', 'right', 'left', 'yeah',
+    'help', 'need', 'want', 'looking', 'find', 'get', 'give', 'tell', 'show',
+    'know', 'think', 'feel', 'hope', 'wish', 'like', 'love', 'hate',
+    'danger', 'relationship', 'out', 'this', 'that', 'these', 'those',
+    'my', 'mine', 'you', 'your', 'yours', 'he', 'she', 'they', 'them',
+    'we', 'us', 'our', 'ours', 'i', 'am', 'is', 'are', 'was', 'were', 'be',
+    'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+    'could', 'should', 'may', 'might', 'must', 'shall', 'cannot',
+    'any', 'but', 'want', 'to', 'get', 'of', 'with', 'that', 'what'
+  ];
   
-  // FIXED: Don't split and filter words that might break location names like "Station 2"
-  // Instead, only remove complete matches of basic non-location words
+  // FIXED: More aggressive filtering - if the location contains too many non-location words, reject it
   const words = cleaned.split(/\s+/);
+  const nonLocationCount = words.filter(word => {
+    const cleanWord = word.replace(/[^\w]/g, '').toLowerCase();
+    return nonLocationWords.includes(cleanWord);
+  }).length;
+  
+  // If more than 50% of words are non-location words, reject the entire location
+  if (nonLocationCount > words.length * 0.5) {
+    return null;
+  }
+  
+  // Filter out non-location words
   const filteredWords = words.filter(word => {
     const cleanWord = word.replace(/[^\w]/g, '').toLowerCase();
-    return !basicNonLocationWords.includes(cleanWord) || word.length > 1;
+    return !nonLocationWords.includes(cleanWord);
   });
   
   if (filteredWords.length === 0) {
@@ -383,6 +419,11 @@ function cleanExtractedLocation(location) {
   
   // FIXED: Preserve original structure and capitalization
   cleaned = filteredWords.join(' ');
+  
+  // Additional check: if the cleaned location is too short or contains mostly non-location words, reject it
+  if (cleaned.length < 3 || cleaned.split(' ').length < 1) {
+    return null;
+  }
   
   return cleaned || null;
 }
@@ -599,8 +640,8 @@ function containsCurrentLocationWord(text) {
   const normalized = text.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
   
   for (const phrase of CURRENT_LOCATION_WORDS) {
-    // For single words like 'me', 'here', use word boundaries
-    if (phrase.length === 1 || phrase.split(' ').length === 1) {
+    // For single words like 'here', 'me', use word boundaries
+    if (phrase.length <= 4 || phrase.split(' ').length === 1) {
       const wordBoundaryRegex = new RegExp(`\\b${phrase}\\b`, 'i');
       if (wordBoundaryRegex.test(normalized)) {
         return true;
@@ -612,5 +653,17 @@ function containsCurrentLocationWord(text) {
       }
     }
   }
-  return false;
+  
+  // Special case: Only detect "me" when it's part of location-specific phrases
+  const locationSpecificMePatterns = [
+    /\bnear\s+me\b/i,
+    /\bclose\s+to\s+me\b/i,
+    /\baround\s+me\b/i,
+    /\bshelter\s+(?:near|close\s+to|around)\s+me\b/i,
+    /\bresources?\s+(?:near|close\s+to|around)\s+me\b/i,
+    /\bservices?\s+(?:near|close\s+to|around)\s+me\b/i
+    // Removed /\bhelp\s+me\s+(?:find|locate|get)\b/i as it's too broad and catches valid queries
+  ];
+  
+  return locationSpecificMePatterns.some(pattern => pattern.test(normalized));
 } 
