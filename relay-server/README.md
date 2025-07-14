@@ -7,6 +7,10 @@ A Node.js server for handling Twilio voice calls and web requests, providing dom
 ---
 
 ## 🆕 v1.22.13 Highlights
+- **Critical Intent-First Processing Fix**: Fixed critical violation where location extraction was happening before intent classification
+  - **Root Cause**: Simple pattern matching was extracting non-location words like "Yeah" as locations
+  - **Solution**: Enhanced location detection that properly filters non-location words and follows intent-first processing
+  - **Impact**: System now strictly follows: Intent → Context → Follow-up → Location (only if needed)
 - **Enhanced "Near Me" Detection**: Improved location detection to properly handle current location phrases
   - **Robust Phrase Matching**: Enhanced detection of "near me", "around me", "close to me", "my location", "here", etc.
   - **Exact Match Handling**: Special handling for exact matches like "me", "near me", "my location", "here"

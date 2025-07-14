@@ -20,26 +20,34 @@ All notable changes to this project will be documented in this file.
 - **Location Detection Reliability**: More robust detection of current location phrases prevents incorrect location extraction
 - **Follow-up Conversation Flow**: Enhanced ability to handle location mentions in natural conversation flow
 - **Query Context Preservation**: Better preservation of user's original query context when handling location follow-ups
+- **Intent-First Processing**: Ensured location extraction only happens after intent classification for resource-seeking intents
 
 ### Fixed
 - **"Near Me" False Positives**: Fixed issue where "me" was being incorrectly extracted as a location in some contexts
 - **Location Follow-up Detection**: Fixed issue where location mentions in "off_topic" intents weren't triggering resource searches
 - **Test Reliability**: Updated tests to reflect improved location detection behavior
+- **Critical Intent-First Violation**: Fixed critical issue where location extraction was happening before intent classification
+  - **Root Cause**: `extractLocation()` function in `speechProcessor.js` was using simple pattern matching that extracted non-location words like "Yeah" as locations
+  - **Solution**: Updated `extractLocation()` to use enhanced location detection logic that properly filters non-location words
+  - **Impact**: System now properly follows intent-first processing: Intent → Context → Follow-up → Location (only if needed)
+  - **Example**: "Yeah, I need shelter" no longer triggers geocoding of "Yeah" as a location
 
 ### Changed
 - **Performance Optimizations**: Reduced timeouts and retry counts across services for faster response times
 - **TTS Compatibility**: Removed SSML from welcome messages for OpenAI TTS compatibility and improved speed
+- **Location Extraction Logic**: Replaced simple pattern matching with enhanced location detection in `speechProcessor.js`
 
 ### Technical Improvements
 - **Enhanced Location Detection Logic**: Improved `containsCurrentLocationWord` function with better phrase matching
 - **Query Handler Enhancement**: Added logic to detect and handle location follow-ups in "off_topic" intents
 - **Test Coverage**: Updated test expectations to match improved location detection behavior
+- **Speech Processor Refactor**: Replaced old pattern matching functions with enhanced location detection
 
 ### Impact
-- **Before**: System could incorrectly extract "me" as a location and missed location follow-ups in conversations
-- **After**: System properly handles current location phrases and seamlessly processes location follow-ups
-- **User Experience**: More natural conversation flow and accurate location detection
-- **Developer Experience**: Better test coverage and more reliable location detection logic
+- **Before**: System could incorrectly extract "me" as a location, missed location follow-ups in conversations, and violated intent-first processing by extracting locations before intent classification
+- **After**: System properly handles current location phrases, seamlessly processes location follow-ups, and strictly follows intent-first processing with conditional location extraction
+- **User Experience**: More natural conversation flow, accurate location detection, and no more false location extractions
+- **Developer Experience**: Better test coverage, more reliable location detection logic, and proper processing pipeline adherence
 
 ## [v1.22.12] - 2025-07-14
 

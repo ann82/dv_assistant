@@ -4,7 +4,7 @@ import { extractLocationFromQuery } from './enhancedLocationDetector.js';
 import { SearchIntegration } from '../integrations/searchIntegration.js';
 
 /**
- * Extract location from speech input using hybrid approach
+ * Extract location from speech input using enhanced location detection
  * @param {string} speechInput - The speech input to process
  * @returns {string|null} Extracted location or null if not found
  */
@@ -13,117 +13,39 @@ export async function extractLocation(speechInput) {
     return null;
   }
 
-  // Step 1: Try fast pattern matching first (cost-effective)
-  const location = extractLocationByPattern(speechInput);
+  // Use the enhanced location detection logic that properly handles current location phrases
+  const locationInfo = extractLocationFromQuery(speechInput);
   
-  // Step 2: If pattern matching fails or is uncertain, use AI for better accuracy
-  if (!location || location.length < 2) {
-    try {
-      const aiLocation = await extractLocationWithAI(speechInput);
-      if (aiLocation) {
-        logger.info('Used AI for location extraction:', { 
-          original: speechInput, 
-          patternResult: location, 
-          aiResult: aiLocation 
-        });
-        return aiLocation;
-      }
-    } catch (error) {
-      logger.error('AI location extraction failed, using pattern result:', error);
-      // Fall back to pattern matching result
-    }
-  }
-  
-  return location;
-}
-
-/**
- * Extract location using simple pattern matching (fast and cheap)
- * @param {string} speechInput - The speech input to process
- * @returns {string|null} Extracted location or null if not found
- */
-function extractLocationByPattern(speechInput) {
-  const input = speechInput.toLowerCase();
-  
-  // Common location patterns (now includes 'for')
-  const locationPatterns = [
-    // Standard patterns
-    /(?:in|at|near|around|to|from|for)\s+([a-zA-Z\s,]+?)(?:\s+(?:area|region|county|city|town|state))?/i,
-    /(?:shelter|help|services)\s+(?:in|at|near|around|for)\s+([a-zA-Z\s,]+)/i,
-    /([a-zA-Z\s,]+?)\s+(?:area|region|county|city|town|state)/i,
-    // New: direct 'for' pattern
-    /for\s+([a-zA-Z\s,]+?)(?:[?.,!;]|$)/i,
-    // Handle speech recognition errors and informal speech
-    /(?:hold|help|find|need|want)\s+(?:me|a|the)?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-    /(?:homeless|me|a)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-    // Catch any capitalized word that might be a location (fallback)
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g
-  ];
-  
-  for (const pattern of locationPatterns) {
-    const match = speechInput.match(pattern);
-    if (match && match[1]) {
-      const location = match[1].trim();
-      // Filter out common words that aren't locations
-      const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'at', 'near', 'around', 'to', 'from', 'for', 'me', 'my', 'i', 'need', 'want', 'looking', 'for', 'help', 'shelter', 'services', 'hold', 'find', 'homeless'];
-      const words = location.split(' ').filter(word => !commonWords.includes(word.toLowerCase()));
-      if (words.length > 0) {
-        // Return with proper case (capitalize first letter of each word)
-        return words.map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-      }
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Use AI to extract location from speech input (only when needed)
- * @param {string} speechInput - The speech input to process
- * @returns {string|null} Extracted location or null if not found
- */
-async function extractLocationWithAI(speechInput) {
-  try {
-    const { ResponseGenerator } = await import('./response.js');
-    
-    const prompt = `Extract the location from this speech input. Look for city names, area names, or geographic references.
-
-Speech input: "${speechInput}"
-
-If a location is found, respond with only the location name with proper capitalization (e.g., "San Francisco", "Oakland", "Tahoe").
-If no location is found, respond with "none".
-
-Examples:
-- "I need shelter in San Francisco" → "San Francisco"
-- "homeless me a Tahoe" → "Tahoe" 
-- "help in the Oakland area" → "Oakland"
-- "I need assistance" → "none"`;
-
-    const response = await ResponseGenerator.generateGPTResponse(prompt, 'gpt-3.5-turbo', '');
-    
-    // Handle the response properly - generateGPTResponse returns an object with a text property
-    let responseText;
-    if (typeof response === 'string') {
-      responseText = response;
-    } else if (response && typeof response === 'object' && response.text) {
-      responseText = response.text;
-    } else {
-      logger.error('Unexpected response format from generateGPTResponse:', { response, type: typeof response });
-      return null;
-    }
-    
-    const location = responseText.trim();
-    
-    if (location.toLowerCase() === 'none' || location.toLowerCase() === 'no location' || location === '') {
-      return null;
-    }
-    
-    // Ensure proper capitalization
-    return location.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-  } catch (error) {
-    logger.error('Error calling GPT for location extraction:', error);
+  // If it's a current location phrase, return null (no specific location)
+  if (locationInfo.scope === 'current-location') {
+    logger.info('Detected current location phrase, returning null:', { 
+      speechInput, 
+      scope: locationInfo.scope 
+    });
     return null;
   }
+  
+  // If it's a follow-up or incomplete query, return null
+  if (locationInfo.scope === 'follow-up' || locationInfo.scope === 'incomplete') {
+    logger.info('Detected follow-up or incomplete query, returning null:', { 
+      speechInput, 
+      scope: locationInfo.scope 
+    });
+    return null;
+  }
+  
+  // Return the extracted location if found
+  if (locationInfo.location) {
+    logger.info('Extracted location using enhanced detection:', { 
+      speechInput, 
+      location: locationInfo.location,
+      scope: locationInfo.scope 
+    });
+    return locationInfo.location;
+  }
+  
+  logger.info('No location found in speech input:', { speechInput });
+  return null;
 }
 
 /**
